@@ -28,16 +28,16 @@
 
 ### P0-1. SkillIndex / Loader
 - Red  
-  - [ ] `SKILL.md` から `name/description/inputs/outputs/stages/keywords` を抽出する失敗テスト  
-  - [ ] 未対応フィールドを無視し**警告ログ**が出る失敗テスト  
-  - [ ] `resources/` と `scripts/` の相対パス収集テスト  
+  - [x] `SKILL.md` から `name/description/inputs/outputs/stages/keywords` を抽出する失敗テスト  
+  - [x] 未対応フィールドを無視し**警告ログ**が出る失敗テスト  
+  - [x] `resources/` と `scripts/` の相対パス収集テスト  
 - Green  
-  - [ ] 最小実装でテストを通す（YAML読み＋必要キー抽出）  
+  - [x] 最小実装でテストを通す（YAML読み＋必要キー抽出）  
 - Refactor  
-  - [ ] 抽出器を純粋関数化（I/O分離）  
+  - [x] 抽出器を純粋関数化（I/O分離）  
 - DoD  
-  - [ ] ユニットテスト緑（3件）  
-  - [ ] System提示用 **L1要約**（name/description/発火条件短文）を生成
+  - [x] ユニットテスト緑（3件）  
+  - [x] System提示用 **L1要約**（name/description/発火条件短文）を生成
 
 ---
 
@@ -314,4 +314,3 @@
 - 途中でブロッカーが出たら、現タスクに「保留理由」を追記し `[ ] WIP → [ ] BLOCKED` と記す。ブロッカー解消タスクを先に立てる。  
 - E2E を壊す変更は **同一PR内で直す**（赤のままのマージ禁止）。  
 - タグ付け：主要マイルストーン完了時に `v0.1.0-m1` などを付与しておくとデモ復元が容易。
-

@@ -95,6 +95,8 @@ CliApp → AgentService (Workflow Runner)
 ## 6. Skills-lite 実行エンジン
 ### 6.1 Loader / Indexer
 - `skills/` を再帰走査して SKILL.md を読み、サブセット抽出 → `SkillIndex` 構築
+- 実装（`io.github.hide212131.langchain4j.claude.skills.index` パッケージ）では `SkillIndexLoader` が `SkillFrontMatterExtractor` を用いてフロントマターを解析し、`SkillIndexEntry` を生成する
+- 未対応フィールドは `SkillIndexLogger` 経由で警告として記録し、`resources/`・`scripts/` 配下の相対パスと L1 要約（name/description/keywords 由来）を自動付与
 
 ### 6.2 Stages Executor
 - `stages[*].purpose` を提示し、必要 `resources` と `inputs` を束ねてプロンプト化  
@@ -191,7 +193,7 @@ repo-root/
 ├─ build/
 │  ├─ .context/                 # 抜粋キャッシュ・索引
 │  └─ out/                      # 成果物（deck.pptx など）
-├─ src/main/java/...            # アプリ本体
+├─ app/src/main/java/...        # アプリ本体（`io.github.hide212131.langchain4j.claude`）
 ├─ build.gradle.kts             # skills 取得タスク等（定義は別紙）
 └─ README.md
 
@@ -204,4 +206,3 @@ repo-root/
 - 入出力スキーマ宣言の強化と **自動マッピング精度** の向上  
 - Prebuilt Skills 互換層の拡張（必要範囲のみ段階的に）  
 - 評価関数の学習的改善（成功ログからスコアリングをチューニング）
-
