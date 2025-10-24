@@ -38,6 +38,7 @@
 - 出力 `deck.pptx` が **ブランド色・書体・トーン**を反映。
 - ログに **tokens(before→after)**、**抜粋投入サイズ**、**キャッシュヒット率**、**選択理由（短文）** が出力される。
 - エラー時に **不足入力の指摘 or 代替案の自動再試行**（1回）を行い、最終的に明確なメッセージで終了。
+- LangChain4j の Workflow/Agent API (`dev.langchain4j.agentic.AgenticServices` など) を利用して Plan→Act→Reflect を構築していることがテストで保証される（ArchUnit などで検証）。
 
 ## 技術要件
 - **言語/ビルド**：Java 21、**Gradle (Kotlin DSL)**
@@ -56,6 +57,7 @@
   - `runtime.workflow`（`plan` / `act` / `reflect` / `support`）、`runtime.provider`, `runtime.skill`, `runtime.blackboard`, `runtime.context`, `runtime.guard`, `runtime.human`。  
   - `infra.logging`, `infra.config`。  
   - 依存方向は `app` → `runtime` → `infra` で固定し、ArchUnit 等で検証する。
+- `build.gradle.kts` には LangChain4j の BOM (`dev.langchain4j:langchain4j-bom`) と `langchain4j-agentic` / `langchain4j-open-ai` など必要モジュールを明示的に追加し、依存解決がテストで確認される。
 - **AgenticScope 契約（spec.md 3.4 準拠）**：
   - `plan.goal`, `plan.inputs`, `plan.candidateSteps`, `plan.constraints`, `plan.evaluationCriteria` を Plan ノードが必ず書き込む。  
   - Act ノードは `act.windowState`, `act.currentStep`, `act.inputBundle`, `act.output.<skillId>`, `shared.blackboardIndex` を更新する。  
