@@ -51,6 +51,16 @@
   - **Agent 層**：Plan→Act→Reflect、**単一ツール `invokeSkill`** を仲介
   - **Runtime（Skills-lite）**：`stages` 実行、リソース解決、ブラックボード（中間成果共有）
   - **ContextCache**：抜粋・要約・トークン統計の保存
+- **モジュール構成（spec.md 2.1 準拠）**：
+  - `app.cli` → CLI エントリーポイント（PicoCLI 等）。  
+  - `runtime.workflow`（`plan` / `act` / `reflect` / `support`）、`runtime.provider`, `runtime.skill`, `runtime.blackboard`, `runtime.context`, `runtime.guard`, `runtime.human`。  
+  - `infra.logging`, `infra.config`。  
+  - 依存方向は `app` → `runtime` → `infra` で固定し、ArchUnit 等で検証する。
+- **AgenticScope 契約（spec.md 3.4 準拠）**：
+  - `plan.goal`, `plan.inputs`, `plan.candidateSteps`, `plan.constraints`, `plan.evaluationCriteria` を Plan ノードが必ず書き込む。  
+  - Act ノードは `act.windowState`, `act.currentStep`, `act.inputBundle`, `act.output.<skillId>`, `shared.blackboardIndex` を更新する。  
+  - Reflect ノードは `reflect.review`, `reflect.retryAdvice`, `reflect.finalSummary` を生成し、`shared.contextSnapshot`/`shared.guardState`/`shared.metrics` を更新する。  
+  - これらは `AgenticScopeBridge` と DTO で型安全にアクセスし、未設定キーを検出した場合は例外を送出する。
 
 ## アーキテクチャ概要
 - `CliApp` → `AgentService`（LangChain4j Workflow Runner）  

@@ -24,6 +24,19 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 
 ## 2. タスク詳細（P0：MVP 必須）
 
+### P0-0. モジュールスケルトン & AgenticScope 契約定義
+- Red  
+  - [ ] `runtime.workflow`, `runtime.provider`, `runtime.skill`, `runtime.blackboard`, `runtime.context`, `runtime.guard`, `runtime.human`, `infra.logging`, `infra.config`, `app.cli` へのクラス生成が行われていない状態を検出する失敗テスト（ArchUnit などでパッケージ存在を検証）  
+  - [ ] AgenticScope の必須キー（`plan.goal`, `act.output.<skillId>` など）が未設定のまま `AgenticScopeBridge` を呼び出すと例外となることを期待する失敗テスト  
+- Green  
+  - [ ] 各パッケージにスケルトン（`package-info.java` または空クラス）を配置し、`WorkflowFactory`, `ProviderAdapter`, `SkillIndex`, `BlackboardStore`, `ContextPackingService`, `SkillInvocationGuard`, `HumanReviewAgentFactory`, `WorkflowLogger`, `RuntimeConfig` の雛形を実装  
+  - [ ] `AgenticScopeBridge` と `PlanState` / `ActState` / `ReflectState` DTO を作成し、未設定キー検知ロジックを実装  
+- Refactor  
+  - [ ] ArchUnit ルールで層間依存（`app` → `runtime` → `infra`）を固定し、テストを緑に保つ  
+- DoD  
+  - [ ] `./gradlew test` がスケルトン・AgenticScope 契約テストを含めて緑  
+  - [ ] spec.md 2.1 / 3.4 の記載とコードのパッケージ・キーが一致することを確認
+
 ### P0-1. Workflow & CLI ブートストラップ（最小 E2E）
 - Red  
   - [ ] `skills run --goal "demo"` が LangChain4j `Workflow` を起動し、Plan → Act → Reflect の 3 ノードが呼ばれることを検証する失敗テスト（ノードは Stub）  

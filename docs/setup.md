@@ -57,4 +57,33 @@
 - P0-1 完了後は LangChain4j Workflow ノード（Plan / Act / Reflect）の充実と安全性向上を段階的に進めます。  
 - 追加の設定項目（モデル名、スロットリング、プロキシなど）が増えた場合は本書に追記してください。
 
+## 7. パッケージ雛形の作成手順
+- ソース構成は `spec.md 2.1` に従い、基底パッケージ `io.github.hide212131.langchain4j.claude.skills` の下に以下のディレクトリを作成します。  
+  ```bash
+  cd app/src/main/java/io/github/hide212131/langchain4j/claude/skills
+  mkdir -p app/cli \
+           runtime/workflow/plan \
+           runtime/workflow/act \
+           runtime/workflow/reflect \
+           runtime/workflow/support \
+           runtime/provider \
+           runtime/skill \
+           runtime/blackboard \
+           runtime/context \
+           runtime/guard \
+           runtime/human \
+           infra/logging \
+           infra/config
+  ```
+- それぞれに `package-info.java` もしくは空のスケルトンクラスを置き、ArchUnit テストでパッケージ階層を検証できる状態にします。  
+- 新規パッケージ追加時は `docs/spec.md` / `docs/tasks.md` のモジュール構成を更新し、ArchUnit ルールとの整合を保ってください。
+
+## 8. ArchUnit/JUnit セットアップ
+- 依存関係は `app/build.gradle.kts` に追加済み：  
+  ```kotlin
+  testImplementation("com.tngtech.archunit:archunit-junit5:1.2.1")
+  ```
+- ベースとなるテストクラスを `src/test/java/app/architecture/ArchitectureSmokeTest.java`（例）として配置し、ArchUnit の import と簡単なアサーションが通ることを確認します。  
+- ルールの本実装は P0-0 の Red フェーズで追加しますが、`./gradlew test` が ArchUnit を通じて失敗・成功を検出できることを事前にチェックしておきます。
+
 以上で LangChain4j + OpenAI を利用するための最低限の下準備は完了です。レビュー時はこのガイドを参照しつつ、環境変数の有無を確認してください。

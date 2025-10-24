@@ -41,6 +41,22 @@ CliApp → AgentService (Workflow Runner)
 - **自律ウィンドウ**：Act 内で、許可枠の中で **どのスキルを何回・どの順に呼ぶか** を自律決定  
 - **安全策**：回数/トークン/時間/Allowlist/スキーマ検証でガード
 
+### 2.1 実装モジュール構成（LangChain4j Agentic 適用方針）
+- `app.cli`：CLI エントリーポイント。ユーザ入力を受け取り、`runtime.AgentService` に委譲。  
+- `runtime.workflow`：LangChain4j の Workflow/Agent API を直接扱う層。`PlanWorkflow`, `ActWorkflow`, `ReflectWorkflow` を `AgenticServices.sequenceBuilder()` で合成し、Plan→Act→Reflect の固定骨格を生成する。  
+  - `runtime.workflow.plan`：`PlannerAgent`（Supervisor/Sequence のどちらを採用するかを含む）、`PlanContextBuilder`、`PlanResultMapper`。  
+  - `runtime.workflow.act`：`InvokerAgent`（Supervisor + 自律ウィンドウ設定）、`SkillInvocationGuard`、`AgenticScopeSynchronizer`。  
+  - `runtime.workflow.reflect`：`EvaluatorAgent`、`ValidationRules`, `RetryPolicyEvaluator`。  
+  - `runtime.workflow.support`：`WorkflowFactory`（チャットモデル/ツールの差し替え）、`AgenticScopePrinter` のラッパ。  
+- `runtime.provider`：`ProviderAdapter` と各実装（`OpenAiProvider`, `ClaudeProvider`）。`AgenticServices.agentBuilder(...).chatModel(provider.chatModel())` で利用。  
+- `runtime.skill`：`SkillIndex`, `SkillRepository`, `SkillContextLoader`, `SkillInputBinder`。Plan/Act/Reflect から共通利用。  
+- `runtime.blackboard`：`BlackboardStore`, `ArtifactHandle`, `AgenticScopeBridge`。AgenticScope の `readState`/`writeState` と命名規約（`<stage>.<artifact>` 形式）をここで統制。  
+- `runtime.context`：`ContextPackingService`, `ProgressiveDisclosurePolicy`。Plan/Act ノードからの投入を共通化。  
+- `runtime.guard`：トークン/時間/回数の制限、Allowlist/Denylist 判定、スキーマ検証を担う。Act/Evaluator から呼び出し。  
+- `runtime.human`：Human-in-the-loop 連携（`HumanReviewAgentFactory`）。`AgenticServices.humanInTheLoopBuilder()` を用い、Act/Reflect の再試行経路に挿入。  
+- `infra.logging`：`WorkflowLogger`, `DisclosureMetricsTracker`。LangChain4j サンプルの `CustomLogging` 由来の PRETTY ログ整形＋構造化ログ出力。  
+- `infra.config`：`RuntimeConfig`, `BudgetConfig`, `SkillRuntimeConfig` 等。CLI 起動時に読み込み、WorkflowFactory/ProviderAdapter へ注入。
+
 ---
 
 ## 3. データモデル（概念）
@@ -56,6 +72,30 @@ CliApp → AgentService (Workflow Runner)
 ### 3.3 Blackboard（中間成果）
 - 生成物レジストリ：`key -> { kind(file/json/text), path, summary, lineage }`  
 - 例：`brand_profile@1`, `deck@1` など
+
+### 3.4 AgenticScope ステート設計
+- **命名規約**：`<phase>.<artifact>`（phase = `plan`, `act`, `reflect`, `shared`）。再試行サイクルは `.<iteration>` を付与（例：`act.output@2`）。  
+- **Plan フェーズ**（PlannerAgent → Act への引き渡し）
+  - `plan.goal`：正規化済みゴールテキスト。  
+  - `plan.inputs`：ユーザ提供素材のサマリと参照パス。  
+  - `plan.candidateSteps`：`List<PlanStep>`（`skillId` / `intent` / `expectedInputKeys` / `expectedOutputKeys` / `evalFocus`）。  
+  - `plan.constraints`：`Map<String, Object>`（`tokenBudget`, `timeBudgetMs`, `maxToolCalls` など）。  
+  - `plan.evaluationCriteria`：Reflect 用メトリクス（`requiredArtifacts`, `qualityChecks`）。  
+- **Act フェーズ**（InvokerAgent / 各スキル呼び出し）
+  - `act.windowState`：残り予算（call/token/time）。  
+  - `act.currentStep`：実行中ステップの `skillId` と `stageIntent`。  
+  - `act.inputBundle`：スキルに渡した入力（SkillInputBinder が整形）。  
+  - `act.output.<skillId>`：スキル実行結果（原文＋要約＋Blackboard ハンドル）。  
+  - `shared.blackboardIndex`：Blackboard 登録済みキー一覧（`artifactHandle` と同期）。  
+- **Reflect フェーズ**（EvaluatorAgent）
+  - `reflect.review`：各成果物の検証メモ（`artifactKey`, `status`, `issues`).  
+  - `reflect.retryAdvice`：再試行が必要な場合の補足指示。  
+  - `reflect.finalSummary`：最終レポート（成功時は Deliverable 要約、失敗時は終了理由）。  
+- **補助ステート**
+  - `shared.contextSnapshot`：Progressive Disclosure の投入ログ。  
+  - `shared.guardState`：Guard 判定の結果（違反種別、残リトライ数）。  
+  - `shared.metrics`：ログ収集用のトークン/時間計測キャッシュ。  
+- AgenticScope への read/write は `AgenticScopeBridge` 経由で集約し、Plan/Act/Reflect ノードは domain オブジェクトに変換して扱う。
 
 ---
 
@@ -129,6 +169,12 @@ CliApp → AgentService (Workflow Runner)
   - エージェント構成は LangChain4j の Agentic チュートリアル/サンプルを基準とし、必要な拡張（Blackboard・ContextCache 等）はノードの内部またはカスタムフックで実装する。  
   - チュートリアル：https://docs.langchain4j.dev/tutorials/agents  
   - Claude 連携の例：https://github.com/langchain4j/langchain4j-examples/tree/main/anthropic-examples
+- **Agentic API コーディングスタイル**（`langchain4j/docs/tutorials/agents.md`, `langchain4j-examples/agentic-tutorial` を参照）  
+  - Agent インタフェースは `@Agent` に `name`/`description`/`outputName` を明示し、`@UserMessage` と必要なら `@SystemMessage` でプロンプトを固定。メソッド引数は `@V` でバインドし、1 エージェント＝1 目的（単一メソッド）とする。  
+  - 実装は `AgenticServices.agentBuilder(...).chatModel(...).outputName(...).build()` を基本形とし、スキル側の Structured Output（record/class）を優先。共通設定（モデル、ツール、非同期可否）はビルダーに対する関数で合成可能にする。  
+  - Workflow は `sequenceBuilder`（直列）、`parallelBuilder`（並列＋`executor` 管理）、`conditionalBuilder`（ガード判定）、`loopBuilder`（再帰処理）を使い分け、スーパーエージェントには `supervisorBuilder` を用いて Plan/Invoker の自律判断を行う。Composite Agent の `outputName` は AgenticScope のステート名と一致させ、Blackboard 連携用に命名規約（例：`stageName.artifactKind`）を設ける。  
+  - AgenticScope の read/write を通じてステートを共有し、Plan/Reflect ノードは Scope から構造化データを取得する。`AgenticServices.agentAction(...)` や専用クラス経由で非 LLM 処理（集計・検証）を挿入し、`humanInTheLoopBuilder` で Human-in-the-loop ステップを統合する。  
+  - ログの可視化はサンプルの `AgenticScopePrinter`/`CustomLogging` 相当の仕組みで踏襲し、Scope の変化とサブエージェント呼び出し履歴（名前・説明）を PRETTY ログ形式で残す。Reflect 段階での検証・再試行ポリシーは Supervisor/Loop パターンと一貫させる。
 
 ---
 
@@ -206,4 +252,3 @@ repo-root/
 - 入出力スキーマ宣言の強化と **自動マッピング精度** の向上  
 - Prebuilt Skills 互換層の拡張（必要範囲のみ段階的に）  
 - 評価関数の学習的改善（成功ログからスコアリングをチューニング）
-
