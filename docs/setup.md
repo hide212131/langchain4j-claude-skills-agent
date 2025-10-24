@@ -85,5 +85,14 @@
   ```
 - ベースとなるテストクラスを `src/test/java/app/architecture/ArchitectureSmokeTest.java`（例）として配置し、ArchUnit の import と簡単なアサーションが通ることを確認します。  
 - ルールの本実装は P0-0 の Red フェーズで追加しますが、`./gradlew test` が ArchUnit を通じて失敗・成功を検出できることを事前にチェックしておきます。
+- **Codex CLI（サンドボックス）での実行**：Gradle はファイルロック取得に制限がかかるため、テスト実行時は昇格付きコマンドを使用してください。  
+  ```json
+  {
+    "command": ["bash", "-lc", "./gradlew test"],
+    "workdir": "/Users/hide/Github/langchain4j-claude-skills-agent",
+    "with_escalated_permissions": true,
+    "justification": "Gradle requires unrestricted filesystem access to obtain file locks while running tests"
+  }
+  ```
 
 以上で LangChain4j + OpenAI を利用するための最低限の下準備は完了です。レビュー時はこのガイドを参照しつつ、環境変数の有無を確認してください。
