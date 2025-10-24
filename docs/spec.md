@@ -1,7 +1,8 @@
 # 仕様書（spec.md）— langchain4j-claude-skills-agent
 
 ## 0. 目的とスコープ
-- `skills/` 配下に配置した **Claude Skills 互換の SKILL.md** 群を読み取り、**LangChain4j の Agentic 骨格（Plan → Act → Reflect）**で **自動選択・段階実行**する “Skills-lite ランタイム” を提供する。
+- `skills/` 配下に配置した **Claude Skills 互換の SKILL.md** 群を読み取り、**LangChain4j の Workflow / Agent API** を土台にした **Plan → Act → Reflect** 骨格で自動選択・段階実行する “Skills-lite ランタイム” を提供する。  
+  - LangChain4j を本番経路のオーケストレーションに採用し、Plan / Act / Reflect は Workflow ノードとして実装する。補助的なユーティリティのみ独自コードで補完する。
 - **Progressive Disclosure 準拠**：メタだけ常駐 → 本文は必要時に最小抜粋 → スクリプトは実行結果のみを注入（コンテキスト最適化）。
   - 参考: 概要 https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview  
           設計思想（Engineering Blog） https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills
@@ -123,8 +124,9 @@ CliApp → AgentService (Workflow Runner)
 ---
 
 ## 8. Provider / LangChain4j 連携
-- **ProviderAdapter**：OpenAI（既定）/Claude（代替）の会話・ツール呼び出し差分を吸収  
-- **LangChain4j**：Agentic 機能（ワークフロー・メモリ）を使用  
+- **ProviderAdapter**：OpenAI（既定）/Claude（代替）の会話・ツール呼び出し差分を吸収。  
+- **LangChain4j 利用範囲**：Workflow / Agent API を活用し、Planner・Invoker・Evaluator を Workflow ノードとして構成する。`LangChain4jLlmClient` はこれらのノードから利用する既定のチャットモデル実装。  
+  - エージェント構成は LangChain4j の Agentic チュートリアル/サンプルを基準とし、必要な拡張（Blackboard・ContextCache 等）はノードの内部またはカスタムフックで実装する。  
   - チュートリアル：https://docs.langchain4j.dev/tutorials/agents  
   - Claude 連携の例：https://github.com/langchain4j/langchain4j-examples/tree/main/anthropic-examples
 

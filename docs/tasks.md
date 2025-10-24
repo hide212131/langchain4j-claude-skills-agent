@@ -1,317 +1,216 @@
 # 実装タスク集（tasks.md）— langchain4j-claude-skills-agent
 
-本書は **t_wada 風TDD（Red → Green → Refactor）** で進めるための作業台帳。  
-優先度は **P0（必須） / P1（重要） / P2（拡張）**。各タスクは **チェックボックス**で進捗管理します。
+本書は **t_wada 風TDD（Red → Green → Refactor）** で進めるための作業台帳です。  
+優先度は **P0（MVP 必須） / P1（MVP 完走後すぐ着手したい重要項目） / P2（拡張）**。  
+P0 では「API キーをセットすれば LangChain4j Workflow が `skills run ...` を最後まで流しきる」ことを最速で満たすことを最優先します。各タスクは LangChain4j の Workflow / Agent API を骨格に据え、常に **全体を通した結合** を意識した垂直スライスで進めます。
 
 ---
 
-## 0. 原則（TDDガイド）
-- [ ] 小さく歩く：最小の失敗テスト → 最短の実装 → リファクタを細かく回す  
-- [ ] 仮実装 / 三角測量 / 明白な実装を状況で使い分ける  
-- [ ] 外部I/F（CLI）と主ユースケース（brand→pptx）を“外から”固定する
+## 0. 原則（TDD ガイド）
+- [ ] まず縦を通す：最初に **疎な実装でも E2E** を成立させ、その後に精度を高める  
+- [ ] Red → Green → Refactor を小さく回し、Workflow ノードごとに契約テストを整備  
+- [ ] LangChain4j Workflow を “外側の契約” と捉え、内側の実装は差し替え可能に保つ  
+- [ ] API キー・環境変数は常に最初に確認し、実機 LLM での疎通を早期に行う
 
 ---
 
 ## 1. マイルストーン
-- [ ] **M1**：Index / Cache（P0-1〜2）  
-- [ ] **M2**：Provider / Tool 定義（P0-3〜4）  
-- [ ] **M3**：Runtime / Scripts（P0-5〜6）  
-- [ ] **M4**：Planner（P0-7）  
-- [ ] **M5**：Invoker（P0-8）  
-- [ ] **M6**：Evaluator / Logs（P0-9〜10）  
-- [ ] **M7**：CLI / E2E（P0-11）  
-- [ ] **M8**：拡張・堅牢化（P1〜P2）
+- [ ] **M0**：最小 E2E デモ（P0-1〜P0-4）  
+- [ ] **M1**：安全性と精度の強化（P0-5〜P0-8）  
+- [ ] **M2**：重要タスク拡張（P1）  
+- [ ] **M3**：機能拡張（P2）
 
 ---
 
-## 2. タスク詳細（P0：必須）
+## 2. タスク詳細（P0：MVP 必須）
 
-### P0-1. SkillIndex / Loader
+### P0-1. Workflow & CLI ブートストラップ（最小 E2E）
 - Red  
-  - [ ] `SKILL.md` から `name/description/inputs/outputs/stages/keywords` を抽出する失敗テスト  
-  - [ ] 未対応フィールドを無視し**警告ログ**が出る失敗テスト  
-  - [ ] `resources/` と `scripts/` の相対パス収集テスト  
+  - [ ] `skills run --goal "demo"` が LangChain4j `Workflow` を起動し、Plan → Act → Reflect の 3 ノードが呼ばれることを検証する失敗テスト（ノードは Stub）  
+  - [ ] `LangChain4jLlmClient` が環境変数 `OPENAI_API_KEY` 未設定で起動すると例外になる失敗テスト  
 - Green  
-  - [ ] 最小実装でテストを通す（YAML読み＋必要キー抽出）  
+  - [ ] LangChain4j Workflow Builder で Plan / Act / Reflect の空ノードを構築し、PicoCLI（等）から起動  
+  - [ ] `--dry-run` 実行で Fake LLM を使い、`OPENAI_API_KEY` が無くてもテスト可能にする  
 - Refactor  
-  - [ ] 抽出器を純粋関数化（I/O分離）  
+  - [ ] Workflow ノード間 DTO を整理し、`AgentService` に閉じ込める  
 - DoD  
-  - [ ] ユニットテスト緑（3件）  
-  - [ ] System提示用 **L1要約**（name/description/発火条件短文）を生成
+  - [ ] `skills run --goal "demo" --dry-run` が通る  
+  - [ ] README/setup.md に環境変数の設定手順を反映
 
----
-
-### P0-2. ContextCache（抜粋・要約・統計）
+### P0-2. LangChain4j LLM 接続（実 API キーで確認）
 - Red  
-  - [ ] 同一 docref の再投入で**キャッシュヒット**（tokens_in 減少）  
-  - [ ] **差分投入**のみ追加されること  
+  - [ ] `LangChain4jLlmClient.forOpenAi()` が `ChatLanguageModel.generate()` を呼び、tokens 使用量を返す失敗テスト（Fake モデル）  
+  - [ ] `skills run --goal "Working LLM"` 実行時、Assistant 応答がログに記録されることを検証する失敗テスト（Integration テストは Fake LLM で）  
 - Green  
-  - [ ] メモリ実装で通す  
+  - [ ] `skills run ...` で `LangChain4jLlmClient` を利用する実装を追加（`OPENAI_API_KEY` があれば本物を使用、`--dry-run` は Fake）  
 - Refactor  
-  - [ ] 抽出/要約の戦略差し替え化  
+  - [ ] Provider 層に tokens/time の共通メトリクス収集を実装  
 - DoD  
-  - [ ] before/after/ヒット率が構造化ログに出る  
-  - [ ] `putExcerpt/getExcerpt/recordStats` API 提供
+  - [ ] 実際に API キーを設定して 1 度応答を取得（手順をレビュー用に記録）  
+  - [ ] 構造化ログに `tokens_in/out` が出力される
 
----
-
-### P0-3. ProviderAdapter（OpenAI 既定）
+### P0-3. SkillIndex + Plan ノード（最小連携）
 - Red  
-  - [ ] メッセージ往復の契約テスト（Fake LLM）  
-  - [ ] Tool 呼び出しのブリッジ（ToolSpec 生成）  
+  - [ ] `skills/` 配下の 2 スキル（brand / pptx）を `SkillIndexLoader` が読み込み、Plan ノードへ渡す失敗テスト  
+  - [ ] Plan ノードが goal→推奨順（brand→pptx）を返す失敗テスト  
 - Green  
-  - [ ] 最小Adapter＋Fakeで通す  
+  - [ ] `SkillIndexLoader` と `DefaultPlanner` を Workflow Plan ノードとして接続し、Plan 結果をログに残す  
+  - [ ] System プロンプトへ L1 要約（name/description/発火条件）を注入  
 - Refactor  
-  - [ ] tokens/time 計測の注入ポイント整備  
+  - [ ] Plan 入力/出力 DTO を定義し、テストで固定値比較  
 - DoD  
-  - [ ] `LlmResult{messages, toolCalls, tokensIn, tokensOut}` 返却
+  - [ ] `skills run --goal "ブランド準拠で5枚スライド"` の Plan ログが確認できる  
+  - [ ] SkillIndex の未対応フィールドに警告が出る
 
----
-
-### P0-4. `invokeSkill` Tool 定義
+### P0-4. invokeSkill Tool + Runtime（最小成果物）
 - Red  
-  - [ ] LLM が `invokeSkill(skillId, inputs)` を選び、`SkillRuntime` に委譲される  
+  - [ ] Act ノードが LangChain4j Tool 呼び出し（`invokeSkill`）を経由し、`SkillRuntime` を実行する失敗テスト  
+  - [ ] Runtime が 1 Stage で `build/out/deck.pptx`（仮のテンプレートでも可）を生成し、Blackboard に登録する失敗テスト  
 - Green  
-  - [ ] ダミーRuntimeで固定応答しテスト通過  
+  - [ ] `InvokeSkillTool` を `ToolSpecification` として登録し、Act ノード内で `DefaultInvoker` + `SkillRuntime` を実働化  
+  - [ ] 簡易テンプレートと固定スライド（3 枚程度）を出力し、Goal を満たす最小成果物を作成  
 - Refactor  
-  - [ ] 例外系の失敗メッセージ整形  
+  - [ ] Blackboard API と Runtime 入出力を整理  
 - DoD  
-  - [ ] ToolSpec に説明と引数定義（L1要約由来）が載る
+  - [ ] `skills run --goal "ブランド準拠でスライド"` が LLM→brand skill→pptx skill の順で呼ばれ、`build/out/deck.pptx` を生成  
+  - [ ] Workflow ログに Skill 呼び出し結果と tokens が記録される
 
----
-
-### P0-5. SkillRuntime（Stages Executor）
+### P0-5. Evaluator（Reflect）と再試行
 - Red  
-  - [ ] 1段 stage が `Blackboard` に成果（JSON/file）登録  
-  - [ ] 2段 stage で前段文脈を**要約縮退**して再参照（L2→要約→L2’）  
+  - [ ] Reflect ノードが `deck.pptx` の存在とページ数をチェックし、NG なら Plan へ一度差し戻す失敗テスト  
 - Green  
-  - [ ] Template / JSON検証の最小実装  
+  - [ ] `DefaultEvaluator` を Workflow Reflect ノードとして組み込み、再試行ループ（1 回）を実装  
 - Refactor  
-  - [ ] I/Oユーティリティ分離  
+  - [ ] 評価結果 DTO / ログ出力を整理  
 - DoD  
-  - [ ] 実行記録に `purpose / excerpts(bytes) / tokens_in/out` 出力
+  - [ ] Reflect ログに合否・再試行有無が出る  
+  - [ ] 再試行 1 回で停止することをテストで確認
 
----
-
-### P0-6. Script サンドボックス（ローカル実行）
+### P0-6. Sandboxed Scripts（安全性の確保）
 - Red  
-  - [ ] Allowlist 外通訳器の拒否テスト（python3/node/bash のみ許可）  
-  - [ ] `timeoutMs` 超過で停止する  
-  - [ ] `build/out/` 外への書き込みを拒否  
-  - [ ] `stdout JSON (status/artifacts)` を取り込み Blackboard 登録  
+  - [ ] scripts/ の Allowlist 設定（python3/node/bash）以外を拒否する失敗テスト  
+  - [ ] `timeoutMs` 超過でプロセスを停止する失敗テスト  
+  - [ ] `build/out/` 外への書き込みを拒否する失敗テスト  
 - Green  
-  - [ ] `Process` ラッパ最小実装  
+  - [ ] `Process` ラッパを実装し、Runtime から利用  
 - Refactor  
-  - [ ] allowlist/timeout/cwd/env の設定注入  
+  - [ ] Allowlist/timeout/cwd/env 設定の注入ポイントを共通化  
 - DoD  
-  - [ ] 危険呼び出しが確実にブロックされる  
-  - [ ] **プロンプトへは出力メタのみ**注入（コード本文/冗長ログは除外）
+  - [ ] 危険なスクリプトが実際に拒否される  
+  - [ ] プロンプトには stdout JSON の要約のみ注入
 
----
-
-### P0-7. Planner（Plan）
+### P0-7. Context Cache & Progressive Disclosure（MVP 品質）
 - Red  
-  - [ ] `goal="ブランド準拠の5枚PPTX"` → **A（brand）→B（pptx）** を推奨順で返す  
-  - [ ] 失敗時の**追加入力質問**（例：ブランド素材の所在）を生成  
+  - [ ] 同一 docref 再投入時のキャッシュヒットを確認する失敗テスト  
+  - [ ] 差分投入のみ追加される失敗テスト  
 - Green  
-  - [ ] 静的スコア＋LLM要約のハイブリッド実装  
+  - [ ] `ContextCache` を Plan / Act ノードに組み込み、L1/L2/L3 管理を開始  
 - Refactor  
-  - [ ] 重み付けを設定化  
+  - [ ] 抜粋/要約戦略の差し替えポイントを抽象化  
 - DoD  
-  - [ ] Planに**成功条件**（max_slides/フォント/色）を含む
+  - [ ] Disclosure 指標（before/after/tokens/L レベル）がログに記録される  
+  - [ ] 2 回目実行で tokens 減少を確認
 
----
-
-### P0-8. Invoker（Act with autonomy window）
+### P0-8. 構造化ログ & CI
 - Red  
-  - [ ] `max_tool_calls=3` 超で**打ち切り**  
-  - [ ] **require_progress**：同一出力の繰り返し検知で停止  
-  - [ ] Blackboard 成果を**次入力へ合成**して再呼び出し  
+  - [ ] Workflow から `workflow_id/context_id/plan`、各ステップの `tokens_in/out` を JSON Lines で出力する失敗テスト  
 - Green  
-  - [ ] 最小ループ＆ガードで通す  
+  - [ ] ログ出力ユーティリティを整備し、Plan/Act/Reflect ノードから記録  
+  - [ ] GitHub Actions 等で `skills run --dry-run` を実行する CI ジョブを追加  
 - Refactor  
-  - [ ] 実績（回数/時間/トークン）集計の共通化  
+  - [ ] PII 除外ルールとログレベル設定を整理  
 - DoD  
-  - [ ] 連鎖ログ（時刻/skillId/入出要約/打切理由）出力
-
----
-
-### P0-9. Evaluator / Reflect
-- Red  
-  - [ ] `deck.pptx` の存在・ページ数・メタが閾値OKで Pass  
-  - [ ] NG なら **一度だけ** Plan に差し戻し再試行  
-- Green  
-  - [ ] 最小検証（ファイル存在＋簡易メタ）  
-- Refactor  
-  - [ ] スキーマ検証の戦略化  
-- DoD  
-  - [ ] 失敗時に**終了理由**と**次善策**を出す
-
----
-
-### P0-10. 構造化ログ / メトリクス
-- Red  
-  - [ ] `workflow_id/context_id/plan`、L1-L3 別 tokens、cache ヒット率の記録  
-  - [ ] 連鎖ごとの `tokens_in/out/excerpts(bytes)` 記録  
-- Green  
-  - [ ] JSON Lines 出力  
-- Refactor  
-  - [ ] ログレベルと PII 除外  
-- DoD  
-  - [ ] requirements/spec の必須項目を満たす
-
----
-
-### P0-11. CLI / E2E（最小デモ）
-- Red  
-  - [ ] `--goal/--in/--out/--skills-dir` を受け E2E 正常終了  
-  - [ ] `build/out/deck.pptx` 生成、ログ指標が出る  
-- Green  
-  - [ ] ピコCLI等で最小ワイヤリング  
-- Refactor  
-  - [ ] エラー分類とヘルプ整備  
-- DoD  
-  - [ ] README のコマンド例が**そのまま通る**  
-  - [ ] CI の E2E テスト緑
+  - [ ] CI の最小ジョブが緑  
+  - [ ] README にログ確認方法を追記
 
 ---
 
 ## 3. タスク詳細（P1：重要）
+
 ### P1-1. Context Packing 高度化
-- [ ] 章/見出し/コードブロック単位抽出の選択可  
-- [ ] ソフト上限（Skill ≤5k tokens）超過で自動要約  
+- [ ] 章/見出し/コードブロック単位の動的抽出  
+- [ ] Skill ごとのソフト上限（≤5k tokens）超過時に自動要約  
 - DoD  
   - [ ] 縮退・差分投入がログで確認できる
 
-### P1-2. スクリプトの簡易静的スキャン
-- [ ] 未審査 `scripts/` を実行不可に  
-- [ ] 危険API検知（NG理由付き）  
+### P1-2. スクリプト静的スキャン
+- [ ] 未審査 `scripts/` を実行不可にする  
+- [ ] 危険 API 検知（NG 理由付き）  
 - DoD  
-  - [ ] 審査レポート（OK/NG+理由）出力
+  - [ ] 審査レポート（OK/NG+理由）を出力
 
-### P1-3. 失敗系の拡充
-- [ ] 入力不足／選択不適合／timeout／Disclosure過投入の各シナリオ  
+### P1-3. 失敗シナリオ拡充
+- [ ] 入力不足／選択不適合／timeout／Disclosure 過剰投入の各シナリオ  
 - DoD  
-  - [ ] 各シナリオの次善策ガイドを整備
+  - [ ] 次善策ガイドをログと CLI メッセージに出力
 
-### P1-4. skills 取得（Gradle）とCI統合
-- [ ] `./gradlew updateSkills` をCIで実行  
-- [ ] 固定コミット取得で再現性確保  
+### P1-4. Skills 取得と CI 統合
+- [ ] `./gradlew updateSkills` を CI で実行し、固定コミットを取得  
 - DoD  
-  - [ ] `skills/` 未追跡でもクリーン環境でE2E緑
+  - [ ] `skills/` 未追跡でもクリーン環境で E2E 緑
 
 ---
 
 ## 4. タスク詳細（P2：拡張）
-### P2-1. Planner 並列化/枝刈り
-- [ ] 複数計画案 → 評価 → 最良案採用  
-- DoD  
-  - [ ] 候補比較ログ出力
 
-### P2-2. 入出力スキーマ宣言の強化
-- [ ] 自動マッピング精度向上  
+### P2-1. Planner 並列化 / 枝刈り
+- [ ] 複数計画案を並列生成 → 評価 → 最良案選択  
 - DoD  
-  - [ ] Plan の I/O 写像成功率が向上
+  - [ ] 候補比較ログを出力
 
-### P2-3. 互換層（Prebuilt Skills の追加対応）
-- [ ] docx/xlsx 等の段階的追加  
+### P2-2. 入出力スキーマ強化
+- [ ] Skill I/O とユーザ入力の自動マッピング精度向上  
 - DoD  
-  - [ ] 追加E2E 1件緑
+  - [ ] Plan の I/O 写像成功率が向上したことを評価レポートで確認
+
+### P2-3. 互換層拡張（Prebuilt Skills 対応）
+- [ ] docx / xlsx 等の追加スキル対応  
+- DoD  
+  - [ ] 追加 E2E シナリオ 1 件緑
 
 ---
 
 ## 5. テスト計画（抜粋）
 - 単体（JUnit 5）  
-  - [ ] Loader / ContextCache / ProviderAdapter / Runtime / Sandbox / Planner / Invoker / Evaluator / Logger  
+  - [ ] Workflow スケルトン / Loader / ContextCache / ProviderAdapter / Runtime / Sandbox / Planner / Invoker / Evaluator / Logger  
 - 結合  
-  - [ ] Planner→Invoker→Runtime（brand→pptx チェーン）  
-  - [ ] Sandbox→Runtime（scripts の成功/拒否/timeout）  
+  - [ ] Workflow（Plan→Act→Reflect）で brand→pptx チェーン  
+  - [ ] Sandbox→Runtime（scripts 成功 / 拒否 / timeout）  
 - E2E  
-  - [ ] CLI で `agenda.md` → `deck.pptx` 生成（正常）  
-  - [ ] 失敗：`agenda.md` 欠落 → 追加入力質問 → 失敗終了  
+  - [ ] CLI で `docs/agenda.md` → `deck.pptx` 生成（正常）  
+  - [ ] `agenda.md` 欠落 → 追加入力質問 → 最終的に失敗終了  
 - 計測  
-  - [ ] 2回目実行で tokens before→after 減少を確認
+  - [ ] 2 回目実行で tokens before→after 減少を確認
 
 ---
 
-## 6. DoD（Definition of Done）チェックリスト
+## 6. DoD（Definition of Done）
+- [ ] LangChain4j Workflow / Agent API 上で全処理が完結  
+- [ ] API キーありで `skills run ...` が E2E で成功  
 - [ ] 仕様の受け入れ基準に合致（成果物・ログ・再試行）  
 - [ ] 構造化ログが必須項目を満たす（L1-L3 / before→after / cache）  
-- [ ] スクリプト実行はサンドボックスのみ（allowlist/timeout/書込先制限）  
-- [ ] `skills/` 未追跡でも **CIのクリーン環境でE2E緑**  
-- [ ] ドキュメント更新（requirements/spec/tasks/README）
+- [ ] サンドボックス以外で scripts を実行しない（allowlist/timeout/書込先制限）  
+- [ ] クリーン環境で CI E2E 緑  
+- [ ] ドキュメント更新（requirements/spec/tasks/README/setup）
 
 ---
 
 ## 7. 作業ノート（推奨運用）
-- [ ] テストデータ `docs/agenda.md` の最小版作成（5枚／英日併記見出し）  
-- [ ] P0 では Fake/Stub を多用してスピード優先  
-- [ ] JSON Lines ログを `jq` で検査する簡易スクリプト用意  
-- [ ] まず失敗系（入力不足/timeout/過投入）から落として堅牢化
+- [ ] `docs/agenda.md` 最小デモデータ（5 枚 / 英日併記）を準備  
+- [ ] まず `--dry-run` で API なしのテスト → API キー設定後に本番 LLM を確認  
+- [ ] JSON Lines ログを `jq` で検査するスクリプトを用意  
+- [ ] ブロッカー発生時はタスクに `[ ] BLOCKED` と理由を追記し、解決タスクを先行
 
 ---
 
-## 8. 進め方のワークフロー（1タスクずつ / 緑→コミット→次へ）
+## 8. ワークフロー（進め方）
+1. **タスク選択**：P0 から順に。着手時に `[ ] WIP` を付記。  
+2. **ブランチを切る**：`git switch -c feat/<task-id>-<short-desc>`（例：`feat/P0-1-workflow-bootstrap`）。  
+3. **Red**：対象タスク（Workflow ノード単位など）の失敗テストを追加。  
+4. **Green**：テストが通る最小実装を入れ、`./gradlew test` を実行。  
+5. **Refactor**：命名・重複・責務分離を整えつつテスト緑を維持。  
+6. **チェック & ドキュメント**：該当タスクのチェックボックスを `[x]` に更新し、必要に応じて tasks/spec/requirements/setup/README を反映。  
+7. **コミット & CI**：`git add` → `git commit`（タスク ID を含める）→ PR 作成 → CI 緑を確認。  
+8. **次タスクへ**：`main` を同期し、次のタスクに着手。
 
-**原則**：一度に手を広げない。必ず **1タスクずつ完了（緑）させてから**次へ。
-
-1) **タスク選択**
-   - 最優先は **P0 → P1 → P2** の順。各グループは **上から順番**に着手。
-   - 対象タスクのチェックボックスに **[ ] WIP** とメモを残す（取り掛かり可視化）。
-
-2) **ブランチ運用**
-   - 作業用ブランチを切る：  
-     `git switch -c feat/<task-id>-<short-desc>`  
-     例：`feat/P0-1-skillindex-loader`
-   - バグ/修正は `fix/`、リファクタは `refactor/` を接頭に。
-
-3) **Red**
-   - 失敗するテストを書く（最小の1ケースから）。  
-   - **まだコミットしない**（ローカルWIPは可）。
-
-4) **Green**
-   - 最短の実装でテストを緑にする。必要なら **仮実装→三角測量→明白な実装**で段階的に。
-   - **スイート（単体→結合→E2E該当分）をローカルで全通し**。
-
-5) **Refactor**
-   - 命名・重複・分解・責務の整理。**常に緑を維持**。
-
-6) **ドキュメント反映**
-   - `tasks.md` の該当項目に **[x]** を入れる（サブ項目も更新）。  
-   - 仕様/要件へ影響があれば `spec.md` / `requirements.md` も更新。
-
-7) **コミット（緑になってから）**
-   - すべて緑になったら **コミット** → **プッシュ**。  
-   - メッセージ規約（例）：
-     - `feat(runtime): P0-5 SkillRuntime stages executor green`
-     - 本文に **完了内容・テスト範囲・関連タスクID** を記載
-   - 例：
-     ```
-     git add -A
-     git commit -m "feat(loader): P0-1 SkillIndex/Loader green
-     
-     - parse name/description/inputs/outputs/stages/keywords
-     - warn on unknown keys
-     - collect resources/ and scripts/ paths
-     - unit: 3 tests green"
-     git push -u origin feat/P0-1-skillindex-loader
-     ```
-
-8) **PR / CI**
-   - PR を作成し、CI 全ジョブが緑であることを確認。  
-   - 原則 **Squash & merge**。マージ後、ローカルを `main` に同期。
-
-9) **次のタスクへ**
-   - `main` を最新化 → 次のタスクブランチへ：  
-     ```
-     git switch main
-     git pull
-     git switch -c feat/<next-task>
-     ```
-   - `tasks.md` の **次タスクに着手マーク**（[ ] WIP）を付けて開始。
-
-**補足**  
-- 途中でブロッカーが出たら、現タスクに「保留理由」を追記し `[ ] WIP → [ ] BLOCKED` と記す。ブロッカー解消タスクを先に立てる。  
-- E2E を壊す変更は **同一PR内で直す**（赤のままのマージ禁止）。  
-- タグ付け：主要マイルストーン完了時に `v0.1.0-m1` などを付与しておくとデモ復元が容易。
-
+> 原則：**常に E2E を壊さない**。小さく進めつつ、早期に実 LLM での挙動を確認しながら設計を固める。

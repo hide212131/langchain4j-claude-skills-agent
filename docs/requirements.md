@@ -53,7 +53,7 @@
   - **ContextCache**：抜粋・要約・トークン統計の保存
 
 ## アーキテクチャ概要
-- `CliApp` → `AgentService`（LC4j Agent）  
+- `CliApp` → `AgentService`（LangChain4j Workflow Runner）  
   → `ProviderAdapter`（OpenAI 既定）  
   → `SkillRuntime`（`invokeSkill` 実体, stages 実行, Tools 呼び出し）  
   ↔ `SkillIndex`（SKILL.md/リソースのメタ）  
@@ -144,10 +144,12 @@ skills run --goal "同上" --in docs/agenda.md --out build/out/deck2.pptx
 
 ## 実装参照（LangChain4j）
 
-* LangChain4j **Agentic** チュートリアル（エージェント/ワークフロー/AgenticScope）
+* LangChain4j **Agentic** チュートリアル（Plan→Act→Reflect の公式実装パターン）
   [https://docs.langchain4j.dev/tutorials/agents](https://docs.langchain4j.dev/tutorials/agents)
-* LangChain4j **Anthropic（Claude）連携の例**（サンプルコード群）
-  [https://github.com/langchain4j/langchain4j-examples/tree/main/anthropic-examples](https://github.com/langchain4j/langchain4j-examples/tree/main/anthropic-examples)
+* LangChain4j **エージェント構築例**（Workflow/Agent API の具体例）
+  [https://github.com/langchain4j/langchain4j-examples/tree/main/agentic-tutorial](https://github.com/langchain4j/langchain4j-examples/tree/main/agentic-tutorial)
+
+> LangChain4j の Workflow / Agent API を採用し、Plan・Act・Reflect の各ステップを公式の Agentic コンポーネントとして組み立てること。独自実装はテストダブルや補助ロジックに限定し、本番経路は LangChain4j のエージェント基盤上で動作させる。
 
 ## 参考（一次情報）
 
