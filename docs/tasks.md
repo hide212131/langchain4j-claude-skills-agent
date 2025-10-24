@@ -42,16 +42,17 @@
 ---
 
 ### P0-2. ContextCache（抜粋・要約・統計）
+- [x] Codex 完了（2025-10-24）  
 - Red  
-  - [ ] 同一 docref の再投入で**キャッシュヒット**（tokens_in 減少）  
-  - [ ] **差分投入**のみ追加されること  
+  - [x] 同一 docref の再投入で**キャッシュヒット**（tokens_in 減少）  
+  - [x] **差分投入**のみ追加されること  
 - Green  
-  - [ ] メモリ実装で通す  
+  - [x] メモリ実装で通す  
 - Refactor  
-  - [ ] 抽出/要約の戦略差し替え化  
+  - [x] 抽出/要約の戦略差し替え化  
 - DoD  
-  - [ ] before/after/ヒット率が構造化ログに出る  
-  - [ ] `putExcerpt/getExcerpt/recordStats` API 提供
+  - [x] before/after/ヒット率が構造化ログに出る  
+  - [x] `putExcerpt/getExcerpt/recordStats` API 提供
 
 ---
 
