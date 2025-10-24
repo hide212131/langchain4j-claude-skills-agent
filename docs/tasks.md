@@ -57,15 +57,16 @@
 ---
 
 ### P0-3. ProviderAdapter（OpenAI 既定）
+- [ ] WIP Codex（2025-10-24）  
 - Red  
-  - [ ] メッセージ往復の契約テスト（Fake LLM）  
-  - [ ] Tool 呼び出しのブリッジ（ToolSpec 生成）  
+  - [x] メッセージ往復の契約テスト（Fake LLM）  
+  - [x] Tool 呼び出しのブリッジ（ToolSpec 生成）  
 - Green  
-  - [ ] 最小Adapter＋Fakeで通す  
+  - [x] 最小Adapter＋Fakeで通す  
 - Refactor  
   - [ ] tokens/time 計測の注入ポイント整備  
 - DoD  
-  - [ ] `LlmResult{messages, toolCalls, tokensIn, tokensOut}` 返却
+  - [x] `LlmResult{messages, toolCalls, tokensIn, tokensOut}` 返却
 
 ---
 
