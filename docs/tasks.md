@@ -26,14 +26,14 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 
 ### P0-0. モジュールスケルトン & AgenticScope 契約定義
 - Red  
-  - [ ] `runtime.workflow`, `runtime.provider`, `runtime.skill`, `runtime.blackboard`, `runtime.context`, `runtime.guard`, `runtime.human`, `infra.logging`, `infra.config`, `app.cli` へのクラス生成が行われていない状態を検出する失敗テスト（ArchUnit などでパッケージ存在を検証）  
-  - [ ] `WorkflowFactory` が LangChain4j `AgenticServices` を経由せずにカスタム Workflow を返そうとした場合に失敗するテスト（例：`dev.langchain4j.agentic.AgenticServices` への依存を ArchUnit で強制）  
+- [ ] `runtime.workflow`, `runtime.provider`, `runtime.skill`, `runtime.blackboard`, `runtime.context`, `runtime.guard`, `runtime.human`, `infra.logging`, `infra.config`, `app.cli` へのクラス生成が行われていない状態を検出する失敗テスト  
+- [ ] `WorkflowFactory` が LangChain4j `AgenticServices` を経由せずにカスタム Workflow を返そうとした場合に失敗するテスト  
   - [ ] AgenticScope の必須キー（`plan.goal`, `act.output.<skillId>` など）が未設定のまま `AgenticScopeBridge` を呼び出すと例外となることを期待する失敗テスト  
 - Green  
   - [ ] 各パッケージにスケルトン（`package-info.java` または空クラス）を配置し、`WorkflowFactory`, `ProviderAdapter`, `SkillIndex`, `BlackboardStore`, `ContextPackingService`, `SkillInvocationGuard`, `HumanReviewAgentFactory`, `WorkflowLogger`, `RuntimeConfig` の雛形を実装  
   - [ ] `AgenticScopeBridge` と `PlanState` / `ActState` / `ReflectState` DTO を作成し、未設定キー検知ロジックを実装  
 - Refactor  
-  - [ ] ArchUnit ルールで層間依存（`app` → `runtime` → `infra`）を固定し、テストを緑に保つ  
+- [ ] 静的な依存ルールで層間依存（`app` → `runtime` → `infra`）を固定し、テストを緑に保つ  
 - DoD  
   - [ ] `./gradlew test` がスケルトン・AgenticScope 契約テストを含めて緑  
   - [ ] `WorkflowFactory` が LangChain4j Workflow（`AgenticServices.sequenceBuilder()` 由来の `Workflow` インスタンス）を返していることをテストで確認  
@@ -51,7 +51,7 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 - DoD  
   - [ ] `skills run --goal "demo" --dry-run` が通る  
   - [ ] README/setup.md に環境変数の設定手順を反映  
-  - [ ] `WorkflowFactory` や CLI エントリから `dev.langchain4j.agentic.AgenticServices` など LangChain4j の Workflow/Agent API が直接呼ばれていることを確認（ArchUnit or 単体テストで検証）
+- [ ] `WorkflowFactory` や CLI エントリから `dev.langchain4j.agentic.AgenticServices` など LangChain4j の Workflow/Agent API が直接呼ばれていることを確認（単体テストで検証）
 
 ### P0-2. LangChain4j LLM 接続（実 API キーで確認）
 - Red  

@@ -170,7 +170,7 @@ CliApp → AgentService (Workflow Runner)
   - エージェント構成は LangChain4j の Agentic チュートリアル/サンプルを基準とし、必要な拡張（Blackboard・ContextCache 等）はノードの内部またはカスタムフックで実装する。  
   - チュートリアル：https://docs.langchain4j.dev/tutorials/agents  
   - Claude 連携の例：https://github.com/langchain4j/langchain4j-examples/tree/main/anthropic-examples
-  - `dev.langchain4j.agentic.AgenticServices` / `dev.langchain4j.agentic.workflow.Workflow` / `dev.langchain4j.agentic.agents.Agent` など公式 API を直接 import し、代替実装は作らない。これらの import が存在することを ArchUnit テストで検証する。  
+  - `dev.langchain4j.agentic.AgenticServices` / `dev.langchain4j.agentic.workflow.Workflow` / `dev.langchain4j.agentic.agents.Agent` など公式 API を直接 import し、代替実装は作らない。これらの import が存在することをテストで検証する。  
 - **Agentic API コーディングスタイル**（`langchain4j/docs/tutorials/agents.md`, `langchain4j-examples/agentic-tutorial` を参照）  
   - Agent インタフェースは `@Agent` に `name`/`description`/`outputName` を明示し、`@UserMessage` と必要なら `@SystemMessage` でプロンプトを固定。メソッド引数は `@V` でバインドし、1 エージェント＝1 目的（単一メソッド）とする。  
   - 実装は `AgenticServices.agentBuilder(...).chatModel(...).outputName(...).build()` を基本形とし、スキル側の Structured Output（record/class）を優先。共通設定（モデル、ツール、非同期可否）はビルダーに対する関数で合成可能にする。  

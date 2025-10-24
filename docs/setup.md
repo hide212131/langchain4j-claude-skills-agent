@@ -75,16 +75,12 @@
            infra/logging \
            infra/config
   ```
-- それぞれに `package-info.java` もしくは空のスケルトンクラスを置き、ArchUnit テストでパッケージ階層を検証できる状態にします。  
-- 新規パッケージ追加時は `docs/spec.md` / `docs/tasks.md` のモジュール構成を更新し、ArchUnit ルールとの整合を保ってください。
+- それぞれに `package-info.java` もしくは空のスケルトンクラスを置き、パッケージ階層を検証できる状態にします。  
+- 新規パッケージ追加時は `docs/spec.md` / `docs/tasks.md` のモジュール構成を更新し、依存方針との整合を保ってください。
 
-## 8. ArchUnit/JUnit セットアップ
-- 依存関係は `app/build.gradle.kts` に追加済み：  
-  ```kotlin
-  testImplementation("com.tngtech.archunit:archunit-junit5:1.2.1")
-  ```
-- ベースとなるテストクラスを `src/test/java/app/architecture/ArchitectureSmokeTest.java`（例）として配置し、ArchUnit の import と簡単なアサーションが通ることを確認します。  
-- ルールの本実装は P0-0 の Red フェーズで追加しますが、`./gradlew test` が ArchUnit を通じて失敗・成功を検出できることを事前にチェックしておきます。
+## 8. JUnit セットアップ
+- 依存関係は `app/build.gradle.kts` に追加済み（JUnit 5 / AssertJ）。  
+- `./gradlew test` を実行し、テスト環境が正常に起動することを確認します。  
 - **Codex CLI（サンドボックス）での実行**：Gradle はファイルロック取得に制限がかかるため、テスト実行時は昇格付きコマンドを使用してください。  
   ```json
   {
