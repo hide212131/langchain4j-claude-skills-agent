@@ -51,7 +51,7 @@
      --skills-dir skills \
      --out build/out/deck.pptx
    ```  
-   初回実行で tokens や Tool 呼び出しがログに記録されることを確認し、スクリーンショットやログ抜粋を共有できるようにしておきます。
+   初回実行で `Tokens in/out/total` の集計ログと Plan サマリが出力されることを確認し、スクリーンショットやログ抜粋を共有できるようにしておきます。
 
 ## 6. 今後のタスク連携
 - P0-1 完了後は LangChain4j Workflow ノード（Plan / Act / Reflect）の充実と安全性向上を段階的に進めます。  

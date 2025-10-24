@@ -26,57 +26,57 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 
 ### P0-0. モジュールスケルトン & AgenticScope 契約定義
 - Red  
-- [ ] `runtime.workflow`, `runtime.provider`, `runtime.skill`, `runtime.blackboard`, `runtime.context`, `runtime.guard`, `runtime.human`, `infra.logging`, `infra.config`, `app.cli` へのクラス生成が行われていない状態を検出する失敗テスト  
-- [ ] `WorkflowFactory` が LangChain4j `AgenticServices` を経由せずにカスタム Workflow を返そうとした場合に失敗するテスト  
-  - [ ] AgenticScope の必須キー（`plan.goal`, `act.output.<skillId>` など）が未設定のまま `AgenticScopeBridge` を呼び出すと例外となることを期待する失敗テスト  
+- [x] `runtime.workflow`, `runtime.provider`, `runtime.skill`, `runtime.blackboard`, `runtime.context`, `runtime.guard`, `runtime.human`, `infra.logging`, `infra.config`, `app.cli` へのクラス生成が行われていない状態を検出する失敗テスト  
+- [x] `WorkflowFactory` が LangChain4j `AgenticServices` を経由せずにカスタム Workflow を返そうとした場合に失敗するテスト  
+  - [x] AgenticScope の必須キー（`plan.goal`, `act.output.<skillId>` など）が未設定のまま `AgenticScopeBridge` を呼び出すと例外となることを期待する失敗テスト  
 - Green  
-  - [ ] 各パッケージにスケルトン（`package-info.java` または空クラス）を配置し、`WorkflowFactory`, `ProviderAdapter`, `SkillIndex`, `BlackboardStore`, `ContextPackingService`, `SkillInvocationGuard`, `HumanReviewAgentFactory`, `WorkflowLogger`, `RuntimeConfig` の雛形を実装  
-  - [ ] `AgenticScopeBridge` と `PlanState` / `ActState` / `ReflectState` DTO を作成し、未設定キー検知ロジックを実装  
+  - [x] 各パッケージにスケルトン（`package-info.java` または空クラス）を配置し、`WorkflowFactory`, `ProviderAdapter`, `SkillIndex`, `BlackboardStore`, `ContextPackingService`, `SkillInvocationGuard`, `HumanReviewAgentFactory`, `WorkflowLogger`, `RuntimeConfig` の雛形を実装  
+  - [x] `AgenticScopeBridge` と `PlanState` / `ActState` / `ReflectFinalSummaryState` ほか AgenticScope DTO 群を作成し、未設定キー検知ロジックを実装  
 - Refactor  
-- [ ] 静的な依存ルールで層間依存（`app` → `runtime` → `infra`）を固定し、テストを緑に保つ  
+- [x] 静的な依存ルールで層間依存（`app` → `runtime` → `infra`）を固定し、テストを緑に保つ  
 - DoD  
-  - [ ] `./gradlew test` がスケルトン・AgenticScope 契約テストを含めて緑  
-  - [ ] `WorkflowFactory` が LangChain4j Workflow（`AgenticServices.sequenceBuilder()` 由来の `Workflow` インスタンス）を返していることをテストで確認  
-  - [ ] spec.md 2.1 / 3.4 の記載とコードのパッケージ・キーが一致することを確認
+  - [x] `./gradlew test` がスケルトン・AgenticScope 契約テストを含めて緑  
+  - [x] `WorkflowFactory` が LangChain4j Workflow（`AgenticServices.sequenceBuilder()` 由来の `Workflow` インスタンス）を返していることをテストで確認  
+  - [x] spec.md 2.1 / 3.4 の記載とコードのパッケージ・キーが一致することを確認
 
 ### P0-1. Workflow & CLI ブートストラップ（最小 E2E）
 - Red  
-  - [ ] `skills run --goal "demo"` が LangChain4j `Workflow` を起動し、Plan → Act → Reflect の 3 ノードが呼ばれることを検証する失敗テスト（ノードは Stub）  
-  - [ ] `LangChain4jLlmClient` が環境変数 `OPENAI_API_KEY` 未設定で起動すると例外になる失敗テスト  
+- [x] `skills run --goal "demo"` が LangChain4j `Workflow` を起動し、Plan → Act → Reflect の 3 ノードが呼ばれることを検証する失敗テスト（ノードは Stub）  
+- [x] `LangChain4jLlmClient` が環境変数 `OPENAI_API_KEY` 未設定で起動すると例外になる失敗テスト  
 - Green  
-  - [ ] LangChain4j Workflow Builder で Plan / Act / Reflect の空ノードを構築し、PicoCLI（等）から起動  
-  - [ ] `--dry-run` 実行で Fake LLM を使い、`OPENAI_API_KEY` が無くてもテスト可能にする  
+  - [x] LangChain4j Workflow Builder で Plan / Act / Reflect の空ノードを構築し、PicoCLI（等）から起動  
+  - [x] `--dry-run` 実行で Fake LLM を使い、`OPENAI_API_KEY` が無くてもテスト可能にする  
 - Refactor  
-  - [ ] Workflow ノード間 DTO を整理し、`AgentService` に閉じ込める  
+  - [x] Workflow ノード間 DTO を整理し、`AgentService` に閉じ込める  
 - DoD  
-  - [ ] `skills run --goal "demo" --dry-run` が通る  
-  - [ ] README/setup.md に環境変数の設定手順を反映  
-- [ ] `WorkflowFactory` や CLI エントリから `dev.langchain4j.agentic.AgenticServices` など LangChain4j の Workflow/Agent API が直接呼ばれていることを確認（単体テストで検証）
+  - [x] `skills run --goal "demo" --dry-run` が通る  
+  - [x] README/setup.md に環境変数の設定手順を反映  
+- [x] `WorkflowFactory` や CLI エントリから `dev.langchain4j.agentic.AgenticServices` など LangChain4j の Workflow/Agent API が直接呼ばれていることを確認（単体テストで検証）
 
 ### P0-2. LangChain4j LLM 接続（実 API キーで確認）
 - Red  
-  - [ ] `LangChain4jLlmClient.forOpenAi()` が `ChatLanguageModel.generate()` を呼び、tokens 使用量を返す失敗テスト（Fake モデル）  
-  - [ ] `skills run --goal "Working LLM"` 実行時、Assistant 応答がログに記録されることを検証する失敗テスト（Integration テストは Fake LLM で）  
+  - [x] `LangChain4jLlmClient.forOpenAi()` が `ChatLanguageModel.generate()` を呼び、tokens 使用量を返す失敗テスト（Fake モデル）  
+  - [x] `skills run --goal "Working LLM"` 実行時、Assistant 応答がログに記録されることを検証する失敗テスト（Integration テストは Fake LLM で）  
 - Green  
-  - [ ] `skills run ...` で `LangChain4jLlmClient` を利用する実装を追加（`OPENAI_API_KEY` があれば本物を使用、`--dry-run` は Fake）  
+  - [x] `skills run ...` で `LangChain4jLlmClient` を利用する実装を追加（`OPENAI_API_KEY` があれば本物を使用、`--dry-run` は Fake）  
 - Refactor  
-  - [ ] Provider 層に tokens/time の共通メトリクス収集を実装  
+  - [x] Provider 層に tokens/time の共通メトリクス収集を実装  
 - DoD  
-  - [ ] 実際に API キーを設定して 1 度応答を取得（手順をレビュー用に記録）  
-  - [ ] 構造化ログに `tokens_in/out` が出力される
+  - [x] 実際に API キーを設定して 1 度応答を取得（手順をレビュー用に記録）  
+  - [x] 構造化ログに `tokens_in/out` が出力される
 
 ### P0-3. SkillIndex + Plan ノード（最小連携）
 - Red  
-  - [ ] `skills/` 配下の 2 スキル（brand / pptx）を `SkillIndexLoader` が読み込み、Plan ノードへ渡す失敗テスト  
-  - [ ] Plan ノードが goal→推奨順（brand→pptx）を返す失敗テスト  
+  - [x] `skills/` 配下の 2 スキル（brand / pptx）を `SkillIndexLoader` が読み込み、Plan ノードへ渡す失敗テスト  
+  - [x] Plan ノードが goal→推奨順（brand→pptx）を返す失敗テスト  
 - Green  
-  - [ ] `SkillIndexLoader` と `DefaultPlanner` を Workflow Plan ノードとして接続し、Plan 結果をログに残す  
-  - [ ] System プロンプトへ L1 要約（name/description/発火条件）を注入  
+  - [x] `SkillIndexLoader` と `DefaultPlanner` を Workflow Plan ノードとして接続し、Plan 結果をログに残す  
+  - [x] System プロンプトへ L1 要約（name/description/発火条件）を注入  
 - Refactor  
-  - [ ] Plan 入力/出力 DTO を定義し、テストで固定値比較  
+  - [x] Plan 入力/出力 DTO を定義し、テストで固定値比較  
 - DoD  
-  - [ ] `skills run --goal "ブランド準拠で5枚スライド"` の Plan ログが確認できる  
-  - [ ] SkillIndex の未対応フィールドに警告が出る
+  - [x] `skills run --goal "ブランド準拠で5枚スライド"` の Plan ログが確認できる  
+  - [x] SkillIndex の未対応フィールドに警告が出る
 
 ### P0-4. invokeSkill Tool + Runtime（最小成果物）
 - Red  
