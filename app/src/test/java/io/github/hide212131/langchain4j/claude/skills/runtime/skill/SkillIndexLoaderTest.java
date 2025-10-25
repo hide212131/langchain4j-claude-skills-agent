@@ -58,4 +58,33 @@ class SkillIndexLoaderTest {
         SkillIndex.SkillMetadata metadata = result.index().find("custom-skill").orElseThrow();
         assertThat(metadata.warnings()).contains("unsupported_field");
     }
+
+    @Test
+    void loadShouldWorkWithMinimalRequiredFields() throws Exception {
+        // Test that only name and description are required, per official spec
+        // https://support.claude.com/en/articles/12512198-how-to-create-custom-skills
+        java.nio.file.Path tempDir = java.nio.file.Files.createTempDirectory("skill-loader-minimal");
+        java.nio.file.Path skillDir = tempDir.resolve("minimal");
+        java.nio.file.Files.createDirectories(skillDir);
+        java.nio.file.Path skillFile = skillDir.resolve("SKILL.md");
+        java.nio.file.Files.writeString(
+                skillFile,
+                """
+                ---
+                name: Minimal Skill
+                description: Only required fields
+                ---
+                """);
+        skillFile.toFile().deleteOnExit();
+        skillDir.toFile().deleteOnExit();
+        tempDir.toFile().deleteOnExit();
+
+        SkillIndexLoader.LoadResult result = loader.load(tempDir);
+
+        assertThat(result.warnings()).isEmpty();
+        SkillIndex.SkillMetadata metadata = result.index().find("minimal").orElseThrow();
+        assertThat(metadata.name()).isEqualTo("Minimal Skill");
+        assertThat(metadata.description()).isEqualTo("Only required fields");
+        assertThat(metadata.keywords()).isEmpty(); // keywords is optional
+    }
 }

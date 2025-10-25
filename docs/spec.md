@@ -62,12 +62,14 @@ CliApp → AgentService (Workflow Runner)
 
 ## 3. データモデル（概念）
 ### 3.1 SKILL.md（サブセット）
-- 必須フロントマター：`name, description, version, inputs(id/type/required), outputs, keywords, stages(id/purpose/resources)`  
+- 必須フロントマター：`name, description`
+- 任意フロントマター：`version, inputs(id/type/required), outputs, keywords, stages(id/purpose/resources)`
 - `resources/`：テンプレート、例、スキーマ、**scripts/**（任意）
 - 未対応項目は**無視＋警告**（前方互換）
+- 参考: Claude Skills公式ドキュメント https://support.claude.com/en/articles/12512198-how-to-create-custom-skills
 
 ### 3.2 SkillIndex（抽出メタ）
-- `skillId`（相対パス）、`name/description/version`、`inputs/outputs` 型、`keywords`、`stages` 要約、主要 `resources`（scripts 含む）
+- `skillId`（相対パス）、`name/description`（必須）、`version`（任意）、`inputs/outputs` 型（任意）、`keywords`（任意）、`stages` 要約（任意）、主要 `resources`（scripts 含む、任意）
 - **System 提示用の要約（L1）**：`name / description / 発火条件（短文）` に圧縮
 
 ### 3.3 Blackboard（中間成果）
@@ -104,7 +106,7 @@ CliApp → AgentService (Workflow Runner)
 1) **Plan**  
    - 入力：`goal`、ユーザ入力（例：`docs/agenda.md`）、`SkillIndex`、制約（例：`max_slides`）  
    - 出力：**候補スキル列（推奨順）**、各ステップの目的・入出力写像、**評価基準**  
-   - 選定基準：goal/keywords 類似度、入力/出力整合、履歴（成功ログ）、制約充足
+   - 選定基準：goal と skill の name/description の類似度、入力/出力整合、履歴（成功ログ）、制約充足（keywords が存在する場合は補助的に利用）
 2) **Act（自律ウィンドウ）**  
    - 公開ツールは **単一**：`invokeSkill(skillId, inputs)`  
    - ガード：`max_tool_calls`、`token_budget`、`time_budget_ms`、`skill_allowlist/denylist`、`require_progress`  
