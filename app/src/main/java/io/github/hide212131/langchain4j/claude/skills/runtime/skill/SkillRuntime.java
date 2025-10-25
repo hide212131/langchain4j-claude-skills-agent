@@ -13,7 +13,7 @@ import java.util.Objects;
  * Minimal runtime responsible for executing skills discovered in {@link SkillIndex}.
  * <p>
  * The implementation is intentionally lightweight: it recognises document-generation skills
- * (those under document-skills/) and produces placeholder artefacts so that the full
+ * (those under document-skills/) and produces placeholder artifacts so that the full
  * Plan→Act→Reflect loop can be exercised during the MVP milestone. For other skills it
  * returns simple summaries derived from metadata. This approach is skill-agnostic and does
  * not depend on specific keywords metadata which is not part of the Claude Skills specification.
@@ -42,7 +42,7 @@ public final class SkillRuntime {
         if (isDocumentGenerationSkill(metadata)) {
             Path deckPath = resolveDeckPath(safeInputs);
             writeDeckPlaceholder(deckPath, metadata, safeInputs);
-            logger.info("Skill {} produced document artefact at {}", skillId, deckPath);
+            logger.info("Skill {} produced document artifact at {}", skillId, deckPath);
             return new ExecutionResult(skillId, Map.of("artifactPath", deckPath.toString()), deckPath);
         }
         String summary = metadata.description().isBlank() ? metadata.name() : metadata.description();
