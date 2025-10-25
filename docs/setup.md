@@ -28,8 +28,10 @@
 
 ## 4. skills ディレクトリ
 - `skills/` には `brand-guidelines/` と `document-skills/pptx/`（いずれも anthropics/skills 由来）を配置します。  
+- `./gradlew updateSkills` を実行すると、固定コミット（既定は `c74d647e56e6daa12029b6acb11a821348ad044b`）のアーカイブをダウンロードして `skills/` に展開します。  
+  - `-PskillsCommit=<sha>` で任意のコミットへ切り替え可能です。展開後の `.skills-version` に解決済みコミットが記録されます。  
 - 未取得の場合は一時的に手動コピーでも構いませんが、P0-1 の段階で最低限この 2 スキルが存在することを確認してください。  
-- `skills/` は `.gitignore` 済みのため、個人環境ではローカルに置き、CI では後続タスク（P1-4）で自動取得します。
+- `skills/` はリポジトリ未追跡（`.gitignore` 登録済み）のため、個人環境ではローカルに置き、CI では本タスク（P1-4）で自動取得します。
 
 ## 5. クイックチェック
 1. **ドライラン確認（API キー不要）**  

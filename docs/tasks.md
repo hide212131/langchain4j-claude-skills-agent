@@ -161,7 +161,8 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
   - [ ] 次善策ガイドをログと CLI メッセージに出力
 
 ### P1-4. Skills 取得と CI 統合
-- [ ] `./gradlew updateSkills` を CI で実行し、固定コミットを取得  
+- [x] `./gradlew updateSkills` で固定コミットのスキルを取得するタスクを実装  
+- [ ] CI から `./gradlew updateSkills` を実行し、固定コミットを取得  
 - DoD  
   - [ ] `skills/` 未追跡でもクリーン環境で E2E 緑
 

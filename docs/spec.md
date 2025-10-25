@@ -17,7 +17,7 @@
 
 ## 1. リポジトリ前提と配置
 - `skills/` は **anthropics/skills** のエクスポート置場（未追跡・`.gitignore` 登録）：https://github.com/anthropics/skills  
-- Gradle で **取得・更新タスク**（sparse checkout / 固定コミット指定）を提供し、CI でも毎回取得して再現性を確保。  
+- Gradle の `updateSkills` タスクで固定コミット（既定：`c74d647e56e6daa12029b6acb11a821348ad044b`）を展開し、`-PskillsCommit` で切り替えられるようにして再現性を確保。CI でも同タスクを実行する想定。  
 - 初期デモは `brand-guidelines/` と `document-skills/pptx/` を含むが、**実装は汎用**（特定スキルはハードコードしない）。
 - API 観点の前提（Files/コード実行/ベータ注意）：https://docs.claude.com/en/api/skills-guide
 

@@ -33,3 +33,9 @@ replay_pid*
 
 # Secrets / direnv
 .envrc
+
+# Local Codex CLI metadata
+.serena/
+
+# Local export of anthropics/skills (managed via `./gradlew updateSkills`)
+skills/
