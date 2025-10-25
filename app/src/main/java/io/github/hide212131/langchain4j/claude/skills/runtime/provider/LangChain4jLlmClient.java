@@ -24,14 +24,16 @@ public final class LangChain4jLlmClient {
 
     private final ChatModel chatModel;
     private final Clock clock;
+    private final String defaultModelName;
     private final AtomicInteger callCount = new AtomicInteger();
     private final AtomicLong cumulativeDurationMs = new AtomicLong();
     private final AtomicInteger cumulativeInputTokens = new AtomicInteger();
     private final AtomicInteger cumulativeOutputTokens = new AtomicInteger();
 
-    private LangChain4jLlmClient(ChatModel chatModel, Clock clock) {
+    private LangChain4jLlmClient(ChatModel chatModel, Clock clock, String defaultModelName) {
         this.chatModel = Objects.requireNonNull(chatModel, "chatModel");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.defaultModelName = defaultModelName;
     }
 
     public static LangChain4jLlmClient forOpenAi(EnvironmentVariables environment) {
@@ -46,22 +48,26 @@ public final class LangChain4jLlmClient {
         }
         OpenAiConfig config = new OpenAiConfig(apiKey, "gpt-5");
         ChatModel chatModel = factory.create(config);
-        return new LangChain4jLlmClient(chatModel, clock);
+        return new LangChain4jLlmClient(chatModel, clock, config.modelName);
     }
 
     public static LangChain4jLlmClient usingChatModel(ChatModel chatModel) {
-        return new LangChain4jLlmClient(chatModel, Clock.systemUTC());
+        return new LangChain4jLlmClient(chatModel, Clock.systemUTC(), null);
     }
 
     public static LangChain4jLlmClient fake() {
-        return new LangChain4jLlmClient(new FakeChatModel(), Clock.systemUTC());
+        return new LangChain4jLlmClient(new FakeChatModel(), Clock.systemUTC(), null);
     }
 
     public CompletionResult complete(String prompt) {
         Instant start = clock.instant();
         ChatRequestParameters parameters;
-        if (chatModel instanceof OpenAiChatModel openAiChatModel) {
-            parameters = openAiChatModel.defaultRequestParameters();
+        if (chatModel instanceof OpenAiChatModel) {
+            var builder = OpenAiChatRequestParameters.builder();
+            if (defaultModelName != null && !defaultModelName.isBlank()) {
+                builder.modelName(defaultModelName);
+            }
+            parameters = builder.build();
         } else {
             parameters = ChatRequestParameters.builder().build();
         }
