@@ -32,6 +32,8 @@ class SkillsCliAppTest {
                 .contains("brand-guidelines")
                 .contains("Assistant: dry-run-plan")
                 .contains("Tokens in/out/total:")
-                .contains("calls=1");
+                .contains("calls=1")
+                .contains("Skills: brand-guidelines, document-skills/pptx")
+                .contains("Artifact: ");
     }
 }

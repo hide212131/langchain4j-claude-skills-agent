@@ -23,4 +23,12 @@ public final class BlackboardStore {
     public boolean contains(String key) {
         return artifacts.containsKey(key);
     }
+
+    public void clear() {
+        artifacts.clear();
+    }
+
+    public Map<String, Object> snapshot() {
+        return Map.copyOf(artifacts);
+    }
 }

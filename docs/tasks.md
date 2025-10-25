@@ -80,16 +80,16 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 
 ### P0-4. invokeSkill Tool + Runtime（最小成果物）
 - Red  
-  - [ ] Act ノードが LangChain4j Tool 呼び出し（`invokeSkill`）を経由し、`SkillRuntime` を実行する失敗テスト  
-  - [ ] Runtime が 1 Stage で `build/out/deck.pptx`（仮のテンプレートでも可）を生成し、Blackboard に登録する失敗テスト  
+  - [x] Act ノードが LangChain4j Tool 呼び出し（`invokeSkill`）を経由し、`SkillRuntime` を実行する失敗テスト  
+  - [x] Runtime が 1 Stage で `build/out/deck.pptx`（仮のテンプレートでも可）を生成し、Blackboard に登録する失敗テスト  
 - Green  
-  - [ ] `InvokeSkillTool` を `ToolSpecification` として登録し、Act ノード内で `DefaultInvoker` + `SkillRuntime` を実働化  
-  - [ ] 簡易テンプレートと固定スライド（3 枚程度）を出力し、Goal を満たす最小成果物を作成  
+  - [x] `InvokeSkillTool` を `ToolSpecification` として登録し、Act ノード内で `DefaultInvoker` + `SkillRuntime` を実働化  
+  - [x] 簡易テンプレートと固定スライド（3 枚程度）を出力し、Goal を満たす最小成果物を作成（MVP ではテキストスタブ `deck.pptx` を生成）  
 - Refactor  
-  - [ ] Blackboard API と Runtime 入出力を整理  
+  - [x] Blackboard API と Runtime 入出力を整理  
 - DoD  
-  - [ ] `skills run --goal "ブランド準拠でスライド"` が LLM→brand skill→pptx skill の順で呼ばれ、`build/out/deck.pptx` を生成  
-  - [ ] Workflow ログに Skill 呼び出し結果と tokens が記録される
+  - [x] `skills run --goal "ブランド準拠でスライド"` が LLM→brand skill→pptx skill の順で呼ばれ、`build/out/deck.pptx` を生成  
+  - [x] Workflow ログに Skill 呼び出し結果と tokens が記録される
 
 ### P0-5. Evaluator（Reflect）と再試行
 - Red  

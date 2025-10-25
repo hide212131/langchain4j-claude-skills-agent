@@ -87,6 +87,20 @@ public final class SkillsCliApp implements Runnable {
                                 result.metrics().callCount(),
                                 result.metrics().totalDurationMs());
             }
+            if (result.actResult() != null) {
+                if (!result.actResult().invokedSkills().isEmpty()) {
+                    commandSpec
+                            .commandLine()
+                            .getOut()
+                            .println("Skills: " + String.join(", ", result.actResult().invokedSkills()));
+                }
+                if (result.actResult().hasArtifact()) {
+                    commandSpec
+                            .commandLine()
+                            .getOut()
+                            .println("Artifact: " + result.actResult().finalArtifact());
+                }
+            }
             commandSpec.commandLine().getOut().flush();
             return 0;
         }
