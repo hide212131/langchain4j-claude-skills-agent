@@ -54,4 +54,28 @@ class SkillRuntimeTest {
         assertThat(result.hasArtifact()).isFalse();
         assertThat(result.outputs()).containsEntry("summary", "Summarise brand rules");
     }
+
+    @Test
+    void executeShouldGenerateDeckForPptxSkillWithoutKeywords() throws Exception {
+        // Test that document generation works even without keywords metadata
+        // (keywords are not part of the Claude Skills specification)
+        Path tempDir = Files.createTempDirectory("skill-runtime-test-no-keywords");
+        SkillIndex index = new SkillIndex(Map.of(
+                "document-skills/pptx",
+                new SkillIndex.SkillMetadata(
+                        "document-skills/pptx",
+                        "PPTX Generator",
+                        "Build slide decks",
+                        List.of(), // No keywords
+                        List.of())));
+        SkillRuntime runtime = new SkillRuntime(index, tempDir, logger);
+
+        SkillRuntime.ExecutionResult result =
+                runtime.execute("document-skills/pptx", Map.of("goal", "demo deck"));
+
+        assertThat(result.hasArtifact()).isTrue();
+        assertThat(result.artifactPath()).isNotNull();
+        assertThat(result.artifactPath()).exists();
+        assertThat(Files.readString(result.artifactPath())).contains("demo deck");
+    }
 }

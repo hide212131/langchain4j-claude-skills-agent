@@ -38,4 +38,4 @@ replay_pid*
 .serena/
 
 # Local export of anthropics/skills (managed via `./gradlew updateSkills`)
-skills/
+/skills/

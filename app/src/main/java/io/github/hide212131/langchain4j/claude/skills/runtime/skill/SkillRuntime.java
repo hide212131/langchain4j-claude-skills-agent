@@ -12,9 +12,11 @@ import java.util.Objects;
 /**
  * Minimal runtime responsible for executing skills discovered in {@link SkillIndex}.
  * <p>
- * The implementation is intentionally lightweight: it recognises document-oriented skills (pptx) and
- * produces placeholder artefacts so that the full Plan→Act→Reflect loop can be exercised during the
- * MVP milestone. For other skills it returns simple summaries derived from metadata.
+ * The implementation is intentionally lightweight: it recognises document-generation skills
+ * (those under document-skills/) and produces placeholder artefacts so that the full
+ * Plan→Act→Reflect loop can be exercised during the MVP milestone. For other skills it
+ * returns simple summaries derived from metadata. This approach is skill-agnostic and does
+ * not depend on specific keywords metadata which is not part of the Claude Skills specification.
  */
 public final class SkillRuntime {
 
@@ -37,10 +39,10 @@ public final class SkillRuntime {
         SkillIndex.SkillMetadata metadata = skillIndex.find(skillId)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown skill: " + skillId));
         Map<String, Object> safeInputs = inputs == null ? Map.of() : Map.copyOf(inputs);
-        if (isSlideGenerationSkill(metadata)) {
+        if (isDocumentGenerationSkill(metadata)) {
             Path deckPath = resolveDeckPath(safeInputs);
             writeDeckPlaceholder(deckPath, metadata, safeInputs);
-            logger.info("Skill {} produced PPTX artefact at {}", skillId, deckPath);
+            logger.info("Skill {} produced document artefact at {}", skillId, deckPath);
             return new ExecutionResult(skillId, Map.of("artifactPath", deckPath.toString()), deckPath);
         }
         String summary = metadata.description().isBlank() ? metadata.name() : metadata.description();
@@ -48,15 +50,13 @@ public final class SkillRuntime {
         return new ExecutionResult(skillId, Map.of("summary", summary), null);
     }
 
-    private boolean isSlideGenerationSkill(SkillIndex.SkillMetadata metadata) {
-        List<String> keywords = metadata.keywords();
-        if (keywords == null || keywords.isEmpty()) {
-            return false;
-        }
-        return keywords.stream().anyMatch(keyword -> {
-            String lower = keyword.toLowerCase();
-            return lower.contains("pptx") || lower.contains("slide") || lower.contains("presentation");
-        });
+    private boolean isDocumentGenerationSkill(SkillIndex.SkillMetadata metadata) {
+        // Use skill ID structure to determine if this is a document-generation skill.
+        // Skills under "document-skills/" are considered document generators.
+        // This is more generic than checking for specific keywords and works even when
+        // skills don't have keywords metadata (which is not part of the Claude Skills spec).
+        String id = metadata.id();
+        return id.startsWith("document-skills/");
     }
 
     private Path resolveDeckPath(Map<String, Object> inputs) {
