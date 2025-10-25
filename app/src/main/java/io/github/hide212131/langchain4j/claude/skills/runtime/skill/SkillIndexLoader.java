@@ -14,9 +14,15 @@ import org.yaml.snakeyaml.Yaml;
 
 /**
  * Loads SKILL.md metadata from the skills repository.
+ * <p>
+ * According to the official Claude Skills specification
+ * (https://support.claude.com/en/articles/12512198-how-to-create-custom-skills),
+ * only 'name' and 'description' are required fields in SKILL.md frontmatter.
+ * All other fields (version, inputs, outputs, keywords, stages) are optional.
  */
 public final class SkillIndexLoader {
 
+    // Keys recognized by this loader (does not imply they are required)
     private static final Set<String> ALLOWED_KEYS = Set.of(
             "id",
             "name",

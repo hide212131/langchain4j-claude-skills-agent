@@ -62,12 +62,14 @@ CliApp → AgentService (Workflow Runner)
 
 ## 3. データモデル（概念）
 ### 3.1 SKILL.md（サブセット）
-- 必須フロントマター：`name, description, version, inputs(id/type/required), outputs, keywords, stages(id/purpose/resources)`  
+- 必須フロントマター：`name, description`
+- 任意フロントマター：`version, inputs(id/type/required), outputs, keywords, stages(id/purpose/resources)`
 - `resources/`：テンプレート、例、スキーマ、**scripts/**（任意）
 - 未対応項目は**無視＋警告**（前方互換）
+- 参考: Claude Skills公式ドキュメント https://support.claude.com/en/articles/12512198-how-to-create-custom-skills
 
 ### 3.2 SkillIndex（抽出メタ）
-- `skillId`（相対パス）、`name/description/version`、`inputs/outputs` 型、`keywords`、`stages` 要約、主要 `resources`（scripts 含む）
+- `skillId`（相対パス）、`name/description`（必須）、`version`（任意）、`inputs/outputs` 型（任意）、`keywords`（任意）、`stages` 要約（任意）、主要 `resources`（scripts 含む、任意）
 - **System 提示用の要約（L1）**：`name / description / 発火条件（短文）` に圧縮
 
 ### 3.3 Blackboard（中間成果）
@@ -104,7 +106,7 @@ CliApp → AgentService (Workflow Runner)
 1) **Plan**  
    - 入力：`goal`、ユーザ入力（例：`docs/agenda.md`）、`SkillIndex`、制約（例：`max_slides`）  
    - 出力：**候補スキル列（推奨順）**、各ステップの目的・入出力写像、**評価基準**  
-   - 選定基準：goal/keywords 類似度、入力/出力整合、履歴（成功ログ）、制約充足
+   - 選定基準：goal と skill の name/description の類似度、入力/出力整合、履歴（成功ログ）、制約充足（keywords が存在する場合は補助的に利用）
 2) **Act（自律ウィンドウ）**  
    - 公開ツールは **単一**：`invokeSkill(skillId, inputs)`  
    - ガード：`max_tool_calls`、`token_budget`、`time_budget_ms`、`skill_allowlist/denylist`、`require_progress`  
@@ -168,10 +170,10 @@ CliApp → AgentService (Workflow Runner)
 - **ProviderAdapter**：OpenAI（既定）/Claude（代替）の会話・ツール呼び出し差分を吸収。  
 - **LangChain4j 利用範囲**：Workflow / Agent API を活用し、Planner・Invoker・Evaluator を Workflow ノードとして構成する。`LangChain4jLlmClient` はこれらのノードから利用する既定のチャットモデル実装。  
   - エージェント構成は LangChain4j の Agentic チュートリアル/サンプルを基準とし、必要な拡張（Blackboard・ContextCache 等）はノードの内部またはカスタムフックで実装する。  
-  - チュートリアル：https://docs.langchain4j.dev/tutorials/agents  
-  - Claude 連携の例：https://github.com/langchain4j/langchain4j-examples/tree/main/anthropic-examples
+  - チュートリアル：https://docs.langchain4j.dev/tutorials/agents/  
+  - サンプル：https://github.com/langchain4j/langchain4j-examples/tree/main/agentic-tutorial
   - `dev.langchain4j.agentic.AgenticServices` / `dev.langchain4j.agentic.workflow.Workflow` / `dev.langchain4j.agentic.agents.Agent` など公式 API を直接 import し、代替実装は作らない。これらの import が存在することをテストで検証する。  
-- **Agentic API コーディングスタイル**（`langchain4j/docs/tutorials/agents.md`, `langchain4j-examples/agentic-tutorial` を参照）  
+- **Agentic API コーディングスタイル**  
   - Agent インタフェースは `@Agent` に `name`/`description`/`outputName` を明示し、`@UserMessage` と必要なら `@SystemMessage` でプロンプトを固定。メソッド引数は `@V` でバインドし、1 エージェント＝1 目的（単一メソッド）とする。  
   - 実装は `AgenticServices.agentBuilder(...).chatModel(...).outputName(...).build()` を基本形とし、スキル側の Structured Output（record/class）を優先。共通設定（モデル、ツール、非同期可否）はビルダーに対する関数で合成可能にする。  
   - Workflow は `sequenceBuilder`（直列）、`parallelBuilder`（並列＋`executor` 管理）、`conditionalBuilder`（ガード判定）、`loopBuilder`（再帰処理）を使い分け、スーパーエージェントには `supervisorBuilder` を用いて Plan/Invoker の自律判断を行う。Composite Agent の `outputName` は AgenticScope のステート名と一致させ、Blackboard 連携用に命名規約（例：`stageName.artifactKind`）を設ける。  

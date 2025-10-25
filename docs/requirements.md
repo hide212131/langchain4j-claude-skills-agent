@@ -15,7 +15,7 @@
 - 流れ：ユーザーは「ゴール（例：ブランド準拠の5枚スライド作成）」だけを指示 → Agent が **A→B** を自動選択して実行。
 
 ## スコープ（MVP）
-- **Skills ディスカバリ**：`skills/` を再帰スキャンし、各 `SKILL.md` の YAML フロントマター（`name, description, inputs, outputs, stages, keywords`）と主要 `resources/` をインデックス化。
+- **Skills ディスカバリ**：`skills/` を再帰スキャンし、各 `SKILL.md` の YAML フロントマター（必須: `name, description`、任意: `version, inputs, outputs, stages, keywords`）と主要 `resources/` をインデックス化。参考: https://support.claude.com/en/articles/12512198-how-to-create-custom-skills
 - **自動選択**：Agent へ「利用可能スキルの要約リスト」を提示。**ツールは1つ**（`invokeSkill(skillId, inputs)`）。LLM が skillId と inputs を決める。
 - **Skills-lite 実行**：
   - `stages` を順次実行し、必要な `resources/*` のみロード。
