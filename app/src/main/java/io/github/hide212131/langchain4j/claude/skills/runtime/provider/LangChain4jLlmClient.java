@@ -4,8 +4,10 @@ import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.ChatRequestParameters;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.openai.OpenAiChatModel;
+import dev.langchain4j.model.openai.OpenAiChatRequestParameters;
 import dev.langchain4j.model.output.TokenUsage;
 import java.time.Clock;
 import java.time.Duration;
@@ -42,7 +44,7 @@ public final class LangChain4jLlmClient {
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException("OPENAI_API_KEY must be set");
         }
-        OpenAiConfig config = new OpenAiConfig(apiKey, "gpt-4o-mini");
+        OpenAiConfig config = new OpenAiConfig(apiKey, "gpt-5");
         ChatModel chatModel = factory.create(config);
         return new LangChain4jLlmClient(chatModel, clock);
     }
@@ -57,8 +59,15 @@ public final class LangChain4jLlmClient {
 
     public CompletionResult complete(String prompt) {
         Instant start = clock.instant();
+        ChatRequestParameters parameters;
+        if (chatModel instanceof OpenAiChatModel openAiChatModel) {
+            parameters = openAiChatModel.defaultRequestParameters();
+        } else {
+            parameters = ChatRequestParameters.builder().build();
+        }
         ChatRequest request = ChatRequest.builder()
                 .messages(List.of(UserMessage.from(prompt)))
+                .parameters(parameters)
                 .build();
         ChatResponse response = chatModel.doChat(request);
         long durationMs = Duration.between(start, clock.instant()).toMillis();

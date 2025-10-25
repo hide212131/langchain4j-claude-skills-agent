@@ -23,7 +23,7 @@
 - テストでは既存の `FakeLlmClient` を継続して使用し、外部 API に依存しません。
 
 ## 3. モデルとガードレール
-- 既定モデル：`gpt-4o-mini`（`LangChain4jLlmClient.forOpenAi` のデフォルト）。必要に応じて CLI や設定ファイルで上書きできるよう後続タスクで調整します。  
+- 既定モデル：`gpt-5`（`LangChain4jLlmClient.forOpenAi` のデフォルト）。必要に応じて CLI や設定ファイルで上書きできるよう後続タスクで調整します。  
 - トークン/時間/ツール呼び出しの上限値は環境変数または設定ファイルに外出し予定。暫定値はコード側に埋め込み中。
 
 ## 4. skills ディレクトリ
@@ -43,13 +43,14 @@
    ```  
    成功すれば Workflow/CLI 配線は完了です（Fake LLM が使用され、成果物はダミーの場合があります）。
 2. **実 LLM 疎通（API キー必須）**  
-   ```bash
-   export OPENAI_API_KEY=...   # まだならセット
-   skills run \
-     --goal "ブランド準拠で5枚のスライドを作る" \
-     --in docs/agenda.md \
-     --skills-dir skills \
-     --out build/out/deck.pptx
+  ```bash
+  # direnv を使う場合は `source .envrc` または `direnv allow` で読み込む
+  export OPENAI_API_KEY=...   # まだならセット（手動設定の場合）
+  skills run \
+    --goal "ブランド準拠で5枚のスライドを作る" \
+    --in docs/agenda.md \
+    --skills-dir skills \
+    --out build/out/deck.pptx
    ```  
    初回実行で `Tokens in/out/total` の集計ログと Plan サマリが出力されることを確認し、スクリーンショットやログ抜粋を共有できるようにしておきます。
 

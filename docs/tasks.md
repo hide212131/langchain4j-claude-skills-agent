@@ -62,7 +62,7 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 - Refactor  
   - [x] Provider 層に tokens/time の共通メトリクス収集を実装  
 - DoD  
-  - [x] 実際に API キーを設定して 1 度応答を取得（手順をレビュー用に記録）  
+  - [x] 実際に API キーを設定し `gpt-5` モデルで 1 度応答を取得（direnv 経由の `OPENAI_API_KEY`、`skills run --goal "ブランド準拠でスライド"` 実行ログを記録）  
   - [x] 構造化ログに `tokens_in/out` が出力される
 
 ### P0-3. SkillIndex + Plan ノード（最小連携）
