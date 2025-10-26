@@ -2,7 +2,7 @@
 
 本書は **t_wada 風TDD（Red → Green → Refactor）** で進めるための作業台帳です。  
 優先度は **P0（MVP 必須） / P1（MVP 完走後すぐ着手したい重要項目） / P2（拡張）**。  
-P0 では「API キーをセットすれば LangChain4j Workflow が `skills run ...` を最後まで流しきる」ことを最速で満たすことを最優先します。各タスクは LangChain4j の Workflow / Agent API を骨格に据え、常に **全体を通した結合** を意識した垂直スライスで進めます。  
+P0 では「API キーをセットすれば LangChain4j Workflow が `./sk run ...` を最後まで流しきる」ことを最速で満たすことを最優先します。各タスクは LangChain4j の Workflow / Agent API を骨格に据え、常に **全体を通した結合** を意識した垂直スライスで進めます。  
 **注**：Act（Pure）詳細は別紙 **`spec_skillruntime.md`** を唯一のソース・オブ・トゥルースとします。
 
 ---
@@ -43,7 +43,7 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 
 ### P0-1. Workflow & CLI ブートストラップ（最小 E2E）
 - Red  
-- [x] `skills run --goal "demo"` が LangChain4j `Workflow` を起動し、Plan → Act → Reflect の 3 ノードが呼ばれることを検証する失敗テスト（ノードは Stub）  
+- [x] `./sk run --goal "demo"` が LangChain4j `Workflow` を起動し、Plan → Act → Reflect の 3 ノードが呼ばれることを検証する失敗テスト（ノードは Stub）  
 - [x] `LangChain4jLlmClient` が環境変数 `OPENAI_API_KEY` 未設定で起動すると例外になる失敗テスト  
 - Green  
   - [x] LangChain4j Workflow Builder で Plan / Act / Reflect の空ノードを構築し、PicoCLI（等）から起動  
@@ -51,20 +51,20 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 - Refactor  
   - [x] Workflow ノード間 DTO を整理し、`AgentService` に閉じ込める  
 - DoD  
-  - [x] `skills run --goal "demo" --dry-run` が通る  
+  - [x] `./sk run --goal "demo" --dry-run` が通る  
   - [x] README/setup.md に環境変数の設定手順を反映  
 - [x] `WorkflowFactory` や CLI エントリから `dev.langchain4j.agentic.AgenticServices` など LangChain4j の Workflow/Agent API が直接呼ばれていることを確認（単体テストで検証）
 
 ### P0-2. LangChain4j LLM 接続（実 API キーで確認）
 - Red  
   - [x] `LangChain4jLlmClient.forOpenAi()` が `ChatLanguageModel.generate()` を呼び、tokens 使用量を返す失敗テスト（Fake モデル）  
-  - [x] `skills run --goal "Working LLM"` 実行時、Assistant 応答がログに記録されることを検証する失敗テスト（Integration テストは Fake LLM で）  
+  - [x] `./sk run --goal "Working LLM"` 実行時、Assistant 応答がログに記録されることを検証する失敗テスト（Integration テストは Fake LLM で）  
 - Green  
-  - [x] `skills run ...` で `LangChain4jLlmClient` を利用する実装を追加（`OPENAI_API_KEY` があれば本物を使用、`--dry-run` は Fake）  
+  - [x] `./sk run ...` で `LangChain4jLlmClient` を利用する実装を追加（`OPENAI_API_KEY` があれば本物を使用、`--dry-run` は Fake）  
 - Refactor  
   - [x] Provider 層に tokens/time の共通メトリクス収集を実装  
 - DoD  
-  - [x] 実際に API キーを設定し `gpt-5` モデルで 1 度応答を取得（direnv 経由の `OPENAI_API_KEY`、`skills run --goal "ブランド準拠でスライド"` 実行ログを記録）  
+  - [x] 実際に API キーを設定し `gpt-5` モデルで 1 度応答を取得（direnv 経由の `OPENAI_API_KEY`、`./sk run --goal "ブランド準拠でスライド"` 実行ログを記録）  
   - [x] 構造化ログに `tokens_in/out` が出力される
 
 ### P0-3. SkillIndex + Plan ノード（最小連携）
@@ -80,7 +80,7 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
   - [x] Plan 入出力 DTO を定義し、テストで固定値比較  
   - [x] DefaultPlanner を goal/metadata ベースの汎用ロジックへ更新し、特定スキル依存を排除（現状 `brand`/`pptx` 優先が残存）  
 - DoD  
-  - [x] `skills run --goal "ブランド準拠で5枚スライド"` の Plan ログが確認できる  
+  - [x] `./sk run --goal "ブランド準拠で5枚スライド"` の Plan ログが確認できる  
   - [x] 参照先が任意ディレクトリでも Plan→Act で解決できる（固定名に依存しない）
 
 ### P0-4. invokeSkill Tool + SkillRuntime（最小成果物 / Pure Act）
@@ -95,7 +95,7 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 - Refactor  
   - [x] Blackboard API と Runtime 入出力を整理  
 - DoD  
-  - [x] `skills run --goal "ブランド準拠でスライド"` が LLM→brand skill→pptx skill の順で呼ばれ、`build/out/deck.pptx` を生成  
+  - [x] `./sk run --goal "ブランド準拠でスライド"` が LLM→brand skill→pptx skill の順で呼ばれ、`build/out/deck.pptx` を生成  
   - [ ] **SKILL.mdのみ**でも expectedOutputs 検証を通過して終了（再現用の最小テストケースを作成）  
   - [ ] Act のログに L1/L2/L3 の投入ログが残る（Disclosure ログフォーマットを確定）  
 
@@ -141,7 +141,7 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
   - [ ] Workflow から `workflow_id/context_id/plan`、各ステップの `tokens_in/out` を JSON Lines で出力する失敗テスト  
 - Green  
   - [ ] ログ出力ユーティリティを整備し、Plan/Act/Reflect ノードから記録  
-  - [ ] GitHub Actions 等で `skills run --dry-run` を実行する CI ジョブを追加  
+  - [ ] GitHub Actions 等で `./sk run --dry-run` を実行する CI ジョブを追加  
 - Refactor  
   - [ ] PII 除外ルールとログレベル設定を整理  
 - DoD  
@@ -221,7 +221,7 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 
 ## 6. DoD（Definition of Done）
 - [ ] LangChain4j Workflow / Agent API 上で全処理が完結  
-- [ ] API キーありで `skills run ...` が E2E で成功  
+- [ ] API キーありで `./sk run ...` が E2E で成功  
 - [ ] 仕様の受け入れ基準に合致（成果物・ログ・再試行）  
 - [ ] 構造化ログが必須項目を満たす（L1-L3 / before→after / cache）  
 - [ ] サンドボックス以外で scripts を実行しない（allowlist/timeout/書込先制限）  

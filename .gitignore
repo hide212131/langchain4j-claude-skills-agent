@@ -40,3 +40,6 @@ replay_pid*
 
 # Local export of anthropics/skills (managed via `./gradlew updateSkills`)
 /skills/
+
+# Local runtime environments
+/env/

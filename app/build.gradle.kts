@@ -50,3 +50,7 @@ application {
     mainClass.set("io.github.hide212131.langchain4j.claude.skills.app.cli.SkillsCliApp")
     applicationName = "skills"
 }
+
+tasks.named("run") {
+    dependsOn(rootProject.tasks.named("setupSkillRuntimes"))
+}

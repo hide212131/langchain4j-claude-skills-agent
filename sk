@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+GRADLEW="$ROOT_DIR/gradlew"
+ENVRC="$ROOT_DIR/.envrc"
+ENV_FILE="$ROOT_DIR/.env"
+
+if ! [ -x "$GRADLEW" ]; then
+  echo "Unable to locate gradlew script at $GRADLEW" >&2
+  exit 1
+fi
+
+dotenv_if_exists() {
+  local dotenv_path="$1"
+  if [ -f "$dotenv_path" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$dotenv_path"
+    set +a
+  fi
+}
+
+if [ -f "$ENVRC" ]; then
+  # shellcheck disable=SC1090
+  source "$ENVRC"
+fi
+
+dotenv_if_exists "$ENV_FILE"
+
+if [ "$#" -eq 0 ]; then
+  echo "Usage: ./sk <args>
+Example: ./sk run --goal 'ブランドチェックの動作検証' --skills-dir skills --dry-run" >&2
+  exit 1
+fi
+
+quote_args() {
+  local out=""
+  local first=true
+  local arg
+  for arg in "$@"; do
+    if [[ "$arg" == *[[:space:]]* ]]; then
+      arg="\"${arg//"/\\"}\""
+    fi
+    if [ "$first" = true ]; then
+      first=false
+      out="$arg"
+    else
+      out+=" $arg"
+    fi
+  done
+  printf '%s' "$out"
+}
+
+ARGS="$(quote_args "$@")"
+
+exec "$GRADLEW" :app:run --args="$ARGS"
