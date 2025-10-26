@@ -1,6 +1,7 @@
 package io.github.hide212131.langchain4j.claude.skills.runtime.workflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.ActState;
@@ -12,12 +13,14 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.guard.SkillInvocat
 import io.github.hide212131.langchain4j.claude.skills.runtime.provider.LangChain4jLlmClient;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillIndex;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillIndex.SkillMetadata;
+import io.github.hide212131.langchain4j.claude.skills.runtime.skill.ScriptedSkillRuntimeChatModel;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillRuntime;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.act.DefaultInvoker;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.act.InvokeSkillTool;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect.DefaultEvaluator;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect.ReflectEvaluator;
-import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.DefaultPlanner;
+import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.AgenticPlanner;
+import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.PlanModels;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.support.WorkflowFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -49,29 +52,35 @@ class AgentServiceTest {
                         skillsRoot.resolve("document-skills/pptx"))));
         WorkflowLogger logger = new WorkflowLogger();
         BlackboardStore blackboardStore = new BlackboardStore();
-        SkillRuntime runtime = new SkillRuntime(index, tempDir, logger);
+        ScriptedSkillRuntimeChatModel orchestrator = new ScriptedSkillRuntimeChatModel();
+        SkillRuntime runtime = new SkillRuntime(index, tempDir, logger, orchestrator);
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
         DefaultInvoker invoker =
                 new DefaultInvoker(tool, new SkillInvocationGuard(), blackboardStore, logger);
+        LangChain4jLlmClient llmClient = LangChain4jLlmClient.fake();
+        AgenticPlanner planner = new AgenticPlanner(index, llmClient, logger);
         AgentService service = new AgentService(
                 new WorkflowFactory(),
-                LangChain4jLlmClient.fake(),
+                llmClient,
                 index,
                 logger,
                 invoker,
                 blackboardStore,
-                new DefaultEvaluator(blackboardStore, logger));
+                new DefaultEvaluator(blackboardStore, logger),
+                planner);
         AgentService.ExecutionResult result =
-                service.run(new AgentService.AgentRunRequest("demo", true));
+                service.run(new AgentService.AgentRunRequest("demo", true, List.of()));
 
-        assertThat(result.visitedStages()).containsExactly("plan", "act", "reflect");
+        assertThat(result.visitedStages())
+                .extracting(AgentService.StageVisit::attempt, AgentService.StageVisit::stage)
+                .containsExactly(tuple(1, "plan"), tuple(1, "act"), tuple(1, "reflect"));
         assertThat(result.plan().orderedSkillIds())
                 .containsExactly("brand-guidelines", "document-skills/pptx");
         assertThat(result.plan().systemPromptSummary()).contains("brand-guidelines");
         assertThat(result.plan().steps().get(0).skillRoot())
                 .isEqualTo(skillsRoot.resolve("brand-guidelines").toAbsolutePath().normalize());
         assertThat(result.planResult().content()).isEqualTo("dry-run-plan");
-        assertThat(result.metrics().callCount()).isEqualTo(1);
+        assertThat(result.metrics().callCount()).isEqualTo(2);
         assertThat(result.actResult()).isNotNull();
         assertThat(result.actResult().invokedSkills())
                 .containsExactly("brand-guidelines", "document-skills/pptx");
@@ -109,26 +118,37 @@ class AgentServiceTest {
                         skillsRoot.resolve("document-skills/pptx"))));
         WorkflowLogger logger = new WorkflowLogger();
         BlackboardStore blackboardStore = new BlackboardStore();
-        SkillRuntime runtime = new SkillRuntime(index, tempDir, logger);
+        ScriptedSkillRuntimeChatModel orchestrator = new ScriptedSkillRuntimeChatModel();
+        SkillRuntime runtime = new SkillRuntime(index, tempDir, logger, orchestrator);
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
         DefaultInvoker invoker =
                 new DefaultInvoker(tool, new SkillInvocationGuard(), blackboardStore, logger);
         RetryingEvaluator evaluator = new RetryingEvaluator();
+        LangChain4jLlmClient llmClient = LangChain4jLlmClient.fake();
+        AgenticPlanner planner = new AgenticPlanner(index, llmClient, logger);
         AgentService service = new AgentService(
                 new WorkflowFactory(),
-                LangChain4jLlmClient.fake(),
+                llmClient,
                 index,
                 logger,
                 invoker,
                 blackboardStore,
-                evaluator);
+                evaluator,
+                planner);
 
         AgentService.ExecutionResult result =
-                service.run(new AgentService.AgentRunRequest("demo", true));
+                service.run(new AgentService.AgentRunRequest("demo", true, List.of()));
 
         assertThat(result.visitedStages())
-                .containsExactly("plan", "act", "reflect", "plan", "act", "reflect");
-        assertThat(result.metrics().callCount()).isEqualTo(2);
+                .extracting(AgentService.StageVisit::attempt, AgentService.StageVisit::stage)
+                .containsExactly(
+                        tuple(1, "plan"),
+                        tuple(1, "act"),
+                        tuple(1, "reflect"),
+                        tuple(2, "plan"),
+                        tuple(2, "act"),
+                        tuple(2, "reflect"));
+        assertThat(result.metrics().callCount()).isEqualTo(4);
         assertThat(result.evaluation().success()).isTrue();
         assertThat(result.evaluation().needsRetry()).isFalse();
         assertThat(evaluator.invocationCount()).isEqualTo(2);
@@ -144,7 +164,7 @@ class AgentServiceTest {
         @Override
         public EvaluationResult evaluate(
                 dev.langchain4j.agentic.scope.AgenticScope scope,
-                DefaultPlanner.PlanResult plan,
+                PlanModels.PlanResult plan,
                 DefaultInvoker.ActResult actResult,
                 int attempt,
                 int maxAttempts) {

@@ -1,0 +1,34 @@
+[
+  {
+    "name" : "io.github.hide212131.langchain4j.claude.skills.app.cli.SkillsCliApp",
+    "allDeclaredConstructors" : true,
+    "allPublicConstructors" : true,
+    "allDeclaredMethods" : true,
+    "allPublicMethods" : true
+  },
+  {
+    "name" : "io.github.hide212131.langchain4j.claude.skills.app.cli.SkillsCliApp$RunCommand",
+    "allDeclaredConstructors" : true,
+    "allPublicConstructors" : true,
+    "allDeclaredMethods" : true,
+    "allPublicMethods" : true,
+    "fields" : [
+      { "name" : "commandSpec" },
+      { "name" : "debugSkillIds" },
+      { "name" : "dryRun" },
+      { "name" : "goal" },
+      { "name" : "skillsDir" }
+    ]
+  },
+  {
+    "name" : "picocli.CommandLine$AutoHelpMixin",
+    "allDeclaredConstructors" : true,
+    "allPublicConstructors" : true,
+    "allDeclaredMethods" : true,
+    "allPublicMethods" : true,
+    "fields" : [
+      { "name" : "helpRequested" },
+      { "name" : "versionRequested" }
+    ]
+  }
+]

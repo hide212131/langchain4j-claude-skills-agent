@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.langchain4j.agent.tool.ToolSpecification;
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
+import io.github.hide212131.langchain4j.claude.skills.runtime.skill.ScriptedSkillRuntimeChatModel;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillIndex;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillRuntime;
 import java.nio.file.Files;
@@ -15,10 +16,15 @@ import org.junit.jupiter.api.Test;
 class InvokeSkillToolTest {
 
     private final WorkflowLogger logger = new WorkflowLogger();
+        private final ScriptedSkillRuntimeChatModel orchestrator = new ScriptedSkillRuntimeChatModel();
 
     @Test
     void specificationShouldExposeSkillIdAndInputsSchema() throws Exception {
-        InvokeSkillTool tool = new InvokeSkillTool(new SkillRuntime(new SkillIndex(), Files.createTempDirectory("invoke-tool"), logger));
+        InvokeSkillTool tool = new InvokeSkillTool(new SkillRuntime(
+                new SkillIndex(),
+                Files.createTempDirectory("invoke-tool"),
+                logger,
+                orchestrator));
 
         ToolSpecification specification = tool.specification();
 
@@ -39,7 +45,7 @@ class InvokeSkillToolTest {
                         List.of("pptx"),
                         List.of(),
                         skillsRoot.resolve("document-skills/pptx"))));
-        SkillRuntime runtime = new SkillRuntime(index, tempDir, logger);
+        SkillRuntime runtime = new SkillRuntime(index, tempDir, logger, orchestrator);
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
 
         SkillRuntime.ExecutionResult result =

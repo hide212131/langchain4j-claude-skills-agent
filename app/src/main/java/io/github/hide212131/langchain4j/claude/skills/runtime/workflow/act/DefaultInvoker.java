@@ -12,7 +12,7 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.SharedB
 import io.github.hide212131.langchain4j.claude.skills.runtime.guard.SkillInvocationGuard;
 import io.github.hide212131.langchain4j.claude.skills.runtime.guard.SkillInvocationGuard.BudgetSnapshot;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillRuntime;
-import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.DefaultPlanner;
+import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.PlanModels;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -41,10 +41,10 @@ public final class DefaultInvoker {
         this.logger = Objects.requireNonNull(logger, "logger");
     }
 
-    public ActResult invoke(AgenticScope scope, DefaultPlanner.PlanResult plan) {
+    public ActResult invoke(AgenticScope scope, PlanModels.PlanResult plan) {
         Objects.requireNonNull(scope, "scope");
         Objects.requireNonNull(plan, "plan");
-        List<DefaultPlanner.PlanStep> steps = plan.steps();
+        List<PlanModels.PlanStep> steps = plan.steps();
         List<String> invokedSkills = new ArrayList<>(steps.size());
         Map<String, Object> outputs = new LinkedHashMap<>();
         Path lastArtifact = null;
@@ -56,7 +56,7 @@ public final class DefaultInvoker {
                         "plannedSkillIds", plan.orderedSkillIds(),
                         "remainingToolCalls", steps.size()));
 
-        for (DefaultPlanner.PlanStep step : steps) {
+        for (PlanModels.PlanStep step : steps) {
             guard.ensureAllowed(step.skillId());
             guard.checkBudgets(new BudgetSnapshot(steps.size() - invokedSkills.size(), Integer.MAX_VALUE));
 

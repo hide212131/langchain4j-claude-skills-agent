@@ -20,6 +20,8 @@ dependencies {
     implementation("dev.langchain4j:langchain4j-core")
     implementation("info.picocli:picocli:4.7.6")
     implementation("org.yaml:snakeyaml:2.2")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.17.1")
+    runtimeOnly("org.slf4j:slf4j-simple:2.0.13")
 
     annotationProcessor("info.picocli:picocli-codegen:4.7.6")
     compileOnly("info.picocli:picocli-codegen:4.7.6")

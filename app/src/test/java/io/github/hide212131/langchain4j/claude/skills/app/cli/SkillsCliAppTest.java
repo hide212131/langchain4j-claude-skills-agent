@@ -23,17 +23,17 @@ class SkillsCliAppTest {
                 "--skills-dir",
                 "src/test/resources/test-skills");
 
-        assertThat(exitCode).isZero();
-        assertThat(out.toString())
-                .contains("Stage: plan")
-                .contains("Stage: act")
-                .contains("Stage: reflect")
-                .contains("Plan:")
-                .contains("brand-guidelines")
-                .contains("Assistant: dry-run-plan")
-                .contains("Tokens in/out/total:")
-                .contains("calls=1")
-                .contains("Skills: brand-guidelines, document-skills/pptx")
-                .contains("Artifact: ");
+    assertThat(exitCode).isZero();
+    String output = out.toString();
+
+    assertThat(output)
+        .contains("Attempt 1: plan -> act -> reflect")
+        .contains("Plan skills: brand-guidelines -> document-skills/pptx -> with-reference")
+        .contains("Assistant draft: dry-run-plan")
+    .contains("Tokens in/out/total: 0/0/0 (calls=2")
+        .contains("Invoked skills: brand-guidelines, document-skills/pptx, with-reference")
+                .contains("Act outputs:")
+                .contains("with-reference: ")
+        .contains("Reflect summary: Complete");
     }
 }

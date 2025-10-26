@@ -31,7 +31,8 @@ public final class SkillIndexLoader {
             "inputs",
             "outputs",
             "keywords",
-            "stages");
+            "stages",
+            "license");
 
     private final Yaml yaml = new Yaml();
 
@@ -96,7 +97,6 @@ public final class SkillIndexLoader {
                 return new SkillFrontMatter(Map.of(), List.of(), List.of(), content);
             }
             String yamlSection = content.substring(start + 3, end);
-            @SuppressWarnings("unchecked")
             Map<String, Object> map = yaml.load(yamlSection);
             if (map == null) {
                 map = Map.of();

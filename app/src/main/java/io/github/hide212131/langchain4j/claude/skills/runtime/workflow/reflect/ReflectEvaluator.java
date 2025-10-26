@@ -2,7 +2,7 @@ package io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect;
 
 import dev.langchain4j.agentic.scope.AgenticScope;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.act.DefaultInvoker;
-import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.DefaultPlanner;
+import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.PlanModels;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -12,7 +12,7 @@ import java.util.List;
 public interface ReflectEvaluator {
     EvaluationResult evaluate(
             AgenticScope scope,
-            DefaultPlanner.PlanResult plan,
+            PlanModels.PlanResult plan,
             DefaultInvoker.ActResult actResult,
             int attemptIndex,
             int maxAttempts);

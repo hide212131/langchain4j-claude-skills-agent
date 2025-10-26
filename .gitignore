@@ -33,6 +33,7 @@ replay_pid*
 
 # Secrets / direnv
 .envrc
+.env
 
 # Local Codex CLI metadata
 .serena/

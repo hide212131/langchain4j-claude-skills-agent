@@ -46,7 +46,7 @@ public final class LangChain4jLlmClient {
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException("OPENAI_API_KEY must be set");
         }
-        OpenAiConfig config = new OpenAiConfig(apiKey, "gpt-5");
+        OpenAiConfig config = new OpenAiConfig(apiKey, "gpt-5-mini");
         ChatModel chatModel = factory.create(config);
         return new LangChain4jLlmClient(chatModel, clock, config.modelName);
     }
@@ -136,8 +136,12 @@ public final class LangChain4jLlmClient {
     private static final class FakeChatModel implements ChatModel {
         @Override
         public ChatResponse doChat(ChatRequest request) {
+            String combined = request.messages().toString();
+            String reply = combined.contains("JSON schema")
+                    ? "{\"skill_ids\":[\"brand-guidelines\",\"document-skills/pptx\",\"with-reference\"]}"
+                    : "dry-run-plan";
             return ChatResponse.builder()
-                    .aiMessage(AiMessage.from("dry-run-plan"))
+                    .aiMessage(AiMessage.from(reply))
                     .tokenUsage(new TokenUsage(0, 0, 0))
                     .build();
         }

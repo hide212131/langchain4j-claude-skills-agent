@@ -6,6 +6,6 @@ package io.github.hide212131.langchain4j.claude.skills.infra.config;
 public record RuntimeConfig(String defaultModel) {
 
     public RuntimeConfig() {
-        this("gpt-5");
+        this("gpt-5-mini");
     }
 }

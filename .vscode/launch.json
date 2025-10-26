@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "SkillsCliApp (debug skill ids)",
+      "type": "java",
+      "request": "launch",
+      "mainClass": "io.github.hide212131.langchain4j.claude.skills.app.cli.SkillsCliApp",
+      "projectName": "app",
+      "args": "run --goal \"ブランド準拠で5枚のスライドを作る\" --skills-dir skills --debug-skill-ids brand-guidelines,document-skills/pptx",
+      "cwd": "/Users/hide/Github/langchain4j-claude-skills-agent",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    }
+  ]
+}

@@ -78,6 +78,7 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
   - [x] 固定名に依存しない参照解決ロジック（相対リンク/明示パス/glob）を実装  
 - Refactor  
   - [x] Plan 入出力 DTO を定義し、テストで固定値比較  
+  - [x] DefaultPlanner を goal/metadata ベースの汎用ロジックへ更新し、特定スキル依存を排除（現状 `brand`/`pptx` 優先が残存）  
 - DoD  
   - [x] `skills run --goal "ブランド準拠で5枚スライド"` の Plan ログが確認できる  
   - [x] 参照先が任意ディレクトリでも Plan→Act で解決できる（固定名に依存しない）
@@ -90,12 +91,13 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 - Green  
   - [x] `InvokeSkillTool` を登録し、`DefaultInvoker` + `SkillRuntime` を実働化  
   - [ ] **Pure 方式**：順序配線せず、**単一エージェント＋ツール群**で Act を実装（`readSkillMd/readRef/runScript/validate/writeArtifact/blackboard.*` 等。仕様は `spec_skillruntime.md` に準拠）  
+  - [ ] スタブ出力（固定テキスト）を排除し、Skill 定義に基づく実成果物生成を実装  
 - Refactor  
   - [x] Blackboard API と Runtime 入出力を整理  
 - DoD  
   - [x] `skills run --goal "ブランド準拠でスライド"` が LLM→brand skill→pptx skill の順で呼ばれ、`build/out/deck.pptx` を生成  
-  - [ ] **SKILL.mdのみ**でも expectedOutputs 検証を通過して終了  
-  - [ ] Act のログに L1/L2/L3 の投入ログが残る
+  - [ ] **SKILL.mdのみ**でも expectedOutputs 検証を通過して終了（再現用の最小テストケースを作成）  
+  - [ ] Act のログに L1/L2/L3 の投入ログが残る（Disclosure ログフォーマットを確定）  
 
 ### P0-5. Evaluator（Reflect）と再試行
 - Red  

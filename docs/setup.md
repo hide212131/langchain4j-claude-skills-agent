@@ -26,21 +26,25 @@
 - 既定モデル：`gpt-5`（`LangChain4jLlmClient.forOpenAi` のデフォルト）。必要に応じて CLI や設定ファイルで上書きできるよう後続タスクで調整します。  
 - トークン/時間/ツール呼び出しの上限値は環境変数または設定ファイルに外出し予定。暫定値はコード側に埋め込み中。
 
-## 4. skills ディレクトリ
+## 4. CLI オプション（`skills run`）
+- `--goal <text>`: 必須。エージェントに与える高レベルの目的。  
+- `--skills-dir <path>`: 任意。スキルディレクトリの位置（既定値はリポジトリ直下の `skills/`）。  
+- `--dry-run`: 任意。Fake LLM を使って外部 API を呼び出さずにワークフローを検証。  
+- `--debug-skill-ids id1,id2,...`: 任意。カンマ区切りで指定したスキル ID をその順で実行し、プランナーの自動選択をバイパスします。デバッグ用途のみで使用し、存在しないスキル ID は警告として出力されます。
+## 5. skills ディレクトリ
 - `skills/` には `brand-guidelines/` と `document-skills/pptx/`（いずれも anthropics/skills 由来）を配置します。  
 - `./gradlew updateSkills` を実行すると、固定コミット（既定は `c74d647e56e6daa12029b6acb11a821348ad044b`）のアーカイブをダウンロードして `skills/` に展開します。  
   - `-PskillsCommit=<sha>` で任意のコミットへ切り替え可能です。展開後の `.skills-version` に解決済みコミットが記録されます。  
 - 未取得の場合は一時的に手動コピーでも構いませんが、P0-1 の段階で最低限この 2 スキルが存在することを確認してください。  
 - `skills/` はリポジトリ未追跡（`.gitignore` 登録済み）のため、個人環境ではローカルに置き、CI では本タスク（P1-4）で自動取得します。
 
-## 5. クイックチェック
+## 6. クイックチェック
 1. **ドライラン確認（API キー不要）**  
    ```bash
    ./gradlew test            # 省略可：単体テストを実行
    skills run \
      --goal "dry-run sanity check" \
      --skills-dir skills \
-     --out build/out/demo.pptx \
      --dry-run
    ```  
    成功すれば Workflow/CLI 配線は完了です（Fake LLM が使用され、成果物はダミーの場合があります）。
@@ -50,17 +54,32 @@
   export OPENAI_API_KEY=...   # まだならセット（手動設定の場合）
   skills run \
     --goal "ブランド準拠で5枚のスライドを作る" \
-    --in docs/agenda.md \
-    --skills-dir skills \
-    --out build/out/deck.pptx
+    --skills-dir skills
    ```  
    初回実行で `Tokens in/out/total` の集計ログと Plan サマリが出力されることを確認し、スクリーンショットやログ抜粋を共有できるようにしておきます。
 
-## 6. 今後のタスク連携
+   LLM への依存を避けてデバッグしたい場合は、以下のようにスキル実行順を固定できます。  
+   ```bash
+   skills run \
+     --goal "ブランドチェックの動作検証" \
+     --skills-dir skills \
+     --dry-run \
+     --debug-skill-ids brand-guidelines,document-skills/pptx
+   ```  
+   このモードでは指定順に Act ステージが進み、Plan 段階の LLM 呼び出しは省略されます。
+
+3. **VS Code デバッグ実行（再現性確保）**  
+  `.vscode/launch.json` には `SkillsCliApp (debug skill ids)` 構成を用意しています。Run and Debug パネルで選択して F5（または Run ボタン）を押すと、`SkillsCliApp` の `main` に直接アタッチした状態で以下の引数が渡されます。  
+  ```bash
+  run --goal "ブランド準拠で5枚のスライドを作る" --skills-dir skills --debug-skill-ids brand-guidelines,document-skills/pptx
+  ```  
+  デバッグ環境向けの環境変数はプロジェクトルートの `.env` に `KEY=VALUE` 形式で記述し（例：`OPENAI_API_KEY=...`）、`launch.json` の `envFile` から読み込ませます。目標やスキル並びを変えたい場合は、`launch.json` を複製して `args` を調整すると便利です。
+
+## 7. 今後のタスク連携
 - P0-1 完了後は LangChain4j Workflow ノード（Plan / Act / Reflect）の充実と安全性向上を段階的に進めます。  
 - 追加の設定項目（モデル名、スロットリング、プロキシなど）が増えた場合は本書に追記してください。
 
-## 7. パッケージ雛形の作成手順
+## 8. パッケージ雛形の作成手順
 - ソース構成は `spec.md 2.1` に従い、基底パッケージ `io.github.hide212131.langchain4j.claude.skills` の下に以下のディレクトリを作成します。  
   ```bash
   cd app/src/main/java/io/github/hide212131/langchain4j/claude/skills
@@ -81,7 +100,7 @@
 - それぞれに `package-info.java` もしくは空のスケルトンクラスを置き、パッケージ階層を検証できる状態にします。  
 - 新規パッケージ追加時は `docs/spec.md` / `docs/tasks.md` のモジュール構成を更新し、依存方針との整合を保ってください。
 
-## 8. JUnit セットアップ
+## 9. JUnit セットアップ
 - 依存関係は `app/build.gradle.kts` に追加済み（JUnit 5 / AssertJ）。  
 - `./gradlew test` を実行し、テスト環境が正常に起動することを確認します。  
 - **Codex CLI（サンドボックス）での実行**：Gradle はファイルロック取得に制限がかかるため、テスト実行時は昇格付きコマンドを使用してください。  

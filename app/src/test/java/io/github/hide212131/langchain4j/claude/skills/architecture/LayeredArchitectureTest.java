@@ -45,7 +45,8 @@ class LayeredArchitectureTest {
                             "javax..",
                             "org.slf4j..",
                             "dev.langchain4j..",
-                            "org.yaml..");
+                            "org.yaml..",
+                            "com.fasterxml.jackson..");
 
     @ArchTest
     static final ArchRule infraModuleShouldBeLeafLayer =

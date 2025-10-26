@@ -19,7 +19,7 @@ class SkillIndexLoaderTest {
         assertThat(result.warnings()).isEmpty();
         SkillIndex index = result.index();
 
-        assertThat(index.skills()).hasSize(2);
+        assertThat(index.skills()).hasSize(3);
         assertThat(index.skillsRoot()).isEqualTo(skillsDir.toAbsolutePath().normalize());
         SkillIndex.SkillMetadata brand = index.find("brand-guidelines").orElseThrow();
         assertThat(brand.name()).isEqualTo("Brand Guidelines");
@@ -31,6 +31,11 @@ class SkillIndexLoaderTest {
         assertThat(pptx.description()).contains("slide decks");
         assertThat(pptx.skillRoot())
                 .isEqualTo(skillsDir.resolve("document-skills/pptx").toAbsolutePath().normalize());
+
+        SkillIndex.SkillMetadata reference = index.find("with-reference").orElseThrow();
+        assertThat(reference.description()).contains("external note");
+        assertThat(reference.skillRoot())
+                .isEqualTo(skillsDir.resolve("with-reference").toAbsolutePath().normalize());
     }
 
     @Test

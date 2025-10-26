@@ -10,9 +10,10 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.ActStat
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.BlackboardStore;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.SharedBlackboardIndexState;
 import io.github.hide212131.langchain4j.claude.skills.runtime.guard.SkillInvocationGuard;
+import io.github.hide212131.langchain4j.claude.skills.runtime.skill.ScriptedSkillRuntimeChatModel;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillIndex;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillRuntime;
-import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.DefaultPlanner;
+import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.PlanModels;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.Test;
 class DefaultInvokerTest {
 
     private final WorkflowLogger logger = new WorkflowLogger();
+    private final ScriptedSkillRuntimeChatModel orchestrator = new ScriptedSkillRuntimeChatModel();
 
     @Test
     void invokeShouldExecuteSkillsInPlannedOrderAndPopulateBlackboard() throws Exception {
@@ -49,13 +51,29 @@ class DefaultInvokerTest {
                         List.of(),
                         skillsRoot.resolve("document-skills/pptx"))));
         BlackboardStore blackboardStore = new BlackboardStore();
-        SkillRuntime runtime = new SkillRuntime(index, tempDir, logger);
+    SkillRuntime runtime = new SkillRuntime(index, tempDir, logger, orchestrator);
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
-        DefaultInvoker invoker =
-                new DefaultInvoker(tool, new SkillInvocationGuard(), blackboardStore, logger);
+    DefaultInvoker invoker =
+        new DefaultInvoker(tool, new SkillInvocationGuard(), blackboardStore, logger);
 
-        DefaultPlanner planner = new DefaultPlanner(index);
-        DefaultPlanner.PlanResult plan = planner.plan("Create a brand aligned deck");
+    List<PlanModels.PlanStep> steps = List.of(
+        new PlanModels.PlanStep(
+            "brand-guidelines",
+            "Brand Guidelines",
+            "Summarise brand rules",
+            List.of("brand"),
+            skillsRoot.resolve("brand-guidelines")),
+        new PlanModels.PlanStep(
+            "document-skills/pptx",
+            "PPTX Generator",
+            "Build slide decks",
+            List.of("pptx"),
+            skillsRoot.resolve("document-skills/pptx")));
+    PlanModels.PlanResult plan = new PlanModels.PlanResult(
+        "Create a brand aligned deck",
+        steps,
+        "brand-guidelines: Brand Guidelines — Summarise brand rules (keywords: brand)\n"
+            + "document-skills/pptx: PPTX Generator — Build slide decks (keywords: pptx)");
         RecordingAgenticScope scope = new RecordingAgenticScope();
 
         DefaultInvoker.ActResult result = invoker.invoke(scope, plan);

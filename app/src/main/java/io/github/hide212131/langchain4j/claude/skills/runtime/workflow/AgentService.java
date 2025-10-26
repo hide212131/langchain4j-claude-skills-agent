@@ -16,7 +16,8 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillRuntime
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.act.DefaultInvoker;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.act.DefaultInvoker.ActResult;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.act.InvokeSkillTool;
-import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.DefaultPlanner;
+import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.AgenticPlanner;
+import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.PlanModels;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect.DefaultEvaluator;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect.ReflectEvaluator;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.support.WorkflowFactory;
@@ -36,7 +37,7 @@ public final class AgentService {
     private final WorkflowFactory workflowFactory;
     private final LangChain4jLlmClient llmClient;
     private final WorkflowLogger logger;
-    private final DefaultPlanner planner;
+    private final AgenticPlanner planner;
     private final DefaultInvoker invoker;
     private final BlackboardStore blackboardStore;
     private final ReflectEvaluator evaluator;
@@ -45,9 +46,13 @@ public final class AgentService {
             WorkflowFactory workflowFactory,
             LangChain4jLlmClient llmClient,
             SkillIndex skillIndex) {
-        WorkflowLogger logger = new WorkflowLogger();
-        BlackboardStore blackboardStore = new BlackboardStore();
-        SkillRuntime runtime = new SkillRuntime(skillIndex, Path.of("build", "out"), logger);
+    WorkflowLogger logger = new WorkflowLogger();
+    BlackboardStore blackboardStore = new BlackboardStore();
+    SkillRuntime runtime = new SkillRuntime(
+        skillIndex,
+        Path.of("build", "out"),
+        logger,
+        llmClient.chatModel());
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
         SkillInvocationGuard guard = new SkillInvocationGuard();
         DefaultInvoker invoker = new DefaultInvoker(tool, guard, blackboardStore, logger);
@@ -59,7 +64,8 @@ public final class AgentService {
                 logger,
                 invoker,
                 blackboardStore,
-                evaluator);
+        evaluator,
+        new AgenticPlanner(skillIndex, llmClient, logger));
     }
 
     public AgentService(
@@ -69,31 +75,33 @@ public final class AgentService {
             WorkflowLogger logger,
             DefaultInvoker invoker,
             BlackboardStore blackboardStore,
-            ReflectEvaluator evaluator) {
+            ReflectEvaluator evaluator,
+            AgenticPlanner planner) {
         this.workflowFactory = Objects.requireNonNull(workflowFactory, "workflowFactory");
         this.llmClient = Objects.requireNonNull(llmClient, "llmClient");
         this.logger = Objects.requireNonNull(logger, "logger");
-        this.planner = new DefaultPlanner(Objects.requireNonNull(skillIndex, "skillIndex"));
+        Objects.requireNonNull(skillIndex, "skillIndex");
         this.invoker = Objects.requireNonNull(invoker, "invoker");
         this.blackboardStore = Objects.requireNonNull(blackboardStore, "blackboardStore");
         this.evaluator = Objects.requireNonNull(evaluator, "evaluator");
+        this.planner = Objects.requireNonNull(planner, "planner");
     }
 
     public ExecutionResult run(AgentRunRequest request) {
         Objects.requireNonNull(request, "request");
         blackboardStore.clear();
-        List<String> visitedStages = new ArrayList<>();
-        LangChain4jLlmClient.CompletionResult finalPlanCompletion = null;
-        DefaultPlanner.PlanResult finalPlan = null;
+        List<StageVisit> stageVisits = new ArrayList<>();
+    LangChain4jLlmClient.CompletionResult finalPlanCompletion = null;
+    PlanModels.PlanResult finalPlan = null;
         ActResult finalActResult = null;
         ReflectEvaluator.EvaluationResult finalEvaluation = null;
         int maxAttempts = 2;
 
-        for (int attempt = 0; attempt < maxAttempts; attempt++) {
+    for (int attempt = 0; attempt < maxAttempts; attempt++) {
             int attemptIndex = attempt;
             int attemptNumber = attemptIndex + 1;
             AtomicReference<LangChain4jLlmClient.CompletionResult> planResultRef = new AtomicReference<>();
-            AtomicReference<DefaultPlanner.PlanResult> planRef = new AtomicReference<>();
+            AtomicReference<PlanModels.PlanResult> planRef = new AtomicReference<>();
             AtomicReference<ActResult> actRef = new AtomicReference<>();
             AtomicReference<ReflectEvaluator.EvaluationResult> evaluationRef = new AtomicReference<>();
 
@@ -102,7 +110,7 @@ public final class AgentService {
                 builder.output(scope -> scope.state());
                 builder.subAgents(
                         AgenticServices.agentAction(scope -> {
-                            visitedStages.add("plan");
+                            stageVisits.add(new StageVisit(attemptNumber, "plan"));
                             writePlanGoal(scope, request.goal());
                             scope.writeState(
                                     PlanInputsState.KEY,
@@ -117,7 +125,11 @@ public final class AgentService {
                                             "maxToolCalls", 3,
                                             "maxAttempts", maxAttempts,
                                             "attempt", attemptNumber));
-                            DefaultPlanner.PlanResult plan = planner.plan(request.goal());
+                List<String> forcedSkillIds = request.forcedSkillIds();
+                boolean hasForcedSkillIds = !forcedSkillIds.isEmpty();
+                PlanModels.PlanResult plan = hasForcedSkillIds
+                    ? planner.planWithFixedOrder(request.goal(), forcedSkillIds)
+                    : planner.plan(request.goal());
                             planRef.set(plan);
                             scope.writeState(
                                     PlanCandidateStepsState.KEY,
@@ -129,24 +141,34 @@ public final class AgentService {
                                                     "keywords", step.keywords(),
                                                     "skillRoot", step.skillRoot().toString()))
                                             .toList());
-                            LangChain4jLlmClient.CompletionResult completion =
-                                    llmClient.complete(request.goal());
-                            planResultRef.set(completion);
+                LangChain4jLlmClient.CompletionResult completion = null;
+                String assistantDraft;
+                if (hasForcedSkillIds) {
+                assistantDraft = "Planner bypassed via forced skill sequence.";
+                logger.info(
+                    "Plan attempt {} using forced skill sequence {}",
+                    attemptNumber,
+                    plan.orderedSkillIds());
+                } else {
+                completion = llmClient.complete(request.goal());
+                planResultRef.set(completion);
+                assistantDraft = completion != null ? completion.content() : "";
+                logger.info(
+                    "Plan attempt {} candidate steps: {}",
+                    attemptNumber,
+                    plan.orderedSkillIds());
+                }
                             scope.writeState(
                                     PlanEvaluationCriteriaState.KEY,
                                     Map.of(
                                             "systemPromptL1", plan.systemPromptSummary(),
                                             "assistantDraft",
-                                            completion != null ? completion.content() : "",
+                        assistantDraft,
                                             "attempt", attemptNumber));
-                            logger.info(
-                                    "Plan attempt {} candidate steps: {}",
-                                    attemptNumber,
-                                    plan.orderedSkillIds());
                         }),
                         AgenticServices.agentAction(scope -> {
-                            visitedStages.add("act");
-                            DefaultPlanner.PlanResult plan = planRef.get();
+                            stageVisits.add(new StageVisit(attemptNumber, "act"));
+                            PlanModels.PlanResult plan = planRef.get();
                             if (plan == null) {
                                 throw new IllegalStateException("Plan stage must complete before Act");
                             }
@@ -154,8 +176,8 @@ public final class AgentService {
                             actRef.set(result);
                         }),
                         AgenticServices.agentAction(scope -> {
-                            visitedStages.add("reflect");
-                            DefaultPlanner.PlanResult plan = planRef.get();
+                            stageVisits.add(new StageVisit(attemptNumber, "reflect"));
+                            PlanModels.PlanResult plan = planRef.get();
                             ReflectEvaluator.EvaluationResult evaluation = evaluator.evaluate(
                                     scope, plan, actRef.get(), attemptIndex, maxAttempts);
                             evaluationRef.set(evaluation);
@@ -210,7 +232,7 @@ public final class AgentService {
             }
         }
         return new ExecutionResult(
-                List.copyOf(visitedStages),
+                List.copyOf(stageVisits),
                 finalPlan,
                 finalPlanCompletion,
                 metricsSnapshot,
@@ -226,14 +248,30 @@ public final class AgentService {
         scope.writeState(PlanState.GOAL_KEY, goal);
     }
 
-    public record AgentRunRequest(String goal, boolean dryRun) {}
+    public record AgentRunRequest(String goal, boolean dryRun, List<String> forcedSkillIds) {
+        public AgentRunRequest {
+            if (goal == null || goal.isBlank()) {
+                throw new IllegalArgumentException("goal must be provided");
+            }
+            forcedSkillIds = forcedSkillIds == null ? List.of() : List.copyOf(forcedSkillIds);
+        }
+    }
 
     public record ExecutionResult(
-            List<String> visitedStages,
-            DefaultPlanner.PlanResult plan,
+            List<StageVisit> visitedStages,
+            PlanModels.PlanResult plan,
             LangChain4jLlmClient.CompletionResult planResult,
             LangChain4jLlmClient.ProviderMetrics metrics,
             ActResult actResult,
             ReflectEvaluator.EvaluationResult evaluation,
             Map<String, Object> blackboardSnapshot) {}
+
+    public record StageVisit(int attempt, String stage) {
+        public StageVisit {
+            if (attempt < 1) {
+                throw new IllegalArgumentException("attempt must be 1-indexed");
+            }
+            Objects.requireNonNull(stage, "stage");
+        }
+    }
 }
