@@ -36,7 +36,7 @@ public final class SkillsCliApp implements Runnable {
     static CommandLine commandLineInstance() {
         CommandLine cmd = new CommandLine(new SkillsCliApp());
         SkillIndexLoader loader = new SkillIndexLoader();
-        AgentServiceFactory factory = (dryRun, index, client) -> AgentService.withDefaults(new WorkflowFactory(), client, index);
+    AgentServiceFactory factory = (dryRun, index, client) -> AgentService.withDefaults(new WorkflowFactory(), client, index, dryRun);
         cmd.addSubcommand("run", new RunCommand(factory, loader));
         return cmd;
     }

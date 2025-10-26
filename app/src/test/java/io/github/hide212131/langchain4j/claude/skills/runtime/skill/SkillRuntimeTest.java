@@ -13,8 +13,8 @@ import org.junit.jupiter.api.Test;
 
 class SkillRuntimeTest {
 
-    private final WorkflowLogger logger = new WorkflowLogger();
-        private final ScriptedSkillRuntimeChatModel orchestrator = new ScriptedSkillRuntimeChatModel();
+        private final WorkflowLogger logger = new WorkflowLogger();
+        private final DryRunSkillRuntimeOrchestrator orchestrator = new DryRunSkillRuntimeOrchestrator();
 
         private SkillRuntime newRuntime(SkillIndex index, Path tempDir) {
                 return new SkillRuntime(index, tempDir, logger, orchestrator);
@@ -204,15 +204,62 @@ class SkillRuntimeTest {
                 .isNotEmpty();
     }
 
-    private EnumSet<SkillRuntime.DisclosureLevel> disclosureLevels(SkillRuntime.ExecutionResult result) {
-        return result.disclosureLog().stream()
-                .map(SkillRuntime.DisclosureEvent::level)
-                .collect(() -> EnumSet.noneOf(SkillRuntime.DisclosureLevel.class), EnumSet::add, EnumSet::addAll);
+    @Test
+    void readReferenceShouldResolveArtifactsFromOutputDirectory() throws Exception {
+        Path tempDir = Files.createTempDirectory("skill-runtime-output-reference");
+        Path skillsRoot = Path.of("skills").toAbsolutePath().normalize();
+        SkillIndex index = new SkillIndex(skillsRoot, Map.of(
+                "document-skills/pptx",
+                new SkillIndex.SkillMetadata(
+                        "document-skills/pptx",
+                        "PPTX Generator",
+                        "Build slide decks",
+                        List.of("pptx"),
+                        List.of(),
+                        skillsRoot.resolve("document-skills/pptx"))));
+        SkillRuntime.SkillAgentOrchestrator customOrchestrator = new SkillRuntime.SkillAgentOrchestrator() {
+            @Override
+            public String run(
+                    SkillRuntime.Toolbox toolbox,
+                    SkillIndex.SkillMetadata metadata,
+                    Map<String, Object> inputs,
+                    List<String> expectedOutputs,
+                    String prompt) {
+                String skillId = metadata.id();
+                SkillRuntime.ArtifactHandle handle =
+                        toolbox.writeArtifact(skillId, "procedures/generated.md", "Generated notes", false);
+                SkillRuntime.ReferenceDocuments docs =
+                        toolbox.readReference(skillId, "procedures/generated.md");
+                assertThat(docs.documents()).hasSize(1);
+                assertThat(docs.documents().get(0).content()).contains("Generated notes");
+                return "artifactPath=" + handle.path() + System.lineSeparator() + "summary=Generated notes";
+            }
+        };
+        SkillRuntime runtime = new SkillRuntime(index, tempDir, logger, customOrchestrator);
+
+        SkillRuntime.ExecutionResult result = runtime.execute("document-skills/pptx", Map.of());
+
+        assertThat(result.toolInvocations()).anyMatch(invocation -> invocation.name().equals("readRef"));
+        assertThat(result.outputs())
+                .containsKey("referencedFiles")
+                .extractingByKey("referencedFiles", InstanceOfAssertFactories.list(String.class))
+                .anyMatch(path -> path.endsWith("procedures/generated.md"));
+        Path generated = tempDir.resolve("procedures/generated.md");
+        assertThat(Files.readString(generated)).contains("Generated notes");
     }
 
-    private List<String> toolNames(SkillRuntime.ExecutionResult result) {
-        return result.toolInvocations().stream()
-                .map(SkillRuntime.ToolInvocation::name)
-                .toList();
-    }
+        private EnumSet<SkillRuntime.DisclosureLevel> disclosureLevels(SkillRuntime.ExecutionResult result) {
+                return result.disclosureLog().stream()
+                                .map(SkillRuntime.DisclosureEvent::level)
+                                .collect(
+                                                () -> EnumSet.noneOf(SkillRuntime.DisclosureLevel.class),
+                                                EnumSet::add,
+                                                EnumSet::addAll);
+        }
+
+        private List<String> toolNames(SkillRuntime.ExecutionResult result) {
+                return result.toolInvocations().stream()
+                                .map(SkillRuntime.ToolInvocation::name)
+                                .toList();
+        }
 }

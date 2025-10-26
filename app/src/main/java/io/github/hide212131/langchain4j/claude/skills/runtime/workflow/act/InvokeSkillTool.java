@@ -6,9 +6,9 @@ import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillRuntime;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.List;
 
 /**
  * LangChain4j tool wrapper that exposes the {@link SkillRuntime} as a single callable tool.
@@ -17,7 +17,7 @@ public final class InvokeSkillTool {
 
     public static final String TOOL_NAME = "invokeSkill";
 
-    private final SkillRuntime skillRuntime;
+     private final SkillRuntime skillRuntime;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(TOOL_NAME)
             .description("Execute a skill identified by skillId with optional inputs bundle")

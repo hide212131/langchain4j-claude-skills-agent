@@ -11,6 +11,7 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.PlanInp
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.PlanState;
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
 import io.github.hide212131.langchain4j.claude.skills.runtime.provider.LangChain4jLlmClient;
+import io.github.hide212131.langchain4j.claude.skills.runtime.skill.DryRunSkillRuntimeOrchestrator;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillIndex;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillRuntime;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.act.DefaultInvoker;
@@ -43,16 +44,30 @@ public final class AgentService {
     private final ReflectEvaluator evaluator;
 
     public static AgentService withDefaults(
-            WorkflowFactory workflowFactory,
-            LangChain4jLlmClient llmClient,
-            SkillIndex skillIndex) {
-    WorkflowLogger logger = new WorkflowLogger();
-    BlackboardStore blackboardStore = new BlackboardStore();
-    SkillRuntime runtime = new SkillRuntime(
-        skillIndex,
-        Path.of("build", "out"),
-        logger,
-        llmClient.chatModel());
+        WorkflowFactory workflowFactory,
+        LangChain4jLlmClient llmClient,
+        SkillIndex skillIndex) {
+    return withDefaults(workflowFactory, llmClient, skillIndex, false);
+    }
+
+    public static AgentService withDefaults(
+        WorkflowFactory workflowFactory,
+        LangChain4jLlmClient llmClient,
+        SkillIndex skillIndex,
+        boolean dryRun) {
+        WorkflowLogger logger = new WorkflowLogger();
+        BlackboardStore blackboardStore = new BlackboardStore();
+    SkillRuntime runtime = dryRun
+        ? new SkillRuntime(
+            skillIndex,
+            Path.of("build", "out"),
+            logger,
+            new DryRunSkillRuntimeOrchestrator())
+        : new SkillRuntime(
+            skillIndex,
+            Path.of("build", "out"),
+            logger,
+            llmClient.chatModel());
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
         SkillInvocationGuard guard = new SkillInvocationGuard();
         DefaultInvoker invoker = new DefaultInvoker(tool, guard, blackboardStore, logger);
@@ -64,8 +79,8 @@ public final class AgentService {
                 logger,
                 invoker,
                 blackboardStore,
-        evaluator,
-        new AgenticPlanner(skillIndex, llmClient, logger));
+                evaluator,
+                new AgenticPlanner(skillIndex, llmClient, logger));
     }
 
     public AgentService(

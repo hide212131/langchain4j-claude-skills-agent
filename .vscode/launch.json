@@ -7,7 +7,7 @@
       "request": "launch",
       "mainClass": "io.github.hide212131.langchain4j.claude.skills.app.cli.SkillsCliApp",
       "projectName": "app",
-      "args": "run --goal \"ブランド準拠で5枚のスライドを作る\" --skills-dir skills --debug-skill-ids brand-guidelines,document-skills/pptx",
+      "args": "run --goal \"JJUG CCCのスライドとなるpptxファイルの作成\" --skills-dir skills --debug-skill-ids document-skills/pptx",
       "cwd": "/Users/hide/Github/langchain4j-claude-skills-agent",
       "envFile": "${workspaceFolder}/.env",
       "console": "integratedTerminal"

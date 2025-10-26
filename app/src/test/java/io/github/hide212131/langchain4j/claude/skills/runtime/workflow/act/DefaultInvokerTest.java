@@ -10,7 +10,7 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.ActStat
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.BlackboardStore;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.SharedBlackboardIndexState;
 import io.github.hide212131.langchain4j.claude.skills.runtime.guard.SkillInvocationGuard;
-import io.github.hide212131.langchain4j.claude.skills.runtime.skill.ScriptedSkillRuntimeChatModel;
+import io.github.hide212131.langchain4j.claude.skills.runtime.skill.DryRunSkillRuntimeOrchestrator;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillIndex;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillRuntime;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.PlanModels;
@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
 class DefaultInvokerTest {
 
     private final WorkflowLogger logger = new WorkflowLogger();
-    private final ScriptedSkillRuntimeChatModel orchestrator = new ScriptedSkillRuntimeChatModel();
+    private final DryRunSkillRuntimeOrchestrator orchestrator = new DryRunSkillRuntimeOrchestrator();
 
     @Test
     void invokeShouldExecuteSkillsInPlannedOrderAndPopulateBlackboard() throws Exception {
@@ -51,10 +51,10 @@ class DefaultInvokerTest {
                         List.of(),
                         skillsRoot.resolve("document-skills/pptx"))));
         BlackboardStore blackboardStore = new BlackboardStore();
-    SkillRuntime runtime = new SkillRuntime(index, tempDir, logger, orchestrator);
+        SkillRuntime runtime = new SkillRuntime(index, tempDir, logger, orchestrator);
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
-    DefaultInvoker invoker =
-        new DefaultInvoker(tool, new SkillInvocationGuard(), blackboardStore, logger);
+        DefaultInvoker invoker =
+                new DefaultInvoker(tool, new SkillInvocationGuard(), blackboardStore, logger);
 
     List<PlanModels.PlanStep> steps = List.of(
         new PlanModels.PlanStep(

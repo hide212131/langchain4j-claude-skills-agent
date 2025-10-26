@@ -1,5 +1,6 @@
 package io.github.hide212131.langchain4j.claude.skills.runtime.skill;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -26,9 +27,15 @@ public final class ScriptedSkillRuntimeChatModel implements SkillRuntime.SkillAg
 		}
 		body.append("Goal: ").append(goal.isBlank() ? "(none)" : goal).append(System.lineSeparator());
 		body.append("Skill: ").append(metadata.name()).append(System.lineSeparator());
-		SkillRuntime.ArtifactHandle handle = toolbox.writeArtifact(skillId, null, body.toString(), null);
+		SkillRuntime.ArtifactHandle handle = toolbox.writeArtifact(skillId, null, body.toString(), false);
+		Map<String, Object> expected = new LinkedHashMap<>();
+		for (String expectedOutput : expectedOutputs) {
+			if (expectedOutput != null && !expectedOutput.isBlank()) {
+				expected.put(expectedOutput, Boolean.TRUE);
+			}
+		}
 		toolbox.validateExpectedOutputs(
-				expectedOutputs,
+				expected,
 				Map.of(
 						"artifactPath", handle.path(),
 						"summary", description,

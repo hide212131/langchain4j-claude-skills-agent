@@ -13,7 +13,7 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.guard.SkillInvocat
 import io.github.hide212131.langchain4j.claude.skills.runtime.provider.LangChain4jLlmClient;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillIndex;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillIndex.SkillMetadata;
-import io.github.hide212131.langchain4j.claude.skills.runtime.skill.ScriptedSkillRuntimeChatModel;
+import io.github.hide212131.langchain4j.claude.skills.runtime.skill.DryRunSkillRuntimeOrchestrator;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillRuntime;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.act.DefaultInvoker;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.act.InvokeSkillTool;
@@ -52,7 +52,7 @@ class AgentServiceTest {
                         skillsRoot.resolve("document-skills/pptx"))));
         WorkflowLogger logger = new WorkflowLogger();
         BlackboardStore blackboardStore = new BlackboardStore();
-        ScriptedSkillRuntimeChatModel orchestrator = new ScriptedSkillRuntimeChatModel();
+        DryRunSkillRuntimeOrchestrator orchestrator = new DryRunSkillRuntimeOrchestrator();
         SkillRuntime runtime = new SkillRuntime(index, tempDir, logger, orchestrator);
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
         DefaultInvoker invoker =
@@ -118,7 +118,7 @@ class AgentServiceTest {
                         skillsRoot.resolve("document-skills/pptx"))));
         WorkflowLogger logger = new WorkflowLogger();
         BlackboardStore blackboardStore = new BlackboardStore();
-        ScriptedSkillRuntimeChatModel orchestrator = new ScriptedSkillRuntimeChatModel();
+        DryRunSkillRuntimeOrchestrator orchestrator = new DryRunSkillRuntimeOrchestrator();
         SkillRuntime runtime = new SkillRuntime(index, tempDir, logger, orchestrator);
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
         DefaultInvoker invoker =

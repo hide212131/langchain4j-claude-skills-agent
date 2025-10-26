@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.langchain4j.agent.tool.ToolSpecification;
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
-import io.github.hide212131.langchain4j.claude.skills.runtime.skill.ScriptedSkillRuntimeChatModel;
+import io.github.hide212131.langchain4j.claude.skills.runtime.skill.DryRunSkillRuntimeOrchestrator;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillIndex;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillRuntime;
 import java.nio.file.Files;
@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 class InvokeSkillToolTest {
 
     private final WorkflowLogger logger = new WorkflowLogger();
-        private final ScriptedSkillRuntimeChatModel orchestrator = new ScriptedSkillRuntimeChatModel();
+        private final DryRunSkillRuntimeOrchestrator orchestrator = new DryRunSkillRuntimeOrchestrator();
 
     @Test
     void specificationShouldExposeSkillIdAndInputsSchema() throws Exception {

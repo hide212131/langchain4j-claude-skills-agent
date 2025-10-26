@@ -1,17 +1,33 @@
 package io.github.hide212131.langchain4j.claude.skills.runtime.skill;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.ReturnBehavior;
 import dev.langchain4j.agent.tool.Tool;
+import dev.langchain4j.agentic.Agent;
+import dev.langchain4j.agentic.AgenticServices;
+import dev.langchain4j.agentic.scope.ResultWithAgenticScope;
+import dev.langchain4j.agentic.supervisor.SupervisorContextStrategy;
+import dev.langchain4j.agentic.supervisor.SupervisorResponseStrategy;
 import dev.langchain4j.model.chat.ChatModel;
-import dev.langchain4j.service.AiServices;
-import dev.langchain4j.service.SystemMessage;
-import dev.langchain4j.service.UserMessage;
+import dev.langchain4j.service.V;
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystems;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.PathMatcher;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -20,6 +36,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -28,6 +46,15 @@ public final class SkillRuntime {
     private static final String DEFAULT_OUTPUT_FILE = "deck.pptx";
     private static final Pattern LOCAL_REFERENCE_PATTERN =
             Pattern.compile("\\[[^\\]]*]\\((?!https?://)([^)]+)\\)");
+    private static final Set<String> ALLOWED_SCRIPT_EXTENSIONS = Set.of(".py", ".sh", ".js");
+    private static final int DEFAULT_SCRIPT_TIMEOUT_SECONDS = 20;
+    private static final int MAX_SCRIPT_TIMEOUT_SECONDS = 120;
+    private static final int DEFAULT_DEPENDENCY_TIMEOUT_SECONDS = 60;
+    private static final int MAX_STDOUT_CHARS = 8192;
+    private static final int MAX_STDERR_CHARS = 8192;
+    private static final int MAX_STDERR_LINES = 512;
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final TypeReference<Map<String, Object>> JSON_MAP_TYPE = new TypeReference<>() {};
 
     private final SkillIndex skillIndex;
     private final Path outputDirectory;
@@ -58,6 +85,7 @@ public final class SkillRuntime {
         SkillIndex.SkillMetadata metadata = skillIndex.find(skillId)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown skill: " + skillId));
         Map<String, Object> safeInputs = inputs == null ? Map.of() : Map.copyOf(inputs);
+    prepareOutputDirectory(outputDirectory);
         List<String> expectedOutputs = resolveExpectedOutputs(safeInputs);
 
     SkillRuntimeContext context = new SkillRuntimeContext(metadata, expectedOutputs, outputDirectory, logger);
@@ -125,14 +153,17 @@ public final class SkillRuntime {
                 Skill Name: %s
                 Goal: %s
                 Constraints: %s
-                Expected Outputs: %s
+                Expected Outputs: %s of artifacts aligned with the goal
 
                 Use the available tools to gather instructions and source material.
                 Guidelines:
                 - Call readSkillMd before performing other actions.
                 - Use readRef for any additional resources referenced in the skill.
                 - Generate artefacts with writeArtifact (paths are relative to build/out by default).
-                - Call validateExpectedOutputs before finishing.
+                - If you have devised a procedure after reading the resource, save that procedure using `writeArtifact`. Subsequently, use `readRef` to reference it and incorporate it as new knowledge.
+                - If you need to run an existing script to resolve an issue, devise the appropriate arguments and execute it using runScript.
+                ‐ Should you need to create a new script to resolve the issue, please use writeArtifact to save its contents. Subsequently, employ the runScript tool to execute the script.
+                - If you are unsure, please devise and proceed with the most appropriate method yourself, as you will not receive answers to any additional questions you may ask users.
                 - When you are done, reply with key=value lines containing at least:
                   artifactPath=<absolute path to the generated artefact>
                   summary=<one-line summary>
@@ -183,6 +214,33 @@ public final class SkillRuntime {
         return List.of("artifactPath");
     }
 
+    private void prepareOutputDirectory(Path directory) {
+        try {
+            Files.createDirectories(directory);
+            Files.walkFileTree(directory, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+                        throws IOException {
+                    if (!file.equals(directory)) {
+                        Files.deleteIfExists(file);
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult postVisitDirectory(Path dir, IOException exc)
+                        throws IOException {
+                    if (!dir.equals(directory)) {
+                        Files.deleteIfExists(dir);
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to prepare output directory " + directory, e);
+        }
+    }
+
     private Validation validateOutputs(List<String> expectedOutputs, Map<String, Object> outputs, Path artifactPath) {
         Set<String> missing = new LinkedHashSet<>();
         for (String expected : expectedOutputs) {
@@ -222,12 +280,17 @@ public final class SkillRuntime {
         return List.copyOf(references);
     }
 
-    interface SkillActAgent {
-        @SystemMessage("""
-                You are the Act runtime for a single skill.
-                Follow the user's goal, use the available tools responsibly, and call validateExpectedOutputs before finishing.
-                """)
-        String run(@UserMessage String prompt);
+    interface SkillActSupervisor {
+    @Agent(
+        name = "SkillActSupervisor",
+        description = "Supervisor coordinating Pure Act execution for a single skill. Goals must be set specifically in line with the purpose of the skill.",
+        outputName = "finalResponse")
+    ResultWithAgenticScope<String> run(
+        @V("request") String request,
+        @V("skillId") String skillId,
+        @V("expectedOutputs") List<String> expectedOutputs,
+        @V("goal") String goal,
+        @V("constraints") String constraints);
     }
 
     public interface Toolbox {
@@ -235,9 +298,16 @@ public final class SkillRuntime {
 
         ReferenceDocuments readReference(String skillId, String reference);
 
-        ArtifactHandle writeArtifact(String skillId, String relativePath, String content, String base64Content);
+    ArtifactHandle writeArtifact(String skillId, String relativePath, String content, boolean base64Encoded);
 
-        ValidationResult validateExpectedOutputs(List<String> expected, Map<String, Object> observed);
+    ScriptResult runScript(
+        String skillId,
+        String path,
+        List<String> args,
+        List<String> dependencies,
+        Integer timeoutSeconds);
+
+        ValidationResult validateExpectedOutputs(Map<String, Object> expected, Map<String, Object> observed);
     }
 
     public interface SkillAgentOrchestrator {
@@ -264,11 +334,150 @@ public final class SkillRuntime {
                 Map<String, Object> inputs,
                 List<String> expectedOutputs,
                 String prompt) {
-            SkillActAgent agent = AiServices.builder(SkillActAgent.class)
+        ResultWithAgenticScope<String> result = buildSupervisor(toolbox, metadata, expectedOutputs)
+                    .run(
+                            prompt,
+                            metadata.id(),
+                            expectedOutputs,
+                            Objects.toString(inputs.getOrDefault("goal", ""), ""),
+                Objects.toString(inputs.getOrDefault("constraints", ""), ""));
+        String supervisorResponse = result.result();
+        return supervisorResponse == null ? "" : supervisorResponse;
+        }
+
+    private SkillActSupervisor buildSupervisor(
+        Toolbox toolbox, SkillIndex.SkillMetadata metadata, List<String> expectedOutputs) {
+            return AgenticServices
+                    .supervisorBuilder(SkillActSupervisor.class)
                     .chatModel(chatModel)
-                    .tools(toolbox)
+                    .contextGenerationStrategy(SupervisorContextStrategy.CHAT_MEMORY_AND_SUMMARIZATION)
+                    .responseStrategy(SupervisorResponseStrategy.LAST)
+                    .supervisorContext(createSupervisorContext(metadata, expectedOutputs))
+                    .subAgents(
+                new ReadSkillMdAgent(toolbox),
+                new ReadReferenceAgent(toolbox),
+                new RunScriptAgent(toolbox),
+                new WriteArtifactAgent(toolbox)
+                // new ValidateExpectedOutputsAgent(toolbox)
+                )
                     .build();
-            return agent.run(prompt);
+        }
+
+        private String createSupervisorContext(
+                SkillIndex.SkillMetadata metadata, List<String> expectedOutputs) {
+            String expected = expectedOutputs.isEmpty()
+                    ? "artifactPath (default)"
+                    : String.join(", ", expectedOutputs);
+            return """
+                    Progressive Disclosure Policy:
+                    - Maintain L1 (name/description) in context by default.
+                    - Call readSkillMd first to load SKILL.md (L2) for skill %s.
+                    - Use readRef to resolve any additional references (L3).
+                    - Persist artefacts only through writeArtifact (paths relative to build/out).
+                    - Invoke validateExpectedOutputs before finishing.
+                    Always respond with key=value pairs when completing the task.
+                    Expected outputs: %s
+                    """.formatted(metadata.id(), expected);
+        }
+
+    }
+
+    public static final class ReadSkillMdAgent {
+
+        private final Toolbox toolbox;
+
+        public ReadSkillMdAgent(Toolbox toolbox) {
+            this.toolbox = Objects.requireNonNull(toolbox, "toolbox");
+        }
+
+        @Agent(
+                name = "readSkillMd",
+                description = "Reads the SKILL.md document for the active skill",
+                outputName = "skillDocument")
+        public SkillDocumentResult read(@V("skillId") String skillId) {
+            return toolbox.readSkillMd(skillId);
+        }
+    }
+
+    public static final class ReadReferenceAgent {
+
+        private final Toolbox toolbox;
+
+        public ReadReferenceAgent(Toolbox toolbox) {
+            this.toolbox = Objects.requireNonNull(toolbox, "toolbox");
+        }
+
+        @Agent(
+                name = "readRef",
+                description = "Resolves and reads an additional reference for the active skill",
+                outputName = "referenceDocuments")
+        public ReferenceDocuments read(
+                @V("skillId") String skillId,
+                @V("reference") String reference) {
+            return toolbox.readReference(skillId, reference);
+        }
+    }
+
+    public static final class RunScriptAgent {
+
+        private final Toolbox toolbox;
+
+        public RunScriptAgent(Toolbox toolbox) {
+            this.toolbox = Objects.requireNonNull(toolbox, "toolbox");
+        }
+
+        @Agent(
+                name = "runScript",
+                description = "Executes a script within the skill sandbox",
+                outputName = "scriptResult")
+        public ScriptResult run(
+                @V("skillId") String skillId,
+                @V("path") String path,
+                @V("args") List<String> args,
+                @V("dependencies") List<String> dependencies,
+                @V("timeoutSeconds") Integer timeoutSeconds) {
+            return toolbox.runScript(skillId, path, args, dependencies, timeoutSeconds);
+        }
+    }
+
+    public static final class WriteArtifactAgent {
+
+        private final Toolbox toolbox;
+
+        public WriteArtifactAgent(Toolbox toolbox) {
+            this.toolbox = Objects.requireNonNull(toolbox, "toolbox");
+        }
+
+        @Agent(
+                name = "writeArtifact",
+                description = "Persists generated artefacts under the build output directory. You can save either plain text or Base64-encoded content. Specify which using the base64Encoded parameter.",
+                outputName = "artifactHandle")
+        public ArtifactHandle write(
+                @V("skillId") String skillId,
+                @V(value = "relativePath") String relativePath,
+                @V(value = "content") String content,
+                @V(value = "base64Encoded") Boolean base64Encoded) {
+            boolean encoded = Boolean.TRUE.equals(base64Encoded);
+            return toolbox.writeArtifact(skillId, relativePath, content, encoded);
+        }
+    }
+
+    public static final class ValidateExpectedOutputsAgent {
+
+        private final Toolbox toolbox;
+
+        public ValidateExpectedOutputsAgent(Toolbox toolbox) {
+            this.toolbox = Objects.requireNonNull(toolbox, "toolbox");
+        }
+
+        @Agent(
+                name = "validateExpectedOutputs",
+                description = "Validates that expected outputs have been produced",
+                outputName = "validationResult")
+        public ValidationResult validate(
+                @V("expected") Map<String, Object> expected,
+                @V("observed") Map<String, Object> observed) {
+            return toolbox.validateExpectedOutputs(expected, observed);
         }
     }
 
@@ -305,7 +514,7 @@ public final class SkillRuntime {
                         "readSkillMd",
                         Map.of("skillId", skillId),
                         Map.of("lineCount", lineCount, "path", skillMd.toString(), "summary", summary));
-                    context.recordSkill(metadata.id());
+                context.recordSkill(metadata.id());
                 return new SkillDocumentResult(
                         skillMd.toString(), content, extractLocalReferences(content));
             } catch (IOException e) {
@@ -320,7 +529,7 @@ public final class SkillRuntime {
             SkillIndex.SkillMetadata metadata = context.metadata();
             validateSkillId(skillId, metadata.id());
             try {
-                List<Path> resolved = skillIndex.resolveReferences(metadata.id(), reference);
+                List<Path> resolved = resolveReferencePaths(metadata, reference);
                 List<ReferenceDocument> documents = new ArrayList<>();
                 for (Path path : resolved) {
                     String detail;
@@ -340,8 +549,8 @@ public final class SkillRuntime {
                         "readRef",
                         Map.of("skillId", skillId, "reference", reference),
                         Map.of("resolvedCount", documents.size()));
-            context.recordSkill(metadata.id());
-            return new ReferenceDocuments(reference, documents);
+        context.recordSkill(metadata.id());
+        return new ReferenceDocuments(reference, documents);
             } catch (IOException e) {
                 throw new IllegalStateException(
                         "Failed to read reference '%s' for skill '%s'".formatted(reference, metadata.id()),
@@ -360,22 +569,112 @@ public final class SkillRuntime {
             }
         }
 
+        @Tool(name = "runScript", returnBehavior = ReturnBehavior.TO_LLM)
+        @Override
+        public ScriptResult runScript(
+                @P("skillId") String skillId,
+                @P("path") String path,
+                @P(value = "args", required = false) List<String> args,
+                @P(value = "dependencies", required = false) List<String> dependencies,
+                @P(value = "timeoutSeconds", required = false) Integer timeoutSeconds) {
+            SkillIndex.SkillMetadata metadata = context.metadata();
+            validateSkillId(skillId, metadata.id());
+            if (path == null || path.isBlank()) {
+                throw new IllegalArgumentException("path must be provided when calling runScript");
+            }
+
+            Path scriptPath = resolveScriptPath(metadata.skillRoot(), context.outputDirectory(), path);
+            String extension = resolveExtension(scriptPath);
+            if (!ALLOWED_SCRIPT_EXTENSIONS.contains(extension)) {
+                throw new IllegalArgumentException(
+                        "Unsupported script type '%s'. Allowed extensions: %s".formatted(
+                                extension, ALLOWED_SCRIPT_EXTENSIONS));
+            }
+
+            List<String> argsList = normaliseStringList(args);
+            List<String> dependenciesList = normaliseStringList(dependencies);
+            List<Map<String, Object>> dependencyCalls = installDependencies(metadata, dependenciesList);
+            int effectiveTimeout = determineTimeoutSeconds(timeoutSeconds);
+            String stdinPayload = toJsonPayload(argsList);
+            List<String> command = buildScriptCommand(extension, scriptPath, argsList);
+            ProcessResult execution = executeProcess(
+                    command,
+                    metadata.skillRoot(),
+                    stdinPayload,
+                    Duration.ofSeconds(effectiveTimeout));
+
+            String stdoutLimited = limitChars(execution.stdout(), MAX_STDOUT_CHARS);
+            String stderrLimited = limitText(execution.stderr(), MAX_STDERR_LINES, MAX_STDERR_CHARS);
+            Map<String, Object> stdoutJson = parseStdoutJson(execution.stdout());
+
+            long durationMillis = execution.durationMillis();
+            String message = "Act[script] {} — {} exit={} timedOut={} durationMs={}";
+            if (execution.exitCode() == 0 && !execution.timedOut()) {
+                logger.info(message, metadata.id(), scriptPath, execution.exitCode(), execution.timedOut(), durationMillis);
+            } else {
+                logger.warn(message, metadata.id(), scriptPath, execution.exitCode(), execution.timedOut(), durationMillis);
+            }
+
+            Map<String, Object> invocationArgs = new LinkedHashMap<>();
+            invocationArgs.put("skillId", skillId);
+            invocationArgs.put("path", scriptPath.toString());
+            invocationArgs.put("timeoutSeconds", effectiveTimeout);
+            if (!argsList.isEmpty()) {
+                invocationArgs.put("args", argsList);
+            }
+            if (!dependenciesList.isEmpty()) {
+                invocationArgs.put("dependencies", dependenciesList);
+            }
+
+            Map<String, Object> invocationResult = new LinkedHashMap<>();
+            invocationResult.put("exitCode", execution.exitCode());
+            invocationResult.put("timedOut", execution.timedOut());
+            invocationResult.put("durationMillis", durationMillis);
+            if (!stdoutLimited.isBlank()) {
+                invocationResult.put("stdoutPreview", summariseForLog(stdoutLimited));
+            }
+            if (!stderrLimited.isBlank()) {
+                invocationResult.put("stderrPreview", summariseForLog(stderrLimited));
+            }
+            if (!dependencyCalls.isEmpty()) {
+                invocationResult.put("dependencyCalls", dependencyCalls);
+            }
+
+            context.recordInvocation("runScript", invocationArgs, invocationResult);
+            context.recordSkill(metadata.id());
+            context.recordReferenced(scriptPath);
+
+            return new ScriptResult(
+                    scriptPath.toString(),
+                    execution.exitCode(),
+                    execution.timedOut(),
+                    stdoutJson,
+                    stdoutLimited,
+                    stderrLimited,
+                    durationMillis,
+                    dependencyCalls);
+        }
+
         @Tool(name = "writeArtifact", returnBehavior = ReturnBehavior.TO_LLM)
-    @Override
-    public ArtifactHandle writeArtifact(
+        @Override
+        public ArtifactHandle writeArtifact(
                 @P("skillId") String skillId,
                 @P(value = "relativePath", required = false) String relativePath,
                 @P(value = "content", required = false) String content,
-                @P(value = "base64Content", required = false) String base64Content) {
+                @P(value = "base64Encoded", required = false) boolean base64Encoded) {
             SkillIndex.SkillMetadata metadata = context.metadata();
             validateSkillId(skillId, metadata.id());
             Path outputPath = context.resolveOutputPath(relativePath);
             byte[] bytes;
-            if (base64Content != null && !base64Content.isBlank()) {
-                bytes = Base64.getDecoder().decode(base64Content);
+            String payload = content == null ? "" : content;
+            if (base64Encoded) {
+                try {
+                    bytes = Base64.getDecoder().decode(payload);
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException("Failed to decode Base64 content", e);
+                }
             } else {
-                String text = content == null ? "" : content;
-                bytes = text.getBytes(StandardCharsets.UTF_8);
+                bytes = payload.getBytes(StandardCharsets.UTF_8);
             }
             try {
                 Path parent = outputPath.getParent();
@@ -397,21 +696,21 @@ public final class SkillRuntime {
                     Map.of(
                             "relativePath",
                             relativePath == null || relativePath.isBlank() ? DEFAULT_OUTPUT_FILE : relativePath,
-                            "skillId",
-                            skillId),
+                "skillId",
+                skillId,
+                "base64Encoded",
+                base64Encoded),
                     result);
-            context.recordSkill(metadata.id());
+        context.recordSkill(metadata.id());
             return new ArtifactHandle(outputPath.toString(), bytes.length, preview);
         }
 
         @Tool(name = "validateExpectedOutputs", returnBehavior = ReturnBehavior.TO_LLM)
-    @Override
-    public ValidationResult validateExpectedOutputs(
-                @P(value = "expected", required = false) List<String> expected,
+        @Override
+        public ValidationResult validateExpectedOutputs(
+                @P(value = "expected", required = false) Map<String, Object> expected,
                 @P(value = "observed", required = false) Map<String, Object> observed) {
-            List<String> expectedList = (expected == null || expected.isEmpty())
-                    ? context.expectedOutputs()
-                    : expected;
+            List<String> expectedKeys = resolveExpectedKeys(expected);
             Map<String, Object> observedMap = observed == null
                     ? Map.of()
                     : Map.copyOf(observed);
@@ -421,16 +720,41 @@ public final class SkillRuntime {
                 observedMap = Map.copyOf(merged);
             }
             Validation validation = SkillRuntime.this.validateOutputs(
-                    expectedList, observedMap, context.artifactPath());
+                    expectedKeys, observedMap, context.artifactPath());
             context.setValidation(validation);
+            Map<String, Object> invocationArgs = new LinkedHashMap<>();
+            if (expected != null && !expected.isEmpty()) {
+                invocationArgs.put("expected", new LinkedHashMap<>(expected));
+            }
+            invocationArgs.put("expectedKeys", expectedKeys);
             context.recordInvocation(
                     "validateExpectedOutputs",
-                    Map.of("expected", expectedList),
+                    invocationArgs,
                     Map.of(
                             "satisfied", validation.expectedOutputsSatisfied(),
                             "missing", validation.missingOutputs()));
-        context.recordSkill(context.metadata().id());
+            context.recordSkill(context.metadata().id());
             return new ValidationResult(validation.expectedOutputsSatisfied(), validation.missingOutputs());
+        }
+
+        private List<String> resolveExpectedKeys(Map<String, Object> overrides) {
+            if (overrides == null || overrides.isEmpty()) {
+                return context.expectedOutputs();
+            }
+            LinkedHashSet<String> keys = new LinkedHashSet<>();
+            overrides.forEach((rawKey, value) -> {
+                if (value instanceof Boolean bool && !bool) {
+                    return;
+                }
+                String key = Objects.toString(rawKey, "").trim();
+                if (!key.isEmpty()) {
+                    keys.add(key);
+                }
+            });
+            if (keys.isEmpty()) {
+                return context.expectedOutputs();
+            }
+            return List.copyOf(keys);
         }
 
         private void validateSkillId(String requested, String actual) {
@@ -441,6 +765,537 @@ public final class SkillRuntime {
                 throw new IllegalArgumentException(
                         "Tool requested skillId '%s' but runtime is executing '%s'".formatted(requested, actual));
             }
+        }
+
+        private List<Path> resolveReferencePaths(SkillIndex.SkillMetadata metadata, String reference)
+                throws IOException {
+            List<Path> resolved = new ArrayList<>();
+            IllegalArgumentException resolutionFailure = null;
+            try {
+                resolved.addAll(skillIndex.resolveReferences(metadata.id(), reference));
+            } catch (IllegalArgumentException ex) {
+                resolutionFailure = ex;
+            }
+            resolved.addAll(resolveOutputReferences(reference));
+            List<Path> deduplicated = resolved.stream()
+                    .map(Path::toAbsolutePath)
+                    .map(Path::normalize)
+                    .collect(Collectors.toCollection(LinkedHashSet::new))
+                    .stream()
+                    .collect(Collectors.toCollection(ArrayList::new));
+            if (!deduplicated.isEmpty()) {
+                return deduplicated;
+            }
+            if (resolutionFailure != null) {
+                throw resolutionFailure;
+            }
+            throw new IllegalArgumentException(
+                    "No resources matched '%s' for skill '%s'".formatted(reference, metadata.id()));
+        }
+
+        private List<Path> resolveOutputReferences(String reference) throws IOException {
+            String normalised = Objects.requireNonNull(reference, "reference").trim();
+            if (normalised.isEmpty()) {
+                return List.of();
+            }
+            Path outputBase = context.outputDirectory().toAbsolutePath().normalize();
+            Set<Path> matches = new LinkedHashSet<>();
+            for (String variant : expandOutputReferenceVariants(outputBase, normalised)) {
+                if (variant.isBlank()) {
+                    continue;
+                }
+                if (isGlobPattern(variant)) {
+                    matches.addAll(resolveOutputGlob(outputBase, variant));
+                    continue;
+                }
+                Path candidate = Path.of(variant);
+                List<Path> options = new ArrayList<>();
+                if (candidate.isAbsolute()) {
+                    options.add(candidate);
+                } else {
+                    options.add(outputBase.resolve(candidate));
+                }
+                for (Path option : options) {
+                    Path normalisedPath = option.toAbsolutePath().normalize();
+                    if (normalisedPath.startsWith(outputBase) && Files.exists(normalisedPath)) {
+                        matches.add(normalisedPath);
+                    }
+                }
+            }
+            return matches.stream().collect(Collectors.toCollection(ArrayList::new));
+        }
+
+        private Set<String> expandOutputReferenceVariants(Path outputBase, String reference) {
+            Set<String> variants = new LinkedHashSet<>();
+            variants.add(reference);
+            if (reference.startsWith("./")) {
+                variants.add(reference.substring(2));
+            }
+            if (reference.startsWith("/")) {
+                variants.add(reference.substring(1));
+            }
+            Path baseName = outputBase.getFileName();
+            if (baseName != null) {
+                String basePrefix = baseName + "/";
+                if (reference.startsWith(basePrefix)) {
+                    variants.add(reference.substring(basePrefix.length()));
+                }
+            }
+            Path parent = outputBase.getParent();
+            if (parent != null) {
+                Path parentName = parent.getFileName();
+                if (parentName != null && baseName != null) {
+                    String combined = parentName + "/" + baseName + "/";
+                    if (reference.startsWith(combined)) {
+                        variants.add(reference.substring(combined.length()));
+                    }
+                }
+            }
+            return variants;
+        }
+
+        private boolean isGlobPattern(String candidate) {
+            return candidate.contains("*")
+                    || candidate.contains("?")
+                    || candidate.contains("{")
+                    || candidate.contains("[");
+        }
+
+        private List<Path> resolveOutputGlob(Path outputBase, String pattern) throws IOException {
+            Path normalisedBase = outputBase.toAbsolutePath().normalize();
+            PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + adaptGlobPattern(pattern));
+            Set<Path> resolved = new LinkedHashSet<>();
+            try (var stream = Files.walk(normalisedBase)) {
+                stream.filter(path -> !path.equals(normalisedBase))
+                        .filter(path -> matcher.matches(normalisedBase.relativize(path)))
+                        .map(Path::toAbsolutePath)
+                        .map(Path::normalize)
+                        .filter(path -> path.startsWith(normalisedBase))
+                        .forEach(resolved::add);
+            }
+            return resolved.stream().collect(Collectors.toCollection(ArrayList::new));
+        }
+
+        private String adaptGlobPattern(String pattern) {
+            String separator = FileSystems.getDefault().getSeparator();
+            if ("/".equals(separator)) {
+                return pattern;
+            }
+            return pattern.replace("/", separator);
+        }
+
+        private Path resolveScriptPath(Path skillRoot, Path outputDir, String requested) {
+            Path candidate = Path.of(requested);
+            List<Path> searchOrder = new ArrayList<>();
+            if (candidate.isAbsolute()) {
+                searchOrder.add(candidate);
+            } else {
+                searchOrder.add(skillRoot.resolve(candidate));
+                searchOrder.add(outputDir.resolve(candidate));
+            }
+            for (Path option : searchOrder) {
+                Path normalised = option.toAbsolutePath().normalize();
+                if (Files.exists(normalised)
+                        && Files.isRegularFile(normalised)
+                        && (normalised.startsWith(skillRoot) || normalised.startsWith(outputDir))) {
+                    return normalised;
+                }
+            }
+            if (candidate.isAbsolute()) {
+                Path absolute = candidate.toAbsolutePath().normalize();
+                if (!absolute.startsWith(skillRoot) && !absolute.startsWith(outputDir)) {
+                    throw new IllegalArgumentException(
+                            "Script path must reside under the skill root or output directory");
+                }
+                if (Files.exists(absolute) && Files.isRegularFile(absolute)) {
+                    return absolute;
+                }
+            }
+            throw new IllegalArgumentException(
+                    "Script '%s' could not be resolved for skill '%s'".formatted(requested, context.metadata().id()));
+        }
+
+        private String resolveExtension(Path path) {
+            String name = path.getFileName().toString();
+            int index = name.lastIndexOf('.');
+            if (index < 0) {
+                return "";
+            }
+            return name.substring(index).toLowerCase();
+        }
+
+        private int determineTimeoutSeconds(Integer requestedSeconds) {
+            int seconds = requestedSeconds == null ? DEFAULT_SCRIPT_TIMEOUT_SECONDS : requestedSeconds;
+            if (seconds <= 0) {
+                seconds = DEFAULT_SCRIPT_TIMEOUT_SECONDS;
+            }
+            return Math.min(seconds, MAX_SCRIPT_TIMEOUT_SECONDS);
+        }
+
+        private String toJsonPayload(List<String> payload) {
+            List<String> safePayload = payload == null ? List.of() : payload;
+            try {
+                return OBJECT_MAPPER.writeValueAsString(safePayload);
+            } catch (IOException e) {
+                throw new IllegalArgumentException("Failed to serialise script args to JSON", e);
+            }
+        }
+
+        private Map<String, Object> parseStdoutJson(String stdout) {
+            if (stdout == null || stdout.isBlank()) {
+                return Map.of();
+            }
+            try {
+                return OBJECT_MAPPER.readValue(stdout, JSON_MAP_TYPE);
+            } catch (IOException e) {
+                logger.debug("Act[script] stdout is not valid JSON: {}", e.getMessage());
+                return Map.of();
+            }
+        }
+
+        private List<String> buildScriptCommand(String extension, Path scriptPath, List<String> args) {
+            List<String> command = new ArrayList<>();
+            if (".py".equals(extension)) {
+                command.add(locatePythonExecutable());
+            } else if (".js".equals(extension)) {
+                command.add(locateNodeExecutable());
+            } else if (".sh".equals(extension)) {
+                command.add(locateShellExecutable());
+            } else {
+                throw new IllegalArgumentException("Unsupported script extension: " + extension);
+            }
+            command.add(scriptPath.toString());
+            if (args != null && !args.isEmpty()) {
+                command.addAll(args);
+            }
+            return List.copyOf(command);
+        }
+
+        private List<Map<String, Object>> installDependencies(
+                SkillIndex.SkillMetadata metadata, List<String> dependencies) {
+            if (dependencies == null || dependencies.isEmpty()) {
+                return List.of();
+            }
+            Map<String, List<String>> grouped = groupDependencies(dependencies);
+            if (grouped.isEmpty()) {
+                return List.of();
+            }
+            List<Map<String, Object>> summaries = new ArrayList<>();
+            List<String> pipPackages = grouped.getOrDefault("pip", List.of());
+            if (!pipPackages.isEmpty()) {
+                ProcessResult pipResult = executeProcess(
+                        buildPipCommand(pipPackages),
+                        resolveDependencyWorkDir(pythonEnvDirectory(), metadata.skillRoot()),
+                        null,
+                        Duration.ofSeconds(DEFAULT_DEPENDENCY_TIMEOUT_SECONDS));
+                logDependencyOutcome("pip", pipPackages, pipResult);
+                summaries.add(createDependencySummary("pip", pipPackages, pipResult));
+            }
+            List<String> npmPackages = grouped.getOrDefault("npm", List.of());
+            if (!npmPackages.isEmpty()) {
+                ProcessResult npmResult = executeProcess(
+                        buildNpmCommand(npmPackages),
+                        resolveDependencyWorkDir(nodeEnvDirectory(), metadata.skillRoot()),
+                        null,
+                        Duration.ofSeconds(DEFAULT_DEPENDENCY_TIMEOUT_SECONDS));
+                logDependencyOutcome("npm", npmPackages, npmResult);
+                summaries.add(createDependencySummary("npm", npmPackages, npmResult));
+            }
+            if (summaries.isEmpty()) {
+                return List.of();
+            }
+            return List.copyOf(summaries);
+        }
+
+        private Map<String, List<String>> groupDependencies(List<String> dependencies) {
+            Map<String, List<String>> grouped = new LinkedHashMap<>();
+            for (String entry : dependencies) {
+                if (entry == null || entry.isBlank()) {
+                    continue;
+                }
+                DependencyDescriptor descriptor = parseDependencyEntry(entry);
+                if (descriptor.packages().isEmpty()) {
+                    continue;
+                }
+                grouped.computeIfAbsent(descriptor.tool(), key -> new ArrayList<>())
+                        .addAll(descriptor.packages());
+            }
+            Map<String, List<String>> immutable = new LinkedHashMap<>();
+            for (Map.Entry<String, List<String>> e : grouped.entrySet()) {
+                immutable.put(e.getKey(), List.copyOf(e.getValue()));
+            }
+            return immutable;
+        }
+
+        private DependencyDescriptor parseDependencyEntry(String rawEntry) {
+            String entry = rawEntry.trim();
+            int separator = entry.indexOf(':');
+            String tool;
+            String payload;
+            if (separator > 0) {
+                tool = entry.substring(0, separator).trim().toLowerCase(Locale.ROOT);
+                payload = entry.substring(separator + 1).trim();
+            } else {
+                tool = "pip";
+                payload = entry;
+            }
+            if (tool.isEmpty()) {
+                tool = "pip";
+            }
+            if (!"pip".equals(tool) && !"npm".equals(tool)) {
+                throw new IllegalArgumentException(
+                        "Unsupported dependency tool '%s'. Supported tools: pip, npm".formatted(tool));
+            }
+            List<String> packages = new ArrayList<>();
+            if (!payload.isEmpty()) {
+                for (String token : payload.split("[,\\s]+")) {
+                    String value = token.trim();
+                    if (!value.isEmpty()) {
+                        packages.add(value);
+                    }
+                }
+            }
+            return new DependencyDescriptor(tool, List.copyOf(packages));
+        }
+
+        private final class DependencyDescriptor {
+            private final String tool;
+            private final List<String> packages;
+
+            private DependencyDescriptor(String tool, List<String> packages) {
+                this.tool = Objects.requireNonNullElse(tool, "pip");
+                this.packages = packages == null ? List.of() : List.copyOf(packages);
+            }
+
+            private String tool() {
+                return tool;
+            }
+
+            private List<String> packages() {
+                return packages;
+            }
+        }
+
+        private List<String> normaliseStringList(List<String> values) {
+            if (values == null || values.isEmpty()) {
+                return List.of();
+            }
+            List<String> cleaned = new ArrayList<>();
+            for (String value : values) {
+                if (value == null) {
+                    continue;
+                }
+                String trimmed = value.trim();
+                if (!trimmed.isEmpty()) {
+                    cleaned.add(trimmed);
+                }
+            }
+            if (cleaned.isEmpty()) {
+                return List.of();
+            }
+            return List.copyOf(cleaned);
+        }
+
+        private void logDependencyOutcome(String tool, List<String> packages, ProcessResult result) {
+            String message = "Act[script] dependency {} {} exit={} timedOut={} durationMs={}";
+            if (result.exitCode() == 0 && !result.timedOut()) {
+                logger.info(message, tool, packages, result.exitCode(), result.timedOut(), result.durationMillis());
+            } else {
+                logger.warn(message, tool, packages, result.exitCode(), result.timedOut(), result.durationMillis());
+            }
+        }
+
+        private Map<String, Object> createDependencySummary(String tool, List<String> packages, ProcessResult result) {
+            Map<String, Object> summary = new LinkedHashMap<>();
+            summary.put("tool", tool);
+            summary.put("packages", List.copyOf(packages));
+            summary.put("command", String.join(" ", result.command()));
+            summary.put("exitCode", result.exitCode());
+            summary.put("timedOut", result.timedOut());
+            summary.put("durationMillis", result.durationMillis());
+            if (!result.stdout().isBlank()) {
+                summary.put("stdoutPreview", summariseForLog(limitChars(result.stdout(), 512)));
+            }
+            if (!result.stderr().isBlank()) {
+                summary.put("stderrPreview", summariseForLog(limitText(result.stderr(), 16, 512)));
+            }
+            return summary;
+        }
+
+        private List<String> buildPipCommand(List<String> packages) {
+            List<String> command = new ArrayList<>();
+            command.add(locatePipExecutable());
+            command.add("install");
+            command.addAll(packages);
+            return command;
+        }
+
+        private List<String> buildNpmCommand(List<String> packages) {
+            List<String> command = new ArrayList<>();
+            command.add(locateNpmExecutable());
+            command.add("install");
+            command.addAll(packages);
+            return command;
+        }
+
+        private Path resolveDependencyWorkDir(Path preferred, Path fallback) {
+            if (preferred != null && Files.isDirectory(preferred)) {
+                return preferred;
+            }
+            return fallback;
+        }
+
+        private Path pythonEnvDirectory() {
+            return SkillRuntime.this.skillIndex.skillsRoot().resolveSibling("env").resolve("python")
+                    .toAbsolutePath()
+                    .normalize();
+        }
+
+        private Path nodeEnvDirectory() {
+            return SkillRuntime.this.skillIndex.skillsRoot().resolveSibling("env").resolve("node")
+                    .toAbsolutePath()
+                    .normalize();
+        }
+
+        private String locatePythonExecutable() {
+            Path envDir = pythonEnvDirectory();
+            Path unix = envDir.resolve("bin").resolve("python");
+            if (Files.isRegularFile(unix)) {
+                return unix.toString();
+            }
+            Path windows = envDir.resolve("Scripts").resolve("python.exe");
+            if (Files.isRegularFile(windows)) {
+                return windows.toString();
+            }
+            return "python3";
+        }
+
+        private String locatePipExecutable() {
+            Path envDir = pythonEnvDirectory();
+            Path unix = envDir.resolve("bin").resolve("pip");
+            if (Files.isRegularFile(unix)) {
+                return unix.toString();
+            }
+            Path windows = envDir.resolve("Scripts").resolve("pip.exe");
+            if (Files.isRegularFile(windows)) {
+                return windows.toString();
+            }
+            return "pip";
+        }
+
+        private String locateNodeExecutable() {
+            Path envDir = nodeEnvDirectory();
+            Path unix = envDir.resolve("bin").resolve("node");
+            if (Files.isRegularFile(unix)) {
+                return unix.toString();
+            }
+            Path modules = envDir.resolve("node_modules").resolve(".bin").resolve("node");
+            if (Files.isRegularFile(modules)) {
+                return modules.toString();
+            }
+            return "node";
+        }
+
+        private String locateNpmExecutable() {
+            Path envDir = nodeEnvDirectory();
+            Path unix = envDir.resolve("bin").resolve("npm");
+            if (Files.isRegularFile(unix)) {
+                return unix.toString();
+            }
+            Path modules = envDir.resolve("node_modules").resolve(".bin").resolve("npm");
+            if (Files.isRegularFile(modules)) {
+                return modules.toString();
+            }
+            return "npm";
+        }
+
+        private String locateShellExecutable() {
+            Path bash = Path.of("/bin/bash");
+            if (Files.isRegularFile(bash)) {
+                return bash.toString();
+            }
+            return "bash";
+        }
+
+        private ProcessResult executeProcess(
+                List<String> command, Path workingDirectory, String stdinPayload, Duration timeout) {
+            Objects.requireNonNull(command, "command");
+            Objects.requireNonNull(workingDirectory, "workingDirectory");
+            Objects.requireNonNull(timeout, "timeout");
+            List<String> commandCopy = List.copyOf(command);
+            Instant start = Instant.now();
+            ProcessBuilder builder = new ProcessBuilder(commandCopy);
+            builder.directory(workingDirectory.toFile());
+            builder.redirectErrorStream(false);
+            Process process;
+            try {
+                process = builder.start();
+            } catch (IOException e) {
+                throw new IllegalStateException("Failed to start process: " + String.join(" ", commandCopy), e);
+            }
+            try (OutputStream output = process.getOutputStream()) {
+                if (stdinPayload != null && !stdinPayload.isEmpty()) {
+                    try (OutputStreamWriter writer = new OutputStreamWriter(output, StandardCharsets.UTF_8)) {
+                        writer.write(stdinPayload);
+                        writer.flush();
+                    }
+                }
+            } catch (IOException e) {
+                process.destroyForcibly();
+                throw new IllegalStateException("Failed to send input to process", e);
+            }
+            boolean finished;
+            try {
+                finished = process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                process.destroyForcibly();
+                throw new IllegalStateException("Interrupted while waiting for process", e);
+            }
+            if (!finished) {
+                process.destroyForcibly();
+                try {
+                    process.waitFor(1, TimeUnit.SECONDS);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            String stdout = readAll(process.getInputStream());
+            String stderr = readAll(process.getErrorStream());
+            long durationMillis = Duration.between(start, Instant.now()).toMillis();
+            int exitCode = finished ? process.exitValue() : -1;
+            return new ProcessResult(commandCopy, exitCode, !finished, stdout, stderr, durationMillis);
+        }
+
+        private String readAll(InputStream stream) {
+            try (InputStream input = stream) {
+                return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        private String limitChars(String text, int maxChars) {
+            if (text == null) {
+                return "";
+            }
+            String trimmed = text.strip();
+            if (trimmed.length() <= maxChars) {
+                return trimmed;
+            }
+            return trimmed.substring(0, maxChars);
+        }
+
+        private String limitText(String text, int maxLines, int maxChars) {
+            if (text == null || text.isBlank()) {
+                return "";
+            }
+            List<String> lines = text.lines().limit(maxLines).collect(Collectors.toList());
+            String joined = String.join(System.lineSeparator(), lines).strip();
+            if (joined.length() <= maxChars) {
+                return joined;
+            }
+            return joined.substring(0, maxChars);
         }
 
         private String summarisePreview(byte[] bytes) {
@@ -460,6 +1315,20 @@ public final class SkillRuntime {
             }
             String text = new String(bytes, StandardCharsets.UTF_8);
             return summariseForLog(text);
+        }
+    }
+
+    private record ProcessResult(
+            List<String> command,
+            int exitCode,
+            boolean timedOut,
+            String stdout,
+            String stderr,
+            long durationMillis) {
+        ProcessResult {
+            command = List.copyOf(command);
+            stdout = stdout == null ? "" : stdout;
+            stderr = stderr == null ? "" : stderr;
         }
     }
 
@@ -493,6 +1362,10 @@ public final class SkillRuntime {
 
         List<String> expectedOutputs() {
             return expectedOutputs;
+        }
+
+        Path outputDirectory() {
+            return outputDirectory;
         }
 
         void logL1() {
@@ -585,6 +1458,24 @@ public final class SkillRuntime {
     public record ReferenceDocuments(String reference, List<ReferenceDocument> documents) {}
 
     public record ReferenceDocument(String path, String content, String kind) {}
+
+    public record ScriptResult(
+            String path,
+            int exitCode,
+            boolean timedOut,
+            Map<String, Object> stdout,
+            String stdoutText,
+            String stderrText,
+            long durationMillis,
+            List<Map<String, Object>> dependencyCalls) {
+        public ScriptResult {
+            Objects.requireNonNull(path, "path");
+            stdout = stdout == null ? Map.of() : Map.copyOf(stdout);
+            stdoutText = stdoutText == null ? "" : stdoutText;
+            stderrText = stderrText == null ? "" : stderrText;
+            dependencyCalls = dependencyCalls == null ? List.of() : List.copyOf(dependencyCalls);
+        }
+    }
 
     public record ArtifactHandle(String path, long bytesWritten, String preview) {}
 
