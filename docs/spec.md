@@ -1,9 +1,9 @@
 # 仕様書（spec.md）— langchain4j-claude-skills-agent
 
 ## 0. 目的とスコープ
-- `skills/` 配下に配置した **Claude Skills 互換の SKILL.md** 群を読み取り、**LangChain4j の Workflow / Agent API** を土台にした **Plan → Act → Reflect** 骨格で自動選択・段階実行する “Skills-lite ランタイム” を提供する。  
+- 任意の skill ルート（例：`skills/` 取得物や `brand-guidelines` など）に配置された **Claude Skills 互換の SKILL.md** 群を読み取り、**Plan → Act → Reflect** 骨格で自動選択・段階実行する “Skills-lite ランタイム” を提供する。  
   - LangChain4j を本番経路のオーケストレーションに採用し、Plan / Act / Reflect は Workflow ノードとして実装する。補助的なユーティリティのみ独自コードで補完する。
-- **Progressive Disclosure 準拠**：メタだけ常駐 → 本文は必要時に最小抜粋 → スクリプトは実行結果のみを注入（コンテキスト最適化）。
+- **Progressive Disclosure 準拠**：メタだけ常駐 → 本文は必要時に投入（既定は全文、超過時は要約） → スクリプトは実行結果のみを注入（コンテキスト最適化）。
   - 参考: 概要 https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview  
           設計思想（Engineering Blog） https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills
 
@@ -15,23 +15,48 @@
 
 ---
 
+**注記**：単一 Skill を自律的に実行する Act（Pure）の詳細仕様は別紙 **spec_skillruntime.md** を参照。
+
 ## 1. リポジトリ前提と配置
 - `skills/` は **anthropics/skills** のエクスポート置場（未追跡・`.gitignore` 登録）：https://github.com/anthropics/skills  
-- Gradle の `updateSkills` タスクで固定コミット（既定：`c74d647e56e6daa12029b6acb11a821348ad044b`）を展開し、`-PskillsCommit` で切り替えられるようにして再現性を確保。CI でも同タスクを実行する想定。  
+- Gradle の `updateSkills` タスクで固定コミット（既定：`c74d647e56e6daa12029b6a...b`）を展開し、`-PskillsCommit` で切り替えられるようにして再現性を確保。CI でも同タスクを実行する想定。  
 - 初期デモは `brand-guidelines/` と `document-skills/pptx/` を含むが、**実装は汎用**（特定スキルはハードコードしない）。
 - API 観点の前提（Files/コード実行/ベータ注意）：https://docs.claude.com/en/api/skills-guide
 
 ---
 
 ## 2. 全体アーキテクチャ
+- **Concept**：Workflow（Plan/Reflect）＋ Skills-lite Invoker（Act）  
+- **コンポーネント**
 ```
 
-CliApp → AgentService (Workflow Runner)
-├─ Planner (Plan)
-├─ Invoker (Act with autonomy window)
-├─ Evaluator (Reflect / Loop)
+runtime/
+├─ workflow/
+│  ├─ PlannerAgent
+│  ├─ InvokerAgent
+│  └─ EvaluatorAgent
+├─ invoker/
+│  ├─ SkillSelector
+│  ├─ SkillInputBinder
+│  ├─ ArtifactWriter
+│  └─ GuardRails
+├─ provider/
+│  ├─ OpenAIAdapter
+│  └─ ClaudeAdapter
+├─ infra/
+│  ├─ config/
+│  └─ fs/
+├─ evaluation/
+└─ shared/
+├─ Blackboard
+└─ SkillIndex
+
+```
+- **補助モジュール（例）**
+```
+
 ├─ ProviderAdapter (OpenAI 既定 / Claude 代替)
-├─ SkillRuntime (stages 実行)
+├─ SkillRuntime（別紙: spec_skillruntime.md）
 ├─ ContextPacking (抜粋/要約/差分/キャッシュ)
 ├─ SkillIndex (SKILL.md 索引)
 └─ Blackboard (中間成果)
@@ -43,19 +68,12 @@ CliApp → AgentService (Workflow Runner)
 
 ### 2.1 実装モジュール構成（LangChain4j Agentic 適用方針）
 - `app.cli`：CLI エントリーポイント。ユーザ入力を受け取り、`runtime.AgentService` に委譲。  
-- `runtime.workflow`：LangChain4j の Workflow/Agent API を直接扱う層。`PlanWorkflow`, `ActWorkflow`, `ReflectWorkflow` を `AgenticServices.sequenceBuilder()` で合成し、Plan→Act→Reflect の固定骨格を生成する。  
-  - `runtime.workflow.plan`：`PlannerAgent`（Supervisor/Sequence のどちらを採用するかを含む）、`PlanContextBuilder`、`PlanResultMapper`。  
-  - `runtime.workflow.act`：`InvokerAgent`（Supervisor + 自律ウィンドウ設定）、`SkillInvocationGuard`、`AgenticScopeSynchronizer`。  
-  - `runtime.workflow.reflect`：`EvaluatorAgent`、`ValidationRules`, `RetryPolicyEvaluator`。  
-  - `runtime.workflow.support`：`WorkflowFactory`（チャットモデル/ツールの差し替え）、`AgenticScopePrinter` のラッパ。  
-  - `WorkflowFactory` は LangChain4j が提供する `dev.langchain4j.agentic.AgenticServices` / `dev.langchain4j.agentic.workflow.Workflow` を直接利用し、独自の Workflow 実装で代用してはならない。  
-- `runtime.provider`：`ProviderAdapter` と各実装（`OpenAiProvider`, `ClaudeProvider`）。`AgenticServices.agentBuilder(...).chatModel(provider.chatModel())` で利用。  
-- `runtime.skill`：`SkillIndex`, `SkillRepository`, `SkillContextLoader`, `SkillInputBinder`。Plan/Act/Reflect から共通利用。  
-- `runtime.blackboard`：`BlackboardStore`, `ArtifactHandle`, `AgenticScopeBridge`。AgenticScope の `readState`/`writeState` と命名規約（`<stage>.<artifact>` 形式）をここで統制。  
-- `runtime.context`：`ContextPackingService`, `ProgressiveDisclosurePolicy`。Plan/Act ノードからの投入を共通化。  
-- `runtime.guard`：トークン/時間/回数の制限、Allowlist/Denylist 判定、スキーマ検証を担う。Act/Evaluator から呼び出し。  
-- `runtime.human`：Human-in-the-loop 連携（`HumanReviewAgentFactory`）。`AgenticServices.humanInTheLoopBuilder()` を用い、Act/Reflect の再試行経路に挿入。  
-- `infra.logging`：`WorkflowLogger`, `DisclosureMetricsTracker`。LangChain4j サンプルの `CustomLogging` 由来の PRETTY ログ整形＋構造化ログ出力。  
+- `runtime.workflow`：LangChain4j の Workflow/Agent API を直接扱う層。`PlannerAgent` / `InvokerAgent` / `EvaluatorAgent` を合成し、`AgenticServices.sequenceBuilder()` で Plan→Act→Reflect の固定骨格を生成する。  
+  - `runtime.workflow.plan`：`PlannerAgent`（Skill 候補列の生成、期待出力の定義、評価観点の提示）  
+  - `runtime.workflow.act`：`InvokerAgent`（SkillRuntime 呼び出し、Budgets の配布）  
+  - `runtime.workflow.reflect`：`EvaluatorAgent`（Completeness/Compliance/Quality の判定、再試行戦略の決定）
+- `provider`：LLM アダプタ（OpenAI/Claude）。温度/seed/上限の統一設定を適用する。  
+- `shared`：Blackboard/SkillIndex/ContextCache 等の横断 DTO・リポジトリ。  
 - `infra.config`：`RuntimeConfig`, `BudgetConfig`, `SkillRuntimeConfig` 等。CLI 起動時に読み込み、WorkflowFactory/ProviderAdapter へ注入。
 
 ---
@@ -64,24 +82,23 @@ CliApp → AgentService (Workflow Runner)
 ### 3.1 SKILL.md（サブセット）
 - 必須フロントマター：`name, description`
 - 任意フロントマター：`version, inputs(id/type/required), outputs, keywords, stages(id/purpose/resources)`
-- `resources/`：テンプレート、例、スキーマ、**scripts/**（任意）
+- 追加ファイル（例：`resources/`, `templates/`）やコード（例：`scripts/`）は**任意**
 - 未対応項目は**無視＋警告**（前方互換）
 - 参考: Claude Skills公式ドキュメント https://support.claude.com/en/articles/12512198-how-to-create-custom-skills
 
 ### 3.2 SkillIndex（抽出メタ）
-- `skillId`（相対パス）、`name/description`（必須）、`version`（任意）、`inputs/outputs` 型（任意）、`keywords`（任意）、`stages` 要約（任意）、主要 `resources`（scripts 含む、任意）
-- **System 提示用の要約（L1）**：`name / description / 発火条件（短文）` に圧縮
+- `skillId`（相対パス）、`name/description`（必須）、`version`（任意）、`inputs/outputs`（任意）、`keywords`（任意）、`stages` 要約（任意）、主要 `resources`（scripts 含む、任意）
+- **System 提示用の要約（L1）**：`name / description` のみに圧縮
 
 ### 3.3 Blackboard（中間成果）
-- 生成物レジストリ：`key -> { kind(file/json/text), path, summary, lineage }`  
-- 例：`brand_profile@1`, `deck@1` など
+- `artifactHandle`：`build/` 直下に生成されたファイルのハンドル（`path`, `hash`, `meta`）  
+- `evidenceLog`：各手の根拠（`reason_short`, `inputs_digest`, `cost`, `diff_summary`）  
+- `metrics`：tokens/time/tool_calls/disclosure など
 
-### 3.4 AgenticScope ステート設計
-- **命名規約**：`<phase>.<artifact>`（phase = `plan`, `act`, `reflect`, `shared`）。再試行サイクルは `.<iteration>` を付与（例：`act.output@2`）。  
-- **Plan フェーズ**（PlannerAgent → Act への引き渡し）
-  - `plan.goal`：正規化済みゴールテキスト。  
-  - `plan.inputs`：ユーザ提供素材のサマリと参照パス。  
-  - `plan.candidateSteps`：`List<PlanStep>`（`skillId` / `intent` / `expectedInputKeys` / `expectedOutputKeys` / `evalFocus`）。  
+### 3.4 AgenticScope（実行時スナップショット）
+- **Plan フェーズ**
+  - `plan.goal`：ユーザ要求（自然文＋構造化ゴール）  
+  - `plan.candidates`：Skill 候補列（`skillId`, `expectedOutputs`, `evaluationFocus`）  
   - `plan.constraints`：`Map<String, Object>`（`tokenBudget`, `timeBudgetMs`, `maxToolCalls` など）。  
   - `plan.evaluationCriteria`：Reflect 用メトリクス（`requiredArtifacts`, `qualityChecks`）。  
 - **Act フェーズ**（InvokerAgent / 各スキル呼び出し）
@@ -97,37 +114,26 @@ CliApp → AgentService (Workflow Runner)
 - **補助ステート**
   - `shared.contextSnapshot`：Progressive Disclosure の投入ログ。  
   - `shared.guardState`：Guard 判定の結果（違反種別、残リトライ数）。  
-  - `shared.metrics`：ログ収集用のトークン/時間計測キャッシュ。  
-- AgenticScope への read/write は `AgenticScopeBridge` 経由で集約し、Plan/Act/Reflect ノードは domain オブジェクトに変換して扱う。
 
 ---
 
-## 4. 固定ワークフロー
-1) **Plan**  
-   - 入力：`goal`、ユーザ入力（例：`docs/agenda.md`）、`SkillIndex`、制約（例：`max_slides`）  
-   - 出力：**候補スキル列（推奨順）**、各ステップの目的・入出力写像、**評価基準**  
-   - 選定基準：goal と skill の name/description の類似度、入力/出力整合、履歴（成功ログ）、制約充足（keywords が存在する場合は補助的に利用）
-2) **Act（自律ウィンドウ）**  
-   - 公開ツールは **単一**：`invokeSkill(skillId, inputs)`  
-   - ガード：`max_tool_calls`、`token_budget`、`time_budget_ms`、`skill_allowlist/denylist`、`require_progress`  
-   - 各呼び出し後に成果物を Blackboard へ登録。**次の入力合成はエージェントが決定**。  
-3) **Reflect**  
-   - Evaluator が成果物を検証（スキーマ整合、制約満足、品質スコア）  
-   - 未達は **一度だけ再試行**（抜粋強化・代替スキル案）  
-4) **Done**  
-   - 成果物と構造化ログを返却
+## 4. Workflow（Plan/Act/Reflect）の流れ（要点）
+- **Plan**：関連 Skill を選定し、期待出力（`expectedOutputs`）・評価観点・実行順の仮説を立てる。  
+- **Act**：各 Skill を **SkillRuntime（別紙）** で実行。予算（time/token/tool_calls）を渡し、自律ループで達成させる。  
+- **Reflect**：成果物を Completeness/Compliance/Quality で評価。不足があれば再度 Act へ戻すか、代替 Skill を選定。  
+- **終了**：全ての必須成果物が揃えば完了、未達なら終了理由と次善策を返す。
 
 ---
 
 ## 5. コンテキスト最適化（Progressive Disclosure）
-> 「常時：メタ（L1）／必要時：本文抜粋（L2）／リソース・スクリプトは結果のみ（L3）」を厳格適用
+> 「常時：メタ（L1）／必要時：本文（L2）／リソース・スクリプトは結果のみ（L3）」を厳格適用
 
 ### 5.1 Disclosure レベル
-- **L1（常時）**：System には **SkillIndex の要約**のみ（`name/description/発火条件` 短文）  
-- **L2（必要時）**：関連と判定された Skill の **SKILL.md 本文を抜粋注入**  
-  - ソフト上限：1 Skill あたり **≤ 5k tokens 相当**（超過時は更に要約）  
-  - 抜粋単位：章・見出し・コードブロック・表  
-- **L3（リソース/スクリプト）**：`resources/*` は必要断片のみ、`scripts/*` は**実行して出力メタのみ**をプロンプトへ
+- **L1（常時）**：System には **`name/description` のみ**  
+- **L2（必要時）**：関連と判定された Skill の **SKILL.md 本文を全文読込**  
+  - ソフト上限：1 Skill あたり **≤ 5k tokens 相当**（超過時は章・見出し単位で要約/抜粋）  
+  - （超過時の）抜粋単位：章・見出し・コードブロック・表  
+- **L3（追加ファイル/コード）**：追加ファイル（例：`resources/*`, `templates/*`, `*.md`）は必要断片のみ、コード（例：`scripts/*`）は**実行して出力メタのみ**をプロンプトへ
 
 ### 5.2 差分投入と縮退
 - 既投入文脈は **要約へ縮退**、以降は **差分のみ**追加  
@@ -137,100 +143,91 @@ CliApp → AgentService (Workflow Runner)
 ---
 
 ## 6. Skills-lite 実行エンジン
-### 6.1 Loader / Indexer
-- `skills/` を再帰走査して SKILL.md を読み、サブセット抽出 → `SkillIndex` 構築
+### 6.1 Skill 選定（SkillSelector）
+- 入力：`plan.candidates` と `SkillIndex`  
+- 出力：実行順序（スコア：Relevance/Readiness/Impact-Cost-Risk）  
+- メモ：Plan が複数候補を提示し、Selector が逐次決定する
 
-### 6.2 Stages Executor
-- `stages[*].purpose` を提示し、必要 `resources` と `inputs` を束ねてプロンプト化  
-- 生成・検証・テンプレ展開・ファイル出力を行い、Blackboard に登録
+### 6.2 入出力束ね（SkillInputBinder / ArtifactWriter）
+- `SkillInputBinder`：`plan.inputs` と Blackboard を突き合わせ、スキルごとの入力を整形  
+- `ArtifactWriter`：`build/<skillId>/...` への安全な書き出し。重複は `contentHash` で回避
 
 ### 6.3 スクリプト実行（scripts/）
 - **目的**：`document-skills/pptx/scripts` 等を **安全・再現性高く**実行  
 - **方式**：  
   - 既定＝**ローカルプロセス**（`python3` / `node` / `bash` Allowlist、作業ディレクトリ＝該当 skill ルート）  
-  - 任意＝**コンテナ**（`--network=none`、skills/build のみマウント）  
-- **ガード**：I/O は `skills/` と `build/` のみ、`timeoutMs`、`maxStdoutBytes`、`maxFilesCreated`、`maxProcessCount=1`  
+  - 任意＝**コンテナ**（`--network=none`、skillRoot/build のみマウント）  
+- **ガード**：I/O は **skillRoot** と `build/` のみ、`timeoutMs`、`maxStdoutBytes`、`maxFilesCreated`、`maxProcessCount=1`  
 - **入出力**：入力 `args.json`、出力は `build/out/*` と **stdout JSON**（`status/artifacts/warnings`）  
 - **コンテキスト注入**：**stdout JSON と生成物メタのみ**（コード本文・冗長ログは注入しない：L3）
 
----
-
-## 7. プロンプト戦略
-- **System**：役割・安全制約・固定ワークフロー・ガードレール・**SkillIndex 要約のみ（L1）**  
-- **Developer**：評価基準、I/O 制約、抜粋/要約ルール、Disclosure 運用指針  
-- **User**：ゴール文＋入力（例：`docs/agenda.md`）  
-- **Plan**：候補スキル列（理由付き）／入出力写像／成功条件  
-- **Act**：各呼び出しの目的・必要抜粋・入力候補を明示  
-- **Reflect**：達成度の差分指摘と再試行案（1 回）  
-- （API 実装例・前提の参照：Quickstart https://docs.claude.com/en/docs/agents-and-tools/agent-skills/quickstart ／ Skills Guide https://docs.claude.com/en/api/skills-guide）
+### 6.4 GuardRails
+- 予算：`maxToolCalls` / `timeBudgetMs` / `tokenBudget` / `diskWriteLimitMb` / `scriptTimeoutSec`  
+- 例外：超過・違反で即終了（`reason`, `advice` を含む）
 
 ---
 
-## 8. Provider / LangChain4j 連携
-- **ProviderAdapter**：OpenAI（既定）/Claude（代替）の会話・ツール呼び出し差分を吸収。  
-- **LangChain4j 利用範囲**：Workflow / Agent API を活用し、Planner・Invoker・Evaluator を Workflow ノードとして構成する。`LangChain4jLlmClient` はこれらのノードから利用する既定のチャットモデル実装。  
-  - エージェント構成は LangChain4j の Agentic チュートリアル/サンプルを基準とし、必要な拡張（Blackboard・ContextCache 等）はノードの内部またはカスタムフックで実装する。  
-  - チュートリアル：https://docs.langchain4j.dev/tutorials/agents/  
-  - サンプル：https://github.com/langchain4j/langchain4j-examples/tree/main/agentic-tutorial
-  - `dev.langchain4j.agentic.AgenticServices` / `dev.langchain4j.agentic.workflow.Workflow` / `dev.langchain4j.agentic.agents.Agent` など公式 API を直接 import し、代替実装は作らない。これらの import が存在することをテストで検証する。  
-- **Agentic API コーディングスタイル**  
-  - Agent インタフェースは `@Agent` に `name`/`description`/`outputName` を明示し、`@UserMessage` と必要なら `@SystemMessage` でプロンプトを固定。メソッド引数は `@V` でバインドし、1 エージェント＝1 目的（単一メソッド）とする。  
-  - 実装は `AgenticServices.agentBuilder(...).chatModel(...).outputName(...).build()` を基本形とし、スキル側の Structured Output（record/class）を優先。共通設定（モデル、ツール、非同期可否）はビルダーに対する関数で合成可能にする。  
-  - Workflow は `sequenceBuilder`（直列）、`parallelBuilder`（並列＋`executor` 管理）、`conditionalBuilder`（ガード判定）、`loopBuilder`（再帰処理）を使い分け、スーパーエージェントには `supervisorBuilder` を用いて Plan/Invoker の自律判断を行う。Composite Agent の `outputName` は AgenticScope のステート名と一致させ、Blackboard 連携用に命名規約（例：`stageName.artifactKind`）を設ける。  
-  - AgenticScope の read/write を通じてステートを共有し、Plan/Reflect ノードは Scope から構造化データを取得する。`AgenticServices.agentAction(...)` や専用クラス経由で非 LLM 処理（集計・検証）を挿入し、`humanInTheLoopBuilder` で Human-in-the-loop ステップを統合する。  
-  - ログの可視化はサンプルの `AgenticScopePrinter`/`CustomLogging` 相当の仕組みで踏襲し、Scope の変化とサブエージェント呼び出し履歴（名前・説明）を PRETTY ログ形式で残す。Reflect 段階での検証・再試行ポリシーは Supervisor/Loop パターンと一貫させる。
+## 7. 評価（Reflect）と品質ゲート
+- **Completeness**：`expectedOutputs` の全要素が存在  
+- **Compliance**：配置・命名・ブランド指定・スキーマ合致  
+- **Quality**：構文 OK、相互参照整合、空欄なし、差し戻し事項の解消  
+- 評価ログは `reflect.review` として保存し、失敗時は `retryAdvice` を提示
 
 ---
 
-## 9. ログと可観測性（Disclosure 指標を含む）
-- `workflow_id`, `context_id`, **確定プラン**（候補→確定の遷移）  
-- **自律ウィンドウ実績**：呼び出し回数／消費トークン／経過時間／打切り理由  
+## 8. ロギングと可観測性
+- **Attempt ログ**：`action`, `reason_short`, `inputs_digest`, `output_meta`, `cost`, `diff_summary`, `file_ids`  
 - **Disclosure 指標**：レベル別トークン（L1/L2/L3）、**before→after**、抜粋バイト、cache ヒット率、SKILL.md 抜粋サイズと上限適用回数  
-- 各ステップ：`skillId`／入力要約／生成成果／`tokens_in/out`  
-- Evaluator：合否/スコア/NG 理由、再試行有無  
-- 全体：`time_total_ms`
+- **メトリクス**：tokens/time/tool_calls/disclosure、各フェーズの所要時間、再試行回数
 
 ---
 
-## 10. 失敗時の扱い
-- **入力不足**：Plan に差し戻し、明確な追加入力質問を 1 回  
-- **スキル選択ミス**：Reflect で代替候補を提示し再計画→再試行（1 回）  
-- **出力検証 NG**：抜粋強化・テンプレ修正提案を伴う再試行（1 回）  
-- **Disclosure 違反**：過投入検知時は自動縮退して再試行  
-- 収束不可：**終了理由と次善策**（手動手順・参考情報）を返す
+## 9. 例外と失敗ハンドリング
+- **不足参照**（存在しない MD/スクリプト）：即検出 → 代替生成 1 回 → 不可なら差し戻し（不足一覧・推奨次手）  
+- **スキーマ NG / タイムアウト / 循環参照**：終了理由と推奨次手（再入力・必要参照）を返却  
+- **セキュリティ違反**：プロセス中断・生成物のロールバック・監査ログ保存
 
 ---
 
-## 11. セキュリティと制約
-- 書き込みは `build/` 配下のみ。外部ネット無効。任意スクリプトは**サンドボックス**必須  
-- Allowlist/Denylist によるツール・スキル制御。危険命令は拒否  
-- SKILL.md 未対応項目は**無視＋警告**。機密情報はプロンプト・ログに投入しない  
-- スクリプトは **監査済みのみ**実行（初回取り込み時に簡易静的スキャン）
+## 10. コンフィグ
+- `RuntimeConfig`：モデル設定、温度=0/seed 固定（再現性既定）、`maxContextTokens`  
+- `BudgetConfig`：`maxToolCalls`, `timeBudgetMs`, `tokenBudget`, `diskWriteLimitMb`, `scriptTimeoutSec`  
+- `SkillRuntimeConfig`：Sandbox 設定（Allowlist 拡張子、作業ディレクトリ、コンテナ使用可否）
 
 ---
 
-## 12. テストと受け入れ
-- **E2E**：ゴールのみ指定で完走し、制約を満たす成果物（例：ブランド適合の `deck.pptx`）  
-- **再現性**：同条件で Plan → Act → Reflect のログ構造が一致（自律部の揺れは許容）  
-- **コンテキスト最適化**：2 回目以降で **before→after tokens** が減少し、L2/L3 の縮退・差分投入がログで確認できる  
-- **フェイル系**：入力不足／選択不適合／評価 NG／スクリプト失敗／Disclosure 過投入の各系で安全収束  
-- **取得手順**：CI/ローカルともに skills 取得タスク実行後にビルド（`skills/` は未追跡だが再生成可）
+## 11. LangChain4j 適用（実装指針）
+- **Builder**：  
+  - `AgenticServices.sequenceBuilder()` で Plan→Act→Reflect を合成  
+  - `toolExecutionListener` で予算監視（超過で Abort）  
+  - `chatMemory` は Act セッション単位（Workflow フェーズごとにスコープ分離）
+- **エージェント**：  
+  - `PlannerAgent`：関連 Skill 列と期待出力  
+  - `InvokerAgent`：SkillRuntime（別紙）を呼ぶ  
+  - `EvaluatorAgent`：検証・再試行方針の決定  
+- **I/O**：すべて構造化（record/class）。ファイル生成はハンドルで返却
 
 ---
 
-## 13. 運用要件
-- ランタイム：Java 21、Gradle（Kotlin DSL）  
-- LangChain4j：最新安定を `docs/setup.md` に明記して固定  
-- Provider：既定＝OpenAI（GPT 系, `OPENAI_API_KEY`）、代替＝Claude（`ANTHROPIC_API_KEY`）  
-- 環境設定：モデル名、各種予算（token/time/calls）、skills 探索ルート、Allowlist/Denylist、Disclosure 上限  
-- 監査：構造化ログの保存、成功/失敗メトリクスの可視化
+## 12. テスト
+- **ユニット**：SkillSelector スコア、ContextPacking、GuardRails、スキーマ検証  
+- **コンポーネント**：Plan→Act→Reflect の契約（AgenticScope の受け渡し）  
+- **E2E**：`brand-guidelines → pptx` 連携、2 回目実行で tokens/tool_calls 減少（キャッシュ検証）  
+- **フェイル系**：不足参照/スクリプト失敗/連続無進捗/予算超過
 
 ---
 
-## 14. ディレクトリ（概念）
+## 13. 運用モード
+- **Auto**：自動完走（既定）  
+- **Guided**：Plan 提示に 1 回だけ承認を求める（デモ/監査）  
+- **Locked**：Act の Autonomy Window を極小化（再現性優先）
+
+---
+
+## 14. 参考（配置例：任意）
 ```
 
-repo-root/
+repo/
 ├─ skills/                      # anthropics/skills のエクスポート（未追跡）
 │  ├─ brand-guidelines/
 │  │  ├─ SKILL.md
@@ -239,12 +236,10 @@ repo-root/
 │     └─ pptx/
 │        ├─ SKILL.md
 │        └─ resources/ (templates/, scripts/, examples/)
-├─ docs/ (requirements.md, spec.md, tasks.md, agenda.md …)
-├─ build/
-│  ├─ .context/                 # 抜粋キャッシュ・索引
-│  └─ out/                      # 成果物（deck.pptx など）
-├─ src/main/java/...            # アプリ本体
-├─ build.gradle.kts             # skills 取得タスク等（定義は別紙）
+├─ .context/                 # 抜粋キャッシュ・索引
+└─ out/                      # 成果物（deck.pptx など）
+├─ src/main/java/...         # アプリ本体
+├─ build.gradle.kts          # skills 取得タスク等（定義は別紙）
 └─ README.md
 
 ```

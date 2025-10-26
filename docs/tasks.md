@@ -2,7 +2,8 @@
 
 本書は **t_wada 風TDD（Red → Green → Refactor）** で進めるための作業台帳です。  
 優先度は **P0（MVP 必須） / P1（MVP 完走後すぐ着手したい重要項目） / P2（拡張）**。  
-P0 では「API キーをセットすれば LangChain4j Workflow が `skills run ...` を最後まで流しきる」ことを最速で満たすことを最優先します。各タスクは LangChain4j の Workflow / Agent API を骨格に据え、常に **全体を通した結合** を意識した垂直スライスで進めます。
+P0 では「API キーをセットすれば LangChain4j Workflow が `skills run ...` を最後まで流しきる」ことを最速で満たすことを最優先します。各タスクは LangChain4j の Workflow / Agent API を骨格に据え、常に **全体を通した結合** を意識した垂直スライスで進めます。  
+**注**：Act（Pure）詳細は別紙 **`spec_skillruntime.md`** を唯一のソース・オブ・トゥルースとします。
 
 ---
 
@@ -10,7 +11,8 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 - [ ] まず縦を通す：最初に **疎な実装でも E2E** を成立させ、その後に精度を高める  
 - [ ] Red → Green → Refactor を小さく回し、Workflow ノードごとに契約テストを整備  
 - [ ] LangChain4j Workflow を “外側の契約” と捉え、内側の実装は差し替え可能に保つ  
-- [ ] API キー・環境変数は常に最初に確認し、実機 LLM での疎通を早期に行う
+- [ ] API キー・環境変数は常に最初に確認し、実機 LLM での疎通を早期に行う  
+- [ ] **L1/L2/L3 方針**（L1=メタのみ、L2=SKILL.md全文、L3=オンデマンド参照/実行）を厳守（詳細は `spec_skillruntime.md`）
 
 ---
 
@@ -37,7 +39,7 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 - DoD  
   - [x] `./gradlew test` がスケルトン・AgenticScope 契約テストを含めて緑  
   - [x] `WorkflowFactory` が LangChain4j Workflow（`AgenticServices.sequenceBuilder()` 由来の `Workflow` インスタンス）を返していることをテストで確認  
-  - [x] spec.md 2.1 / 3.4 の記載とコードのパッケージ・キーが一致することを確認
+  - [x] `spec.md` 2.1 / 3.4 の記載とコードのパッケージ・キーが一致することを確認
 
 ### P0-1. Workflow & CLI ブートストラップ（最小 E2E）
 - Red  
@@ -67,29 +69,33 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 
 ### P0-3. SkillIndex + Plan ノード（最小連携）
 - Red  
-  - [x] `skills/` 配下の 2 スキル（brand / pptx）を `SkillIndexLoader` が読み込み、Plan ノードへ渡す失敗テスト  
+  - [x] `skills/` 配下の複数スキル（例：`brand-guidelines` / `document-skills/pptx`）を `SkillIndexLoader` が読み込み、Plan ノードへ渡す失敗テスト  
   - [x] Plan ノードが goal→推奨順（brand→pptx）を返す失敗テスト  
+  - [ ] **skillId が任意のパス型であることを前提**に、固定フォルダ名（`resources/`, `scripts/`）に依存しない参照解決を要求する失敗テスト  
 - Green  
   - [x] `SkillIndexLoader` と `DefaultPlanner` を Workflow Plan ノードとして接続し、Plan 結果をログに残す  
-  - [x] System プロンプトへ L1 要約（name/description/発火条件）を注入  
+  - [x] System プロンプトへ L1 要約（name/description）を注入  
+  - [ ] 固定名に依存しない参照解決ロジック（相対リンク/明示パス/glob）を実装  
 - Refactor  
-  - [x] Plan 入力/出力 DTO を定義し、テストで固定値比較  
+  - [x] Plan 入出力 DTO を定義し、テストで固定値比較  
 - DoD  
   - [x] `skills run --goal "ブランド準拠で5枚スライド"` の Plan ログが確認できる  
-  - [x] SkillIndex の未対応フィールドに警告が出る
+  - [ ] 参照先が任意ディレクトリでも Plan→Act で解決できる（固定名に依存しない）
 
-### P0-4. invokeSkill Tool + Runtime（最小成果物）
+### P0-4. invokeSkill Tool + SkillRuntime（最小成果物 / Pure Act）
 - Red  
-  - [x] Act ノードが LangChain4j Tool 呼び出し（`invokeSkill`）を経由し、`SkillRuntime` を実行する失敗テスト  
-  - [x] Runtime が 1 Stage で `build/out/deck.pptx`（仮のテンプレートでも可）を生成し、Blackboard に登録する失敗テスト  
+  - [x] Act ノードが LangChain4j Tool（`invokeSkill(skillId, inputs)`）を経由し、`SkillRuntime` を実行する失敗テスト  
+  - [x] Runtime が 1 Stage で `build/out/deck.pptx`（仮テンプレでも可）を生成し、Blackboard に登録する失敗テスト  
+  - [ ] **SKILL.md のみのスキル**（L3なし）でも完了する失敗テスト  
 - Green  
-  - [x] `InvokeSkillTool` を `ToolSpecification` として登録し、Act ノード内で `DefaultInvoker` + `SkillRuntime` を実働化  
-  - [x] 簡易テンプレートと固定スライド（3 枚程度）を出力し、Goal を満たす最小成果物を作成（MVP ではテキストスタブ `deck.pptx` を生成）  
+  - [x] `InvokeSkillTool` を登録し、`DefaultInvoker` + `SkillRuntime` を実働化  
+  - [ ] **Pure 方式**：順序配線せず、**単一エージェント＋ツール群**で Act を実装（`readSkillMd/readRef/runScript/validate/writeArtifact/blackboard.*` 等。仕様は `spec_skillruntime.md` に準拠）  
 - Refactor  
   - [x] Blackboard API と Runtime 入出力を整理  
 - DoD  
   - [x] `skills run --goal "ブランド準拠でスライド"` が LLM→brand skill→pptx skill の順で呼ばれ、`build/out/deck.pptx` を生成  
-  - [x] Workflow ログに Skill 呼び出し結果と tokens が記録される
+  - [ ] **SKILL.mdのみ**でも expectedOutputs 検証を通過して終了  
+  - [ ] Act のログに L1/L2/L3 の投入ログが残る
 
 ### P0-5. Evaluator（Reflect）と再試行
 - Red  
@@ -104,21 +110,22 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 
 ### P0-6. Sandboxed Scripts（安全性の確保）
 - Red  
-  - [ ] scripts/ の Allowlist 設定（python3/node/bash）以外を拒否する失敗テスト  
+  - [ ] Allowlist 設定（`python3` / `node` / `bash` ほか許可拡張子）以外を拒否する失敗テスト  
   - [ ] `timeoutMs` 超過でプロセスを停止する失敗テスト  
-  - [ ] `build/out/` 外への書き込みを拒否する失敗テスト  
+  - [ ] **`build/` 外への書き込み**を拒否する失敗テスト  
 - Green  
-  - [ ] `Process` ラッパを実装し、Runtime から利用  
+  - [ ] `Process` ラッパを実装し、Runtime から利用（作業ディレクトリ＝**skill ルート固定**、ネットワーク無効、環境変数最小化）  
 - Refactor  
   - [ ] Allowlist/timeout/cwd/env 設定の注入ポイントを共通化  
 - DoD  
   - [ ] 危険なスクリプトが実際に拒否される  
-  - [ ] プロンプトには stdout JSON の要約のみ注入
+  - [ ] プロンプトには stdout JSON の要約のみ注入（コード本文は注入しない）
 
 ### P0-7. Context Cache & Progressive Disclosure（MVP 品質）
 - Red  
   - [ ] 同一 docref 再投入時のキャッシュヒットを確認する失敗テスト  
   - [ ] 差分投入のみ追加される失敗テスト  
+  - [ ] **L1=メタのみ / L2=SKILL.md全文 / L3=オンデマンド** を満たさない投入を拒否する失敗テスト  
 - Green  
   - [ ] `ContextCache` を Plan / Act ノードに組み込み、L1/L2/L3 管理を開始  
 - Refactor  
@@ -138,6 +145,14 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 - DoD  
   - [ ] CI の最小ジョブが緑  
   - [ ] README にログ確認方法を追記
+
+### P0-9. ドキュメント整合（spec ↔ spec_skillruntime）
+- Red  
+  - [ ] `spec.md` と `spec_skillruntime.md` の差分検出テスト（用語/L1-L3/入出力契約のズレ）  
+- Green  
+  - [ ] 差分の自動チェック（簡易 Lint）と PR ゲートを整備  
+- DoD  
+  - [ ] 以後の変更で両者の整合が常に維持される
 
 ---
 
@@ -196,6 +211,7 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 - E2E  
   - [ ] CLI で `docs/agenda.md` → `deck.pptx` 生成（正常）  
   - [ ] `agenda.md` 欠落 → 追加入力質問 → 最終的に失敗終了  
+  - [ ] **SKILL.mdのみ** のスキルで完走（L3 未使用）  
 - 計測  
   - [ ] 2 回目実行で tokens before→after 減少を確認
 
@@ -207,8 +223,10 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 - [ ] 仕様の受け入れ基準に合致（成果物・ログ・再試行）  
 - [ ] 構造化ログが必須項目を満たす（L1-L3 / before→after / cache）  
 - [ ] サンドボックス以外で scripts を実行しない（allowlist/timeout/書込先制限）  
+- [ ] **固定ディレクトリ名に依存しない**（skillId は任意パス、参照は相対/明示/glob で解決）  
+- [ ] **`spec.md` と `spec_skillruntime.md` の整合**  
 - [ ] クリーン環境で CI E2E 緑  
-- [ ] ドキュメント更新（requirements/spec/tasks/README/setup）
+- [ ] ドキュメント更新（requirements/spec/spec_skillruntime/tasks/README/setup）
 
 ---
 
@@ -226,7 +244,7 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 3. **Red**：対象タスク（Workflow ノード単位など）の失敗テストを追加。  
 4. **Green**：テストが通る最小実装を入れ、`./gradlew test` を実行。  
 5. **Refactor**：命名・重複・責務分離を整えつつテスト緑を維持。  
-6. **チェック & ドキュメント**：該当タスクのチェックボックスを `[x]` に更新し、必要に応じて tasks/spec/requirements/setup/README を反映。  
+6. **チェック & ドキュメント**：該当タスクのチェックボックスを `[x]` に更新し、必要に応じて tasks/spec/requirements/`spec_skillruntime`/README を反映。  
 7. **コミット & CI**：`git add` → `git commit`（タスク ID を含める）→ PR 作成 → CI 緑を確認。  
 8. **次タスクへ**：`main` を同期し、次のタスクに着手。
 

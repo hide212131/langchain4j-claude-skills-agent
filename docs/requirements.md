@@ -1,172 +1,73 @@
 # 要件定義（langchain4j-claude-skills-agent / requirements）
 
 ## 目的
-- `skills/` フォルダに置かれた **Claude Skills 互換の SKILL.md** 群を、**LangChain4j の Agent 機能 + GPT API** で読み取り、**自動選択・段階実行**する “Skills-lite ランタイム” を実装する。
+- `skills/` 取得物（例：`brand-guidelines` / `document-skills/pptx` など **任意のパス型 skillId**）に含まれる **Claude Skills 互換の `SKILL.md`** 群を、**LangChain4j の Workflow/Agent 機能 + GPT API** で読み取り、**自動選択・段階実行**する “Skills-lite ランタイム” を実装する。
 - すべての機能を再現しなくてよい。**効率的なコンテキスト（Context Packing / Progressive Disclosure）** を体現する最小限の機能に絞る。
 
 ## 背景と方針
-- Skills は **定義（SKILL.md＋resources）** が本体。実行エンジンは本来 Claude だが、本プロジェクトは **LLM非依存** を志向し、**OpenAI（GPT）経路**で動く **独自ランタイム** を提供する（Claude 直実行は将来互換の“代替経路”として保持）。
+- Skills は **定義（`SKILL.md`＋任意の追加リソース）** が本体。実行エンジンは本来 Claude だが、本プロジェクトでは **OpenAI（GPT）経路**で動く **独自ランタイム** を提供する（Claude 直実行は将来互換の“代替経路”として保持）。
 - **人間はスキルを選ばない**。LLM が `skills/` から **自動で選択・連携** する（Skills は「必要なときにだけ読み込む」設計が公式でも推奨）。
-- **Agentic**（Plan → Act → Reflect）でサブタスク化し、**pause/resume 相当**の再入を考慮。
+- **Hybrid**：外側は **Workflow（Plan/Reflect）**、内側の各 Skill 実行（Act）は **Pure**。  
+  - **Workflow**：要求を複数 Skill に分解・順序化し、評価（Reflect）で再試行を管理。  
+  - **Pure（Act）**：**単一エージェント＋ツール群**で順序を配線せず、LLM が毎ターンのツール選択/停止判断を行う（詳細は `spec_skillruntime.md`）。
+
+## 用語と前提（今回の明確化）
+- **skillId**：`brand-guidelines`、`document-skills/pptx` など **任意の相対パス**。固定ディレクトリ名に依存しない。
+- **ディレクトリ名の非依存**：`resources/` や `scripts/` などの**名称や存在は必須ではない**。  
+  - `SKILL.md` 内の**相対リンク/明示パス/glob** に従って参照解決する。特定名をハードコードしない。
+- **L1/L2/L3（Progressive Disclosure）**  
+  - **L1（常時）**：`name` / `description`（frontmatter 相当）のみをシステム側に常駐。  
+  - **L2（トリガ時）**：関連確定時に **`SKILL.md` 本文を全文**読み込み投入（目安 ≤5k tokens）。  
+  - **L3（必要時）**：追加 MD/テンプレ/コードは **オンデマンド**で読み/実行。**コード本文は原則プロンプトに注入せず、実行結果の要約＋ハンドル（パス）＋stdout(JSON) のみ**を投入。
+- **SKILL.md のみの Skill** にも対応（L3 を使わず達成可能）。
 
 ## デモ用ユースケース（2スキルの自動連携）
 - **A: brand-guidelines**（ブランド規定の取り込み・要約・キャッシュ）
 - **B: document-skills/pptx**（アウトライン＋ブランド規定を反映したスライド自動生成）
 - 流れ：ユーザーは「ゴール（例：ブランド準拠の5枚スライド作成）」だけを指示 → Agent が **A→B** を自動選択して実行。
 
-## スコープ（MVP）
-- **Skills ディスカバリ**：`skills/` を再帰スキャンし、各 `SKILL.md` の YAML フロントマター（必須: `name, description`、任意: `version, inputs, outputs, stages, keywords`）と主要 `resources/` をインデックス化。参考: https://support.claude.com/en/articles/12512198-how-to-create-custom-skills
-- **自動選択**：Agent へ「利用可能スキルの要約リスト」を提示。**ツールは1つ**（`invokeSkill(skillId, inputs)`）。LLM が skillId と inputs を決める。
-- **Skills-lite 実行**：
-  - `stages` を順次実行し、必要な `resources/*` のみロード。
-  - 最小ツール：`FileTool(read/write/zip)`、`TemplateTool`、`JsonTool(validate/transform)`。
-  - 生成物：`build/out/*`、中間：`build/.context/*`。
-- **Context Packing（Progressive Disclosure）**：
-  - 長文は **参照と抜粋**（章・見出し・コードブロック単位）で投入。
-  - **段階的開示**：各 stage で必要断片だけを追加し、既投入の文脈は要約へ縮退。
-  - **Context Cache**：`context_id` 単位で再利用（トークン節約の可視化）。
-- **CLI**（例）：
-  - `skills run --goal "ブランド準拠で5枚のPPTX" --in docs/agenda.md --out build/out/deck.pptx`
-
-## 非スコープ（MVP）
-- Prebuilt Skills（pptx/xlsx 等）の完全互換機能すべて
-- 外部ネットワーク I/O、依存のオンライン解決
-- 大容量ファイルの長期ストレージ（ローカル一時のみ）
-
-## 受け入れ基準
-- 人がスキル名を指定しなくても、**brand-guidelines → pptx** の順で自動選択される。
-- 出力 `deck.pptx` が **ブランド色・書体・トーン**を反映。
-- ログに **tokens(before→after)**、**抜粋投入サイズ**、**キャッシュヒット率**、**選択理由（短文）** が出力される。
-- エラー時に **不足入力の指摘 or 代替案の自動再試行**（1回）を行い、最終的に明確なメッセージで終了。
-- LangChain4j の Workflow/Agent API (`dev.langchain4j.agentic.AgenticServices` など) を利用して Plan→Act→Reflect を構築していることがテストで保証される。
-
-## 技術要件
-- **言語/ビルド**：Java 21、**Gradle (Kotlin DSL)**
-- **LangChain4j**：**1.7系**を想定（最新安定は `docs/setup.md` に明記・随時更新）
-- **LLM/Provider**：
-  - 既定：**OpenAI（GPT-5）** … `OPENAI_API_KEY`
-  - 代替：**Claude**（将来互換のパススルー） … `ANTHROPIC_API_KEY`
-- **主要モジュール**：
-  - **Loader/Indexer**：`skills/` から `SkillIndex` を作成
-  - **ProviderAdapter**：OpenAI/Claude のチャット・ツール呼び出しを抽象化
-  - **Agent 層**：Plan→Act→Reflect、**単一ツール `invokeSkill`** を仲介
-  - **Runtime（Skills-lite）**：`stages` 実行、リソース解決、ブラックボード（中間成果共有）
-  - **ContextCache**：抜粋・要約・トークン統計の保存
-- **モジュール構成（spec.md 2.1 準拠）**：
-  - `app.cli` → CLI エントリーポイント（PicoCLI 等）。  
-  - `runtime.workflow`（`plan` / `act` / `reflect` / `support`）、`runtime.provider`, `runtime.skill`, `runtime.blackboard`, `runtime.context`, `runtime.guard`, `runtime.human`。  
-  - `infra.logging`, `infra.config`。  
-  - 依存方向は `app` → `runtime` → `infra` で固定し、静的なテストで検証する。
-- `build.gradle.kts` には LangChain4j の BOM (`dev.langchain4j:langchain4j-bom`) と `langchain4j-agentic` / `langchain4j-open-ai` など必要モジュールを明示的に追加し、依存解決がテストで確認される。
-- **AgenticScope 契約（spec.md 3.4 準拠）**：
-  - `plan.goal`, `plan.inputs`, `plan.candidateSteps`, `plan.constraints`, `plan.evaluationCriteria` を Plan ノードが必ず書き込む。  
-  - Act ノードは `act.windowState`, `act.currentStep`, `act.inputBundle`, `act.output.<skillId>`, `shared.blackboardIndex` を更新する。  
-  - Reflect ノードは `reflect.review`, `reflect.retryAdvice`, `reflect.finalSummary` を生成し、`shared.contextSnapshot`/`shared.guardState`/`shared.metrics` を更新する。  
-  - これらは `AgenticScopeBridge` と DTO で型安全にアクセスし、未設定キーを検出した場合は例外を送出する。
-
 ## アーキテクチャ概要
-- `CliApp` → `AgentService`（LangChain4j Workflow Runner）  
-  → `ProviderAdapter`（OpenAI 既定）  
-  → `SkillRuntime`（`invokeSkill` 実体, stages 実行, Tools 呼び出し）  
-  ↔ `SkillIndex`（SKILL.md/リソースのメタ）  
-  ↔ `ContextCache`（要約/抜粋/トークン計測）
+- **外側（Workflow）**：Plan → Act 呼出 → Reflect（必要時 Loop）→ Done  
+  - Planner：候補 Skill と期待出力・評価観点を提示  
+  - Evaluator：成果物を Completeness/Compliance/Quality で検証、再試行を制御
+- **内側（SkillRuntime / Pure Act）**：`invokeSkill(skillId, inputs)` 相当の実行を、**単一エージェント＋ツール群**で実装  
+  - ループ最小骨格：**Acquire → Decide → Apply → Record → Progress/Exit**  
+  - 予算：`max_tool_calls` / `time_budget_ms` / `token_budget` / `disk_write_limit_mb` / `script_timeout_s`  
+  - 退出：`expectedOutputs` 検証OK、または予算超過/規約違反/循環参照等で終了  
+  - 詳細は **`spec_skillruntime.md`** に委譲（唯一のソース・オブ・トゥルース）
 
-## セキュリティ/制約
-- デフォルトで **ローカル・サンドボックス**（外部ネット無効、書き込みは `build/` 以下）
-- 実行可能なツールは **Allowlist** 管理（Skill 側の要求とアプリ側の許可が一致した場合のみ可）
-- **scripts/** の実行は許可するが、**必ずサンドボックス下**（Allowlist 実行環境・I/O制限・timeout・ネット遮断）で行う  
-  - 例：許可する通訳器＝`python3` / `node` / `bash`、作業ディレクトリ＝該当 skill ルート  
-  - 入出力は `args.json`（入力）と `build/out/*`（出力）に限定  
-  - **プロンプトへはスクリプトの「出力メタ」だけ**を注入（コード本文や冗長ログは注入しない：Progressive Disclosure）
+## 参照解決（今回の変更点）
+- 固定名（例：`resources/`, `scripts/`）への依存を廃止。  
+- **解決順**：`SKILL.md`（基準パス） → 相対リンク → 明示パス → glob。  
+- 存在しない参照は即検出し、**代替生成 1 回**を試行。不可なら Workflow 側へ差し戻し（不足一覧と推奨次手を返す）。
 
-## ログ/観測
-- `tokens_in/out`、プロンプト投入バイト、キャッシュヒット率、選択スキルと理由、stage 遷移、ツール結果サマリ
-- 失敗時は原因分類（入力不足/整合性エラー/実行拒否）と再試行ログ
+## スクリプト実行（サンドボックス）
+- **ネットワーク無効／実行時依存追加不可／許可拡張子のみ**（例：`.sh` `.py` `.js`）。  
+- 作業ディレクトリは **skill ルート固定**、書込は **`build/` 配下のみ**。  
+- **I/O 契約**：`stdin = args.json`、`stdout = JSON` を期待し、`stderr` は最大512行要約を Evidence 保存。  
+- 失敗は **1 回再試行**（パラメータ変更 or 代替スクリプト）。
 
-## 開発プロセス
-本プロジェクトの文書化と実装は、次の順で進める。
+## 非機能要件 / セキュリティ・制約
+- デフォルトで **ローカル・サンドボックス**（外部ネット無効、書き込みは `build/` 以下）  
+- **再現性重視**：`temperature=0`、`seed` 固定（必要時のみ緩める）  
+- 構造化ログ：tokens/time/tool_calls/disclosure、L1/L2/L3 投入ログ、Attempt ログ（`reason_short / inputs_digest / output_meta / diff / file_ids`）
 
-1) **requirements.md**（要件定義）  
-2) **spec.md**（仕様書：I/F・ワークフロー・コンテキスト最適化・セキュリティ）  
-3) **tasks.md**（実装タスク：優先度・見積り・完了条件）
+## 受け入れ基準（抜粋）
+- **skillId が任意パス**でも Plan→Act→Reflect が E2E 完走する  
+- **固定ディレクトリ名に依存しない参照解決**が機能する（相対/明示/glob）  
+- **SKILL.md のみの Skill** でも完了（L3 未使用）  
+- L1/L2/L3 の投入方針に従っている（L2=SKILL.md 全文、L3=結果のみ）  
+- 2 回目実行でトークン/ツール呼出が減少（キャッシュ/差分投入が有効）
 
-### 実装の進め方：t_wada 風TDD（Red–Green–Refactor）
-- **原則**：小さく歩く（Baby Steps）、問題を小さく分割、テストの構造化と継続的リファクタリング。  
-- **戦略**：仮実装（Fake it）→ 三角測量（Triangulation）→ 明白な実装（Obvious Implementation）を状況で使い分け。  
-- **各タスクのサイクル**：  
-  1. **Red**（失敗するテストを書く）  
-  2. **Green**（最短で通す）  
-  3. **Refactor**（重複排除・命名改善・設計整理）  
-  4. テストを追加し三角測量で一般化
+## 依存・セットアップ（抜粋）
+- LangChain4j **Agentic** チュートリアル（Plan→Act→Reflect の公式実装パターン）  
+  https://docs.langchain4j.dev/tutorials/agents
+- LangChain4j **エージェント構築例**（Workflow/Agent API の具体例）  
+  https://github.com/langchain4j/langchain4j-examples/tree/main/agentic-tutorial
+- Claude Skills 参考  
+  - Overview: https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview  
+  - Quickstart: https://docs.claude.com/en/docs/agents-and-tools/agent-skills/quickstart  
+  - Skills API Guide: https://docs.claude.com/en/api/skills-guide  
+  - GitHub (samples): https://github.com/anthropics/skills
 
-## ディレクトリ構成
-```
-
-repo-root/
-├─ skills/                             # Skills 置き場（自動スキャン対象・未追跡）
-│  ├─ brand-guidelines/
-│  │  ├─ SKILL.md
-│  │  └─ resources/                   # ブランド規定テキスト/配色定義など
-│  │     ├─ palette.yaml
-│  │     └─ typography.md
-│  └─ document-skills/
-│     └─ pptx/
-│        ├─ SKILL.md
-│        └─ resources/                # スライド用テンプレ/例
-│           ├─ templates/
-│           │  ├─ title-slide.md
-│           │  └─ content-slide.md
-│           └─ examples/
-│              └─ sample-outline.md
-│
-├─ docs/                               # ドキュメント
-│  ├─ requirements.md
-│  ├─ spec.md
-│  └─ tasks.md
-│
-├─ build/                              # 実行時に生成
-│  ├─ .context/                        # 抜粋キャッシュ/索引
-│  └─ out/                             # 生成成果物（deck.pptx など）
-│
-├─ src/main/java/...                   # アプリ本体（単一Gradleの場合）
-├─ build.gradle.kts
-└─ README.md
-
-````
-
-## コマンド例
-```bash
-# 目標だけ伝える（自動選択・自動連携）
-skills run \
-  --goal "ブランドガイドに従って docs/agenda.md から5枚のスライドを作る" \
-  --in docs/agenda.md \
-  --out build/out/deck.pptx \
-  --skills-dir skills/
-
-# キャッシュを活かして再実行（トークン削減がログで確認できる）
-skills run --goal "同上" --in docs/agenda.md --out build/out/deck2.pptx
-````
-
-## リスクと対策
-
-* **SKILL.md の表現差/拡張**：サブセット準拠。未対応フィールドは無視し、警告ログを出す。
-* **スキル選択ミス**：Agent の Reflect で 1 回だけ再選択（別候補）を試行。
-* **トークン肥大**：抜粋アルゴの閾値と段階的開示を強制（超過時は要約にフォールバック）。
-* **scripts の安全性**：監査済みスクリプトのみ実行。Allowlist/timeout/ネット遮断で被害半径を限定。
-
-## 実装参照（LangChain4j）
-
-* LangChain4j **Agentic** チュートリアル（Plan→Act→Reflect の公式実装パターン）
-  [https://docs.langchain4j.dev/tutorials/agents](https://docs.langchain4j.dev/tutorials/agents)
-* LangChain4j **エージェント構築例**（Workflow/Agent API の具体例）
-  [https://github.com/langchain4j/langchain4j-examples/tree/main/agentic-tutorial](https://github.com/langchain4j/langchain4j-examples/tree/main/agentic-tutorial)
-
-> LangChain4j の Workflow / Agent API を採用し、Plan・Act・Reflect の各ステップを公式の Agentic コンポーネントとして組み立てること。独自実装はテストダブルや補助ロジックに限定し、本番経路は LangChain4j のエージェント基盤上で動作させる。
-
-## 参考（一次情報）
-
-* **Agent Skills 概要（Overview）**：[https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview)
-* **Quickstart（API からの最短導入）**：[https://docs.claude.com/en/docs/agents-and-tools/agent-skills/quickstart](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/quickstart)
-* **Skills API ガイド（Files/コード実行/運用の前提）**：[https://docs.claude.com/en/api/skills-guide](https://docs.claude.com/en/api/skills-guide)
-* **公式 GitHub（サンプル＆フォルダ構造）**：[https://github.com/anthropics/skills](https://github.com/anthropics/skills)
-* **アナウンス（機能の位置づけ）**：[https://www.anthropic.com/news/skills](https://www.anthropic.com/news/skills)
+---
