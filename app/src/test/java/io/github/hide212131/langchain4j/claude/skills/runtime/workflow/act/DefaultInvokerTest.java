@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.langchain4j.agentic.internal.AgentInvocation;
 import dev.langchain4j.agentic.scope.AgenticScope;
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
+import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.ActInputBundleState;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.ActState;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.BlackboardStore;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.SharedBlackboardIndexState;
@@ -29,17 +30,24 @@ class DefaultInvokerTest {
     @Test
     void invokeShouldExecuteSkillsInPlannedOrderAndPopulateBlackboard() throws Exception {
         Path tempDir = Files.createTempDirectory("default-invoker-test");
-        SkillIndex index = new SkillIndex(Map.of(
+        Path skillsRoot = Path.of("skills").toAbsolutePath().normalize();
+        SkillIndex index = new SkillIndex(skillsRoot, Map.of(
                 "brand-guidelines",
                 new SkillIndex.SkillMetadata(
-                        "brand-guidelines", "Brand Guidelines", "Summarise brand rules", List.of("brand"), List.of()),
+                        "brand-guidelines",
+                        "Brand Guidelines",
+                        "Summarise brand rules",
+                        List.of("brand"),
+                        List.of(),
+                        skillsRoot.resolve("brand-guidelines")),
                 "document-skills/pptx",
                 new SkillIndex.SkillMetadata(
                         "document-skills/pptx",
                         "PPTX Generator",
                         "Build slide decks",
                         List.of("pptx"),
-                        List.of())));
+                        List.of(),
+                        skillsRoot.resolve("document-skills/pptx"))));
         BlackboardStore blackboardStore = new BlackboardStore();
         SkillRuntime runtime = new SkillRuntime(index, tempDir, logger);
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
@@ -64,6 +72,14 @@ class DefaultInvokerTest {
                 .isInstanceOf(List.class)
                 .asList()
                 .containsExactly("brand-guidelines", "document-skills/pptx");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> lastInputBundle = (Map<String, Object>) scope.readState(ActInputBundleState.KEY);
+        assertThat(lastInputBundle)
+                .isNotNull()
+                .containsEntry(
+                        "skillRoot",
+                        skillsRoot.resolve("document-skills/pptx").toAbsolutePath().normalize().toString());
     }
 
     private static final class RecordingAgenticScope implements AgenticScope {

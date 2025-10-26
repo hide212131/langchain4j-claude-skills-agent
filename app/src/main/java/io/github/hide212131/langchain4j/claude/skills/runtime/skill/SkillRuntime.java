@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -39,17 +39,19 @@ public final class SkillRuntime {
         SkillIndex.SkillMetadata metadata = skillIndex.find(skillId)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown skill: " + skillId));
         Map<String, Object> safeInputs = inputs == null ? Map.of() : Map.copyOf(inputs);
+        Path skillRoot = metadata.skillRoot();
         
         // Generic MVP implementation: produce placeholder output for all skills
         Path outputPath = resolveOutputPath(safeInputs, metadata);
         writePlaceholderOutput(outputPath, metadata, safeInputs);
-        logger.info("Skill {} produced output at {}", skillId, outputPath);
+        logger.info("Skill {} produced output at {} (root={})", skillId, outputPath, skillRoot);
         
         String summary = metadata.description().isBlank() ? metadata.name() : metadata.description();
-        return new ExecutionResult(
-                skillId, 
-                Map.of("artifactPath", outputPath.toString(), "summary", summary), 
-                outputPath);
+        Map<String, Object> outputs = new LinkedHashMap<>();
+        outputs.put("artifactPath", outputPath.toString());
+        outputs.put("summary", summary);
+        outputs.put("skillRoot", skillRoot.toString());
+        return new ExecutionResult(skillId, Map.copyOf(outputs), outputPath);
     }
 
     private Path resolveOutputPath(Map<String, Object> inputs, SkillIndex.SkillMetadata metadata) {

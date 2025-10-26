@@ -29,14 +29,16 @@ class InvokeSkillToolTest {
     @Test
     void invokeShouldDelegateToSkillRuntime() throws Exception {
         Path tempDir = Files.createTempDirectory("invoke-tool-runtime");
-        SkillIndex index = new SkillIndex(Map.of(
+        Path skillsRoot = Path.of("skills").toAbsolutePath().normalize();
+        SkillIndex index = new SkillIndex(skillsRoot, Map.of(
                 "document-skills/pptx",
                 new SkillIndex.SkillMetadata(
                         "document-skills/pptx",
                         "PPTX Generator",
                         "Build slide decks",
                         List.of("pptx"),
-                        List.of())));
+                        List.of(),
+                        skillsRoot.resolve("document-skills/pptx"))));
         SkillRuntime runtime = new SkillRuntime(index, tempDir, logger);
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
 
@@ -45,5 +47,9 @@ class InvokeSkillToolTest {
 
         assertThat(result.hasArtifact()).isTrue();
         assertThat(result.outputs()).containsKey("artifactPath");
+        assertThat(result.outputs())
+                .containsEntry(
+                        "skillRoot",
+                        skillsRoot.resolve("document-skills/pptx").toAbsolutePath().normalize().toString());
     }
 }

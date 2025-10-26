@@ -71,16 +71,16 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `skills run
 - Red  
   - [x] `skills/` 配下の複数スキル（例：`brand-guidelines` / `document-skills/pptx`）を `SkillIndexLoader` が読み込み、Plan ノードへ渡す失敗テスト  
   - [x] Plan ノードが goal→推奨順（brand→pptx）を返す失敗テスト  
-  - [ ] **skillId が任意のパス型であることを前提**に、固定フォルダ名（`resources/`, `scripts/`）に依存しない参照解決を要求する失敗テスト  
+  - [x] **skillId が任意のパス型であることを前提**に、固定フォルダ名（`resources/`, `scripts/`）に依存しない参照解決を要求する失敗テスト  
 - Green  
   - [x] `SkillIndexLoader` と `DefaultPlanner` を Workflow Plan ノードとして接続し、Plan 結果をログに残す  
   - [x] System プロンプトへ L1 要約（name/description）を注入  
-  - [ ] 固定名に依存しない参照解決ロジック（相対リンク/明示パス/glob）を実装  
+  - [x] 固定名に依存しない参照解決ロジック（相対リンク/明示パス/glob）を実装  
 - Refactor  
   - [x] Plan 入出力 DTO を定義し、テストで固定値比較  
 - DoD  
   - [x] `skills run --goal "ブランド準拠で5枚スライド"` の Plan ログが確認できる  
-  - [ ] 参照先が任意ディレクトリでも Plan→Act で解決できる（固定名に依存しない）
+  - [x] 参照先が任意ディレクトリでも Plan→Act で解決できる（固定名に依存しない）
 
 ### P0-4. invokeSkill Tool + SkillRuntime（最小成果物 / Pure Act）
 - Red  

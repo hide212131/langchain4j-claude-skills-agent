@@ -1,6 +1,7 @@
 package io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan;
 
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillIndex;
+import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -21,7 +22,8 @@ public final class DefaultPlanner {
                         metadata.id(),
                         metadata.name(),
                         metadata.description(),
-                        metadata.keywords()))
+                        metadata.keywords(),
+                        metadata.skillRoot()))
                 .collect(Collectors.toList());
 
         String systemPromptSummary = steps.stream()
@@ -53,5 +55,6 @@ public final class DefaultPlanner {
         }
     }
 
-    public record PlanStep(String skillId, String name, String description, List<String> keywords) {}
+    public record PlanStep(
+            String skillId, String name, String description, List<String> keywords, Path skillRoot) {}
 }

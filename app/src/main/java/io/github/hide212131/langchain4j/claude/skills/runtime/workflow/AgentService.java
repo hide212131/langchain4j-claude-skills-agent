@@ -126,7 +126,8 @@ public final class AgentService {
                                                     "skillId", step.skillId(),
                                                     "name", step.name(),
                                                     "description", step.description(),
-                                                    "keywords", step.keywords()))
+                                                    "keywords", step.keywords(),
+                                                    "skillRoot", step.skillRoot().toString()))
                                             .toList());
                             LangChain4jLlmClient.CompletionResult completion =
                                     llmClient.complete(request.goal());

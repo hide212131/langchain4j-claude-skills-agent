@@ -37,21 +37,22 @@ public final class SkillIndexLoader {
 
     public LoadResult load(Path skillsDirectory) {
         Objects.requireNonNull(skillsDirectory, "skillsDirectory");
-        if (!Files.exists(skillsDirectory)) {
-            return new LoadResult(new SkillIndex(), List.of());
+        Path normalizedRoot = skillsDirectory.toAbsolutePath().normalize();
+        if (!Files.exists(normalizedRoot)) {
+            return new LoadResult(new SkillIndex(normalizedRoot, Map.of()), List.of());
         }
         Map<String, SkillIndex.SkillMetadata> metadataMap = new HashMap<>();
         List<String> warnings = new ArrayList<>();
 
         try {
-            Files.walk(skillsDirectory)
+            Files.walk(normalizedRoot)
                     .filter(path -> path.getFileName().toString().equalsIgnoreCase("SKILL.md"))
-                    .forEach(path -> parseSkillFile(skillsDirectory, metadataMap, path, warnings));
+                    .forEach(path -> parseSkillFile(normalizedRoot, metadataMap, path, warnings));
         } catch (IOException e) {
             throw new IllegalStateException("Failed to scan skills directory: " + skillsDirectory, e);
         }
 
-        return new LoadResult(new SkillIndex(metadataMap), List.copyOf(warnings));
+        return new LoadResult(new SkillIndex(normalizedRoot, metadataMap), List.copyOf(warnings));
     }
 
     private void parseSkillFile(
@@ -74,7 +75,8 @@ public final class SkillIndexLoader {
                             frontMatter.name().orElse(id),
                             frontMatter.description().orElse(""),
                             List.copyOf(frontMatter.keywords()),
-                            List.copyOf(unknownKeys)));
+                            List.copyOf(unknownKeys),
+                            skillFile.getParent().toAbsolutePath().normalize()));
         } catch (IOException e) {
             throw new IllegalStateException("Failed to read skill file: " + skillFile, e);
         }

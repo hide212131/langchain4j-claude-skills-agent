@@ -29,11 +29,24 @@ class AgentServiceTest {
     @Test
     void runGoalInvokesPlanActReflectInOrder() throws Exception {
         Path tempDir = Files.createTempDirectory("agent-service-test");
-        SkillIndex index = new SkillIndex(java.util.Map.of(
+        Path skillsRoot = Path.of("skills").toAbsolutePath().normalize();
+        SkillIndex index = new SkillIndex(skillsRoot, java.util.Map.of(
                 "brand-guidelines",
-                new SkillMetadata("brand-guidelines", "Brand", "", java.util.List.of("brand"), java.util.List.of()),
+                new SkillMetadata(
+                        "brand-guidelines",
+                        "Brand",
+                        "",
+                        java.util.List.of("brand"),
+                        java.util.List.of(),
+                        skillsRoot.resolve("brand-guidelines")),
                 "document-skills/pptx",
-                new SkillMetadata("document-skills/pptx", "PPTX", "", java.util.List.of("pptx"), java.util.List.of())));
+                new SkillMetadata(
+                        "document-skills/pptx",
+                        "PPTX",
+                        "",
+                        java.util.List.of("pptx"),
+                        java.util.List.of(),
+                        skillsRoot.resolve("document-skills/pptx"))));
         WorkflowLogger logger = new WorkflowLogger();
         BlackboardStore blackboardStore = new BlackboardStore();
         SkillRuntime runtime = new SkillRuntime(index, tempDir, logger);
@@ -55,6 +68,8 @@ class AgentServiceTest {
         assertThat(result.plan().orderedSkillIds())
                 .containsExactly("brand-guidelines", "document-skills/pptx");
         assertThat(result.plan().systemPromptSummary()).contains("brand-guidelines");
+        assertThat(result.plan().steps().get(0).skillRoot())
+                .isEqualTo(skillsRoot.resolve("brand-guidelines").toAbsolutePath().normalize());
         assertThat(result.planResult().content()).isEqualTo("dry-run-plan");
         assertThat(result.metrics().callCount()).isEqualTo(1);
         assertThat(result.actResult()).isNotNull();
@@ -74,12 +89,24 @@ class AgentServiceTest {
     @Test
     void retriesPlanWhenEvaluatorRequestsRetry() throws Exception {
         Path tempDir = Files.createTempDirectory("agent-service-test-retry");
-        SkillIndex index = new SkillIndex(java.util.Map.of(
+        Path skillsRoot = Path.of("skills").toAbsolutePath().normalize();
+        SkillIndex index = new SkillIndex(skillsRoot, java.util.Map.of(
                 "brand-guidelines",
-                new SkillMetadata("brand-guidelines", "Brand", "", java.util.List.of("brand"), java.util.List.of()),
+                new SkillMetadata(
+                        "brand-guidelines",
+                        "Brand",
+                        "",
+                        java.util.List.of("brand"),
+                        java.util.List.of(),
+                        skillsRoot.resolve("brand-guidelines")),
                 "document-skills/pptx",
                 new SkillMetadata(
-                        "document-skills/pptx", "PPTX", "", java.util.List.of("pptx"), java.util.List.of())));
+                        "document-skills/pptx",
+                        "PPTX",
+                        "",
+                        java.util.List.of("pptx"),
+                        java.util.List.of(),
+                        skillsRoot.resolve("document-skills/pptx"))));
         WorkflowLogger logger = new WorkflowLogger();
         BlackboardStore blackboardStore = new BlackboardStore();
         SkillRuntime runtime = new SkillRuntime(index, tempDir, logger);

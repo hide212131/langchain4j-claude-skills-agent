@@ -64,7 +64,8 @@ public final class DefaultInvoker {
                     "goal", plan.goal(),
                     "skillId", step.skillId(),
                     "description", step.description(),
-                    "keywords", step.keywords());
+                    "keywords", step.keywords(),
+                    "skillRoot", step.skillRoot().toString());
             scope.writeState(
                     ActCurrentStepState.KEY,
                     Map.of("skillId", step.skillId(), "name", step.name()));
