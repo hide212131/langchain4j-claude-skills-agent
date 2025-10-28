@@ -22,7 +22,7 @@ docker-compose up -d
 
 デフォルトでは LangFuse は以下のポートで起動します:
 - Web UI: http://localhost:3000
-- OTLP gRPC エンドポイント: http://localhost:4317
+- OTLP gRPC エンドポイント: http://localhost:4317 (このプロジェクトで使用)
 
 ### 2. 環境変数の設定
 
@@ -30,6 +30,7 @@ LangFuse との連携を有効にするため、以下の環境変数を設定�
 
 ```bash
 # LangFuse OTLP エンドポイント (必須)
+# 注: gRPC エンドポイントを使用 (HTTP/JSON の場合は 4318)
 export LANGFUSE_OTLP_ENDPOINT="http://localhost:4317"
 
 # サービス名 (任意、デフォルトは "langchain4j-claude-skills-agent")

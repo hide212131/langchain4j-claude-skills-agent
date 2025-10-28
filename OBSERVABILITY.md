@@ -14,12 +14,12 @@ docker-compose up -d
 
 LangFuse は以下で利用可能:
 - Web UI: http://localhost:3000
-- OTLP エンドポイント: http://localhost:4317
+- OTLP gRPC エンドポイント: http://localhost:4317
 
 ### 2. 環境変数を設定
 
 ```bash
-export LANGFUSE_OTLP_ENDPOINT="http://localhost:4317"
+export LANGFUSE_OTLP_ENDPOINT="http://localhost:4317"  # gRPC endpoint
 export OPENAI_API_KEY="your-api-key"
 ```
 
@@ -43,7 +43,7 @@ http://localhost:3000 で LangFuse Web UI を開き、トレースデータを�
 
 | 変数名 | 必須 | デフォルト値 | 説明 |
 |--------|------|-------------|------|
-| `LANGFUSE_OTLP_ENDPOINT` | いいえ | なし | OTLP エンドポイント URL。未設定の場合、observability は無効 |
+| `LANGFUSE_OTLP_ENDPOINT` | いいえ | なし | OTLP gRPC エンドポイント URL (例: http://localhost:4317)。未設定の場合、observability は無効 |
 | `LANGFUSE_SERVICE_NAME` | いいえ | `langchain4j-claude-skills-agent` | トレースに使用するサービス名 |
 | `OPENAI_API_KEY` | はい | なし | OpenAI API キー |
 
