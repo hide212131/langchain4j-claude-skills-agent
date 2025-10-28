@@ -34,7 +34,7 @@ class LangChain4jLlmClientTest {
         Clock fixedClock = Clock.fixed(Instant.parse("2024-01-01T00:00:00Z"), ZoneOffset.UTC);
 
         LangChain4jLlmClient client =
-                LangChain4jLlmClient.forOpenAi(key -> "test-key", factory, fixedClock);
+                LangChain4jLlmClient.forOpenAi(key -> "test-key", factory, fixedClock, null);
         LangChain4jLlmClient.CompletionResult result = client.complete("demo prompt");
 
         assertThat(chatModel.lastPrompt).isEqualTo("demo prompt");

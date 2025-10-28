@@ -9,6 +9,7 @@ import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiChatRequestParameters;
 import dev.langchain4j.model.output.TokenUsage;
+import io.opentelemetry.api.OpenTelemetry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -37,16 +38,20 @@ public final class LangChain4jLlmClient {
     }
 
     public static LangChain4jLlmClient forOpenAi(EnvironmentVariables environment) {
-        return forOpenAi(environment, new OpenAiChatModelFactory(), Clock.systemUTC());
+        return forOpenAi(environment, new OpenAiChatModelFactory(), Clock.systemUTC(), null);
+    }
+
+    public static LangChain4jLlmClient forOpenAi(EnvironmentVariables environment, OpenTelemetry openTelemetry) {
+        return forOpenAi(environment, new OpenAiChatModelFactory(), Clock.systemUTC(), openTelemetry);
     }
 
     static LangChain4jLlmClient forOpenAi(
-            EnvironmentVariables environment, ChatModelFactory factory, Clock clock) {
+            EnvironmentVariables environment, ChatModelFactory factory, Clock clock, OpenTelemetry openTelemetry) {
         String apiKey = environment.get("OPENAI_API_KEY");
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException("OPENAI_API_KEY must be set");
         }
-        OpenAiConfig config = new OpenAiConfig(apiKey, "gpt-5-mini");
+        OpenAiConfig config = new OpenAiConfig(apiKey, "gpt-5-mini", openTelemetry);
         ChatModel chatModel = factory.create(config);
         return new LangChain4jLlmClient(chatModel, clock, config.modelName);
     }
@@ -116,20 +121,29 @@ public final class LangChain4jLlmClient {
     static final class OpenAiConfig {
         final String apiKey;
         final String modelName;
+        final OpenTelemetry openTelemetry;
 
-        OpenAiConfig(String apiKey, String modelName) {
+        OpenAiConfig(String apiKey, String modelName, OpenTelemetry openTelemetry) {
             this.apiKey = Objects.requireNonNull(apiKey, "apiKey");
             this.modelName = Objects.requireNonNull(modelName, "modelName");
+            this.openTelemetry = openTelemetry;
         }
     }
 
     private static final class OpenAiChatModelFactory implements ChatModelFactory {
         @Override
         public ChatModel create(OpenAiConfig config) {
-            return OpenAiChatModel.builder()
+            ChatModel baseModel = OpenAiChatModel.builder()
                     .apiKey(config.apiKey)
                     .modelName(config.modelName)
                     .build();
+            
+            if (config.openTelemetry != null) {
+                return new io.github.hide212131.langchain4j.claude.skills.runtime.observability.ObservableChatModel(
+                    baseModel, config.openTelemetry);
+            }
+            
+            return baseModel;
         }
     }
 

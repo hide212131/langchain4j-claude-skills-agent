@@ -29,7 +29,8 @@ class LayeredArchitectureTest {
                             "java..",
                             "javax..",
                             "picocli..",
-                            "dev.langchain4j..");
+                            "dev.langchain4j..",
+                            "io.opentelemetry..");
 
     @ArchTest
     static final ArchRule runtimeModuleShouldNotDependOnAppNorOtherLayers =
@@ -46,7 +47,8 @@ class LayeredArchitectureTest {
                             "org.slf4j..",
                             "dev.langchain4j..",
                             "org.yaml..",
-                            "com.fasterxml.jackson..");
+                            "com.fasterxml.jackson..",
+                            "io.opentelemetry..");
 
     @ArchTest
     static final ArchRule infraModuleShouldBeLeafLayer =

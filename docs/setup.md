@@ -10,6 +10,17 @@
 - `ANTHROPIC_API_KEY`（任意）  
   - 代替プロバイダ（Claude）を利用する場合に設定します。現時点では未配線ですが、将来の切替用として予約。
 
+## 1.1. Observability 環境変数（任意）
+- `LANGFUSE_OTLP_ENDPOINT`（任意）  
+  - LangFuse や他の OTLP 対応 observability プラットフォームへトレースデータを送信する場合に設定します。
+  - 例: `http://localhost:4317`
+  - 未設定の場合、OpenTelemetry は無効化されます。
+- `LANGFUSE_SERVICE_NAME`（任意）  
+  - OpenTelemetry トレースに含まれるサービス名を指定します。
+  - デフォルト: `langchain4j-claude-skills-agent`
+  
+詳細は [LangFuse セットアップガイド](langfuse-setup.md) を参照してください。
+
 ### 設定場所の推奨
 1. ローカル開発：`direnv` もしくはシェルの `~/.zshrc` 等に `export OPENAI_API_KEY=...` を記述。`.env` を使う場合は `.gitignore` で除外すること。  
 2. CI：ジョブのシークレット変数に登録し、ワークフロー定義で `env:` に注入。  

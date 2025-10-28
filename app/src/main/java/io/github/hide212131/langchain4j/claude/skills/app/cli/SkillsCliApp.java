@@ -1,11 +1,13 @@
 package io.github.hide212131.langchain4j.claude.skills.app.cli;
 
+import io.github.hide212131.langchain4j.claude.skills.runtime.observability.ObservabilityConfig;
 import io.github.hide212131.langchain4j.claude.skills.runtime.provider.LangChain4jLlmClient;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillIndex;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillIndexLoader;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.AgentService;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.AgentService.StageVisit;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.support.WorkflowFactory;
+import io.opentelemetry.api.OpenTelemetry;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -98,9 +100,21 @@ public final class SkillsCliApp implements Runnable {
             }
             SkillIndexLoader.LoadResult loadResult = loader.load(resolvedSkillsDir);
             loadResult.warnings().forEach(warning -> commandSpec.commandLine().getOut().println("Warning: " + warning));
+            
+            // Initialize OpenTelemetry for observability (LangFuse support)
+            ObservabilityConfig observabilityConfig = ObservabilityConfig.fromEnvironment(System::getenv);
+            OpenTelemetry openTelemetry = observabilityConfig.createOpenTelemetry();
+            
+            if (observabilityConfig.isEnabled()) {
+                commandSpec
+                    .commandLine()
+                    .getOut()
+                    .println("Info: OpenTelemetry enabled, exporting to " + observabilityConfig.getOtlpEndpoint());
+            }
+            
             LangChain4jLlmClient client = dryRun
                     ? LangChain4jLlmClient.fake()
-                    : LangChain4jLlmClient.forOpenAi(System::getenv);
+                    : LangChain4jLlmClient.forOpenAi(System::getenv, openTelemetry);
             AgentService agentService = agentServiceFactory.create(dryRun, loadResult.index(), client);
         List<String> forcedSkillIds = normaliseSkillIds(debugSkillIds);
         if (!forcedSkillIds.isEmpty()) {
