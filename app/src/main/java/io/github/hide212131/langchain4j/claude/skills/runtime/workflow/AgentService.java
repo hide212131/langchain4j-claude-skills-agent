@@ -72,12 +72,14 @@ public final class AgentService {
             skillIndex,
             Path.of("build", "out"),
             logger,
-            new DryRunSkillRuntimeOrchestrator())
+            new DryRunSkillRuntimeOrchestrator(),
+            workflowTracer)
         : new SkillRuntime(
             skillIndex,
             Path.of("build", "out"),
             logger,
-            llmClient.chatModel());
+            llmClient.chatModel(),
+            workflowTracer);
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
         SkillInvocationGuard guard = new SkillInvocationGuard();
         DefaultInvoker invoker = new DefaultInvoker(tool, guard, blackboardStore, logger);

@@ -35,6 +35,21 @@ LangFuse は LLM アプリケーションの observability プラットフォー
   - リトライアドバイス
   - 試行回数
 
+### SkillRuntime 内部処理レベル
+- **スキル実行（SkillExecution）**:
+  - スキル ID、名前、説明
+  - 成果物の有無とパス
+  - 参照ファイル数
+  - ツール呼び出し回数
+  - 呼び出された子スキル
+  - 検証結果（期待される出力が満たされているか）
+- **プロンプト構築（SkillPromptBuild）**:
+  - プロンプト長
+  - 期待される出力
+- **オーケストレータ実行（SkillOrchestrator）**:
+  - レスポンス長
+  - ツール呼び出し回数
+
 これにより、**SkillRuntime での効率的なコンテキストエンジニアリングを詳細に分析**できます。
 
 ## 前提条件
@@ -148,7 +163,23 @@ Info: OpenTelemetry enabled, exporting to http://localhost:4317
   - `retry_advice`: リトライが必要かどうかのアドバイス
   - `attempt/max_attempts`: 試行回数と最大試行回数
 
-これにより、プロンプトがどのように生成されたか、AgentScope の内容、処理の流れを完全に可視化できます。
+### SkillRuntime トレース
+- **workflow.skillexecution**:
+  - `skill_id/name/description`: スキル情報
+  - `has_artifact/artifact_path`: 成果物情報
+  - `referenced_files`: 参照ファイル数
+  - `tool_invocation_count`: ツール呼び出し回数
+  - `invoked_skills`: 呼び出された子スキル
+  - `validation_satisfied`: 検証結果
+  - `missing_outputs`: 不足している出力
+- **workflow.skillpromptbuild**:
+  - `prompt_length`: プロンプト長
+  - `expected_outputs`: 期待される出力
+- **workflow.skillorchestrator**:
+  - `response_length`: レスポンス長
+  - `tool_invocations`: ツール呼び出し回数
+
+これにより、プロンプトがどのように生成されたか、AgentScope の内容、処理の流れ、さらに **SkillRuntime の内部処理**を完全に可視化できます。
 
 ## トラブルシューティング
 

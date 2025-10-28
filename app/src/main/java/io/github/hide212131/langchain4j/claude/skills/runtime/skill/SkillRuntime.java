@@ -60,10 +60,20 @@ public final class SkillRuntime {
     private final Path outputDirectory;
     private final WorkflowLogger logger;
     private final SkillAgentOrchestrator orchestrator;
+    private final io.github.hide212131.langchain4j.claude.skills.runtime.observability.WorkflowTracer workflowTracer;
 
     public SkillRuntime(
             SkillIndex skillIndex, Path outputDirectory, WorkflowLogger logger, ChatModel chatModel) {
-        this(skillIndex, outputDirectory, logger, new AgenticOrchestrator(chatModel));
+        this(skillIndex, outputDirectory, logger, new AgenticOrchestrator(chatModel), null);
+    }
+
+    public SkillRuntime(
+            SkillIndex skillIndex,
+            Path outputDirectory,
+            WorkflowLogger logger,
+            ChatModel chatModel,
+            io.github.hide212131.langchain4j.claude.skills.runtime.observability.WorkflowTracer workflowTracer) {
+        this(skillIndex, outputDirectory, logger, new AgenticOrchestrator(chatModel), workflowTracer);
     }
 
     public SkillRuntime(
@@ -71,72 +81,134 @@ public final class SkillRuntime {
             Path outputDirectory,
             WorkflowLogger logger,
             SkillAgentOrchestrator orchestrator) {
+        this(skillIndex, outputDirectory, logger, orchestrator, null);
+    }
+
+    public SkillRuntime(
+            SkillIndex skillIndex,
+            Path outputDirectory,
+            WorkflowLogger logger,
+            SkillAgentOrchestrator orchestrator,
+            io.github.hide212131.langchain4j.claude.skills.runtime.observability.WorkflowTracer workflowTracer) {
         this.skillIndex = Objects.requireNonNull(skillIndex, "skillIndex");
         this.outputDirectory =
                 Objects.requireNonNull(outputDirectory, "outputDirectory").toAbsolutePath().normalize();
         this.logger = Objects.requireNonNull(logger, "logger");
         this.orchestrator = Objects.requireNonNull(orchestrator, "orchestrator");
+        this.workflowTracer = workflowTracer; // nullable for backward compatibility
     }
 
     public ExecutionResult execute(String skillId, Map<String, Object> inputs) {
         if (skillId == null || skillId.isBlank()) {
             throw new IllegalArgumentException("skillId must be provided");
         }
-        SkillIndex.SkillMetadata metadata = skillIndex.find(skillId)
-                .orElseThrow(() -> new IllegalArgumentException("Unknown skill: " + skillId));
-        Map<String, Object> safeInputs = inputs == null ? Map.of() : Map.copyOf(inputs);
-    prepareOutputDirectory(outputDirectory);
-        List<String> expectedOutputs = resolveExpectedOutputs(safeInputs);
+        
+        try (var skillTrace = workflowTracer != null ? workflowTracer.traceStage("SkillExecution") : null) {
+            SkillIndex.SkillMetadata metadata = skillIndex.find(skillId)
+                    .orElseThrow(() -> new IllegalArgumentException("Unknown skill: " + skillId));
+            Map<String, Object> safeInputs = inputs == null ? Map.of() : Map.copyOf(inputs);
+            
+            if (skillTrace != null) {
+                skillTrace.setAttribute("skill_id", skillId);
+                skillTrace.setAttribute("skill_name", metadata.name());
+                skillTrace.setAttribute("skill_description", metadata.description());
+            }
+            
+            prepareOutputDirectory(outputDirectory);
+            List<String> expectedOutputs = resolveExpectedOutputs(safeInputs);
 
-    SkillRuntimeContext context = new SkillRuntimeContext(metadata, expectedOutputs, outputDirectory, logger);
-    context.logL1();
-    SkillToolbox toolbox = new SkillToolbox(context);
+            SkillRuntimeContext context = new SkillRuntimeContext(metadata, expectedOutputs, outputDirectory, logger);
+            context.logL1();
+            SkillToolbox toolbox = new SkillToolbox(context);
 
-    String prompt = buildPrompt(metadata, safeInputs, expectedOutputs);
-    String rawResponse = orchestrator.run(toolbox, metadata, safeInputs, expectedOutputs, prompt);
+            // Trace prompt building
+            String prompt;
+            try (var promptTrace = workflowTracer != null ? workflowTracer.traceStage("SkillPromptBuild") : null) {
+                prompt = buildPrompt(metadata, safeInputs, expectedOutputs);
+                if (promptTrace != null) {
+                    promptTrace.setAttribute("prompt_length", prompt.length());
+                    promptTrace.setAttribute("expected_outputs", String.join(", ", expectedOutputs));
+                    promptTrace.setSuccess();
+                }
+            }
+            
+            // Trace orchestrator execution
+            String rawResponse;
+            try (var orchTrace = workflowTracer != null ? workflowTracer.traceStage("SkillOrchestrator") : null) {
+                rawResponse = orchestrator.run(toolbox, metadata, safeInputs, expectedOutputs, prompt);
+                if (orchTrace != null) {
+                    orchTrace.setAttribute("response_length", rawResponse != null ? rawResponse.length() : 0);
+                    orchTrace.setAttribute("tool_invocations", context.toolInvocations().size());
+                    orchTrace.setSuccess();
+                }
+            }
 
-        Map<String, String> parsed = parseFinalResponse(rawResponse);
-        Map<String, Object> outputs = new LinkedHashMap<>();
-        outputs.put("skillRoot", metadata.skillRoot().toString());
-        outputs.put(
-                "summary",
-                parsed.getOrDefault(
-                        "summary",
-                        metadata.description().isBlank() ? metadata.name() : metadata.description()));
-        if (parsed.containsKey("notes")) {
-            outputs.put("notes", parsed.get("notes"));
-        }
-        if (context.artifactPath() != null) {
-            outputs.put("artifactPath", context.artifactPath().toString());
-        } else if (parsed.containsKey("artifactPath")) {
-            outputs.put("artifactPath", parsed.get("artifactPath"));
-        }
-        if (!context.referencedFiles().isEmpty()) {
+            Map<String, String> parsed = parseFinalResponse(rawResponse);
+            Map<String, Object> outputs = new LinkedHashMap<>();
+            outputs.put("skillRoot", metadata.skillRoot().toString());
             outputs.put(
-                    "referencedFiles",
-                    context.referencedFiles().stream().map(Path::toString).toList());
-        }
-        if (!expectedOutputs.isEmpty()) {
-            outputs.put("expectedOutputs", expectedOutputs);
-        }
+                    "summary",
+                    parsed.getOrDefault(
+                            "summary",
+                            metadata.description().isBlank() ? metadata.name() : metadata.description()));
+            if (parsed.containsKey("notes")) {
+                outputs.put("notes", parsed.get("notes"));
+            }
+            if (context.artifactPath() != null) {
+                outputs.put("artifactPath", context.artifactPath().toString());
+            } else if (parsed.containsKey("artifactPath")) {
+                outputs.put("artifactPath", parsed.get("artifactPath"));
+            }
+            if (!context.referencedFiles().isEmpty()) {
+                outputs.put(
+                        "referencedFiles",
+                        context.referencedFiles().stream().map(Path::toString).toList());
+            }
+            if (!expectedOutputs.isEmpty()) {
+                outputs.put("expectedOutputs", expectedOutputs);
+            }
 
-        Validation validation = context.validation() != null
-                ? context.validation()
-                : validateOutputs(expectedOutputs, outputs, context.artifactPath());
-        if (context.validation() == null) {
-            context.setValidation(validation);
-        }
+            Validation validation = context.validation() != null
+                    ? context.validation()
+                    : validateOutputs(expectedOutputs, outputs, context.artifactPath());
+            if (context.validation() == null) {
+                context.setValidation(validation);
+            }
+            
+            if (skillTrace != null) {
+                skillTrace.setAttribute("has_artifact", context.artifactPath() != null);
+                if (context.artifactPath() != null) {
+                    skillTrace.setAttribute("artifact_path", context.artifactPath().toString());
+                }
+                skillTrace.setAttribute("referenced_files", context.referencedFiles().size());
+                skillTrace.setAttribute("tool_invocation_count", context.toolInvocations().size());
+                skillTrace.setAttribute("invoked_skills", String.join(", ", context.invokedSkills()));
+                skillTrace.setAttribute("validation_satisfied", validation.expectedOutputsSatisfied());
+                if (!validation.missingOutputs().isEmpty()) {
+                    skillTrace.setAttribute("missing_outputs", String.join(", ", validation.missingOutputs()));
+                }
+                skillTrace.setSuccess();
+            }
 
-    Path artifactPath = context.artifactPath();
-        logger.info("Act[done] {} — {}", metadata.id(), outputs.get("summary"));
-        return new ExecutionResult(
-                skillId,
-                Map.copyOf(outputs),
-                artifactPath,
-                validation,
-                context.disclosureLog(),
-        context.toolInvocations(),
-        context.invokedSkills());
+            Path artifactPath = context.artifactPath();
+            logger.info("Act[done] {} — {}", metadata.id(), outputs.get("summary"));
+            return new ExecutionResult(
+                    skillId,
+                    Map.copyOf(outputs),
+                    artifactPath,
+                    validation,
+                    context.disclosureLog(),
+                    context.toolInvocations(),
+                    context.invokedSkills());
+        } catch (Exception e) {
+            if (workflowTracer != null) {
+                try (var errorTrace = workflowTracer.traceStage("SkillExecution")) {
+                    errorTrace.setAttribute("skill_id", skillId);
+                    errorTrace.recordException(e);
+                }
+            }
+            throw e;
+        }
     }
 
     private String buildPrompt(
