@@ -19,6 +19,8 @@ public final class ObservabilityConfig {
     private final String otlpEndpoint;
     private final String serviceName;
     private final boolean enabled;
+    private OpenTelemetry openTelemetry;
+    private WorkflowTracer workflowTracer;
 
     private ObservabilityConfig(String otlpEndpoint, String serviceName, boolean enabled) {
         this.otlpEndpoint = otlpEndpoint;
@@ -53,6 +55,13 @@ public final class ObservabilityConfig {
     }
 
     public OpenTelemetry createOpenTelemetry() {
+        if (openTelemetry == null) {
+            openTelemetry = initializeOpenTelemetry();
+        }
+        return openTelemetry;
+    }
+
+    private OpenTelemetry initializeOpenTelemetry() {
         if (!enabled) {
             return OpenTelemetry.noop();
         }
@@ -73,6 +82,13 @@ public final class ObservabilityConfig {
         return OpenTelemetrySdk.builder()
                 .setTracerProvider(sdkTracerProvider)
                 .buildAndRegisterGlobal();
+    }
+
+    public WorkflowTracer createWorkflowTracer() {
+        if (workflowTracer == null) {
+            workflowTracer = new WorkflowTracer(createOpenTelemetry(), enabled);
+        }
+        return workflowTracer;
     }
 
     public boolean isEnabled() {

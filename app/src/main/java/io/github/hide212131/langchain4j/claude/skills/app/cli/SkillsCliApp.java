@@ -38,8 +38,7 @@ public final class SkillsCliApp implements Runnable {
     static CommandLine commandLineInstance() {
         CommandLine cmd = new CommandLine(new SkillsCliApp());
         SkillIndexLoader loader = new SkillIndexLoader();
-    AgentServiceFactory factory = (dryRun, index, client) -> AgentService.withDefaults(new WorkflowFactory(), client, index, dryRun);
-        cmd.addSubcommand("run", new RunCommand(factory, loader));
+        cmd.addSubcommand("run", new RunCommand(loader));
         return cmd;
     }
 
@@ -67,14 +66,12 @@ public final class SkillsCliApp implements Runnable {
             "Comma-separated list of skill IDs to execute in order (bypasses the planner)")
     List<String> debugSkillIds;
 
-        private final AgentServiceFactory agentServiceFactory;
         private final SkillIndexLoader loader;
 
         @Spec
         CommandSpec commandSpec;
 
-        RunCommand(AgentServiceFactory agentServiceFactory, SkillIndexLoader loader) {
-            this.agentServiceFactory = agentServiceFactory;
+        RunCommand(SkillIndexLoader loader) {
             this.loader = loader;
         }
 
@@ -104,6 +101,8 @@ public final class SkillsCliApp implements Runnable {
             // Initialize OpenTelemetry for observability (LangFuse support)
             ObservabilityConfig observabilityConfig = ObservabilityConfig.fromEnvironment(System::getenv);
             OpenTelemetry openTelemetry = observabilityConfig.createOpenTelemetry();
+            io.github.hide212131.langchain4j.claude.skills.runtime.observability.WorkflowTracer workflowTracer = 
+                observabilityConfig.createWorkflowTracer();
             
             if (observabilityConfig.isEnabled()) {
                 commandSpec
@@ -115,7 +114,8 @@ public final class SkillsCliApp implements Runnable {
             LangChain4jLlmClient client = dryRun
                     ? LangChain4jLlmClient.fake()
                     : LangChain4jLlmClient.forOpenAi(System::getenv, openTelemetry);
-            AgentService agentService = agentServiceFactory.create(dryRun, loadResult.index(), client);
+            AgentService agentService = AgentService.withDefaults(
+                new WorkflowFactory(), client, loadResult.index(), dryRun, workflowTracer);
         List<String> forcedSkillIds = normaliseSkillIds(debugSkillIds);
         if (!forcedSkillIds.isEmpty()) {
         commandSpec
@@ -291,8 +291,4 @@ public final class SkillsCliApp implements Runnable {
         }
     }
 
-    @FunctionalInterface
-    interface AgentServiceFactory {
-        AgentService create(boolean dryRun, SkillIndex index, LangChain4jLlmClient client);
-    }
 }

@@ -67,7 +67,8 @@ class AgentServiceTest {
                 invoker,
                 blackboardStore,
                 new DefaultEvaluator(blackboardStore, logger),
-                planner);
+                planner,
+                null); // WorkflowTracer not needed for this test
         AgentService.ExecutionResult result =
                 service.run(new AgentService.AgentRunRequest("demo", true, List.of()));
 
@@ -134,7 +135,8 @@ class AgentServiceTest {
                 invoker,
                 blackboardStore,
                 evaluator,
-                planner);
+                planner,
+                null); // WorkflowTracer not needed for this test
 
         AgentService.ExecutionResult result =
                 service.run(new AgentService.AgentRunRequest("demo", true, List.of()));
