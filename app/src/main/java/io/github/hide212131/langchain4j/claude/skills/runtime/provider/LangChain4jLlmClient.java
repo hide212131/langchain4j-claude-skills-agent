@@ -133,17 +133,27 @@ public final class LangChain4jLlmClient {
     private static final class OpenAiChatModelFactory implements ChatModelFactory {
         @Override
         public ChatModel create(OpenAiConfig config) {
-            ChatModel baseModel = OpenAiChatModel.builder()
+            var builder = OpenAiChatModel.builder()
                     .apiKey(config.apiKey)
-                    .modelName(config.modelName)
-                    .build();
+                    .modelName(config.modelName);
             
+            // Use LangChain4j's built-in OpenTelemetry support if available
             if (config.openTelemetry != null) {
-                return new io.github.hide212131.langchain4j.claude.skills.runtime.observability.ObservableChatModel(
-                    baseModel, config.openTelemetry);
+                try {
+                    // LangChain4j 0.36.0+ supports .openTelemetry() method
+                    builder.getClass().getMethod("openTelemetry", io.opentelemetry.api.OpenTelemetry.class)
+                           .invoke(builder, config.openTelemetry);
+                } catch (NoSuchMethodException e) {
+                    // Method not available in this version, fallback to wrapper
+                    ChatModel baseModel = builder.build();
+                    return new io.github.hide212131.langchain4j.claude.skills.runtime.observability.ObservableChatModel(
+                        baseModel, config.openTelemetry);
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to configure OpenTelemetry", e);
+                }
             }
             
-            return baseModel;
+            return builder.build();
         }
     }
 
