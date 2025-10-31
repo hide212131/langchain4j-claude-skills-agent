@@ -119,16 +119,10 @@ public final class LangChain4jLlmClient {
     static final class OpenAiConfig {
         final String apiKey;
         final String modelName;
-        final OpenTelemetry openTelemetry;
 
         OpenAiConfig(String apiKey, String modelName) {
-            this(apiKey, modelName, null);
-        }
-
-        OpenAiConfig(String apiKey, String modelName, OpenTelemetry openTelemetry) {
             this.apiKey = Objects.requireNonNull(apiKey, "apiKey");
             this.modelName = Objects.requireNonNull(modelName, "modelName");
-            this.openTelemetry = openTelemetry;
         }
     }
 
@@ -141,15 +135,14 @@ public final class LangChain4jLlmClient {
 
         @Override
         public ChatModel create(OpenAiConfig config) {
-            OpenAiChatModel.OpenAiChatModelBuilder builder = OpenAiChatModel.builder()
-                    .apiKey(config.apiKey)
-                    .modelName(config.modelName);
-            
             // Note: OpenTelemetry integration is handled via global OpenTelemetry instance
             // LangChain4j 1.7.1 uses the global OpenTelemetry instance for automatic instrumentation
-            // The observability config sets up the global instance via OpenTelemetrySdk
+            // The observability config sets up and registers the global instance via buildAndRegisterGlobal()
             
-            return builder.build();
+            return OpenAiChatModel.builder()
+                    .apiKey(config.apiKey)
+                    .modelName(config.modelName)
+                    .build();
         }
     }
 

@@ -76,10 +76,15 @@ public final class ObservabilityConfig {
         OpenTelemetrySdk openTelemetry = OpenTelemetrySdk.builder()
             .setTracerProvider(tracerProvider)
             .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
-            .build();
+            .buildAndRegisterGlobal();
         
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            tracerProvider.close();
+            try {
+                tracerProvider.close();
+                openTelemetry.close();
+            } catch (Exception e) {
+                // Ignore shutdown errors
+            }
         }));
         
         Tracer tracer = openTelemetry.getTracer("langchain4j-skills-agent");
