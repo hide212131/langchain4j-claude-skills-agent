@@ -15,9 +15,15 @@ repositories {
 
 dependencies {
     implementation(platform("dev.langchain4j:langchain4j-bom:1.7.1"))
+    implementation(platform("io.opentelemetry:opentelemetry-bom:1.44.1"))
     implementation("dev.langchain4j:langchain4j-agentic")
     implementation("dev.langchain4j:langchain4j-open-ai")
     implementation("dev.langchain4j:langchain4j-core")
+    implementation("dev.langchain4j:langchain4j")
+    implementation("io.opentelemetry:opentelemetry-api")
+    implementation("io.opentelemetry:opentelemetry-sdk")
+    implementation("io.opentelemetry:opentelemetry-exporter-otlp")
+    implementation("io.opentelemetry.semconv:opentelemetry-semconv:1.28.0-alpha")
     implementation("info.picocli:picocli:4.7.6")
     implementation("org.yaml:snakeyaml:2.2")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.17.1")

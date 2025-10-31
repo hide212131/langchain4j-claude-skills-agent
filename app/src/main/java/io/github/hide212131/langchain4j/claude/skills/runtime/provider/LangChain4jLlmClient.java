@@ -9,6 +9,8 @@ import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiChatRequestParameters;
 import dev.langchain4j.model.output.TokenUsage;
+import io.github.hide212131.langchain4j.claude.skills.infra.observability.ObservabilityConfig;
+import io.opentelemetry.api.OpenTelemetry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -37,7 +39,8 @@ public final class LangChain4jLlmClient {
     }
 
     public static LangChain4jLlmClient forOpenAi(EnvironmentVariables environment) {
-        return forOpenAi(environment, new OpenAiChatModelFactory(), Clock.systemUTC());
+        ObservabilityConfig observability = ObservabilityConfig.fromEnvironment();
+        return forOpenAi(environment, new OpenAiChatModelFactory(observability), Clock.systemUTC());
     }
 
     static LangChain4jLlmClient forOpenAi(
@@ -116,20 +119,37 @@ public final class LangChain4jLlmClient {
     static final class OpenAiConfig {
         final String apiKey;
         final String modelName;
+        final OpenTelemetry openTelemetry;
 
         OpenAiConfig(String apiKey, String modelName) {
+            this(apiKey, modelName, null);
+        }
+
+        OpenAiConfig(String apiKey, String modelName, OpenTelemetry openTelemetry) {
             this.apiKey = Objects.requireNonNull(apiKey, "apiKey");
             this.modelName = Objects.requireNonNull(modelName, "modelName");
+            this.openTelemetry = openTelemetry;
         }
     }
 
     private static final class OpenAiChatModelFactory implements ChatModelFactory {
+        private final ObservabilityConfig observabilityConfig;
+
+        OpenAiChatModelFactory(ObservabilityConfig observabilityConfig) {
+            this.observabilityConfig = observabilityConfig;
+        }
+
         @Override
         public ChatModel create(OpenAiConfig config) {
-            return OpenAiChatModel.builder()
+            OpenAiChatModel.OpenAiChatModelBuilder builder = OpenAiChatModel.builder()
                     .apiKey(config.apiKey)
-                    .modelName(config.modelName)
-                    .build();
+                    .modelName(config.modelName);
+            
+            // Note: OpenTelemetry integration is handled via global OpenTelemetry instance
+            // LangChain4j 1.7.1 uses the global OpenTelemetry instance for automatic instrumentation
+            // The observability config sets up the global instance via OpenTelemetrySdk
+            
+            return builder.build();
         }
     }
 

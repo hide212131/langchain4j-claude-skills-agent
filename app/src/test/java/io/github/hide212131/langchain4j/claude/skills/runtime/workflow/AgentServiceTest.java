@@ -59,6 +59,9 @@ class AgentServiceTest {
                 new DefaultInvoker(tool, new SkillInvocationGuard(), blackboardStore, logger);
         LangChain4jLlmClient llmClient = LangChain4jLlmClient.fake();
         AgenticPlanner planner = new AgenticPlanner(index, llmClient, logger);
+        io.github.hide212131.langchain4j.claude.skills.infra.observability.WorkflowTracer tracer = 
+                new io.github.hide212131.langchain4j.claude.skills.infra.observability.WorkflowTracer(
+                    io.opentelemetry.api.OpenTelemetry.noop().getTracer("test"), false);
         AgentService service = new AgentService(
                 new WorkflowFactory(),
                 llmClient,
@@ -67,7 +70,8 @@ class AgentServiceTest {
                 invoker,
                 blackboardStore,
                 new DefaultEvaluator(blackboardStore, logger),
-                planner);
+                planner,
+                tracer);
         AgentService.ExecutionResult result =
                 service.run(new AgentService.AgentRunRequest("demo", true, List.of()));
 
@@ -126,6 +130,9 @@ class AgentServiceTest {
         RetryingEvaluator evaluator = new RetryingEvaluator();
         LangChain4jLlmClient llmClient = LangChain4jLlmClient.fake();
         AgenticPlanner planner = new AgenticPlanner(index, llmClient, logger);
+        io.github.hide212131.langchain4j.claude.skills.infra.observability.WorkflowTracer tracer = 
+                new io.github.hide212131.langchain4j.claude.skills.infra.observability.WorkflowTracer(
+                    io.opentelemetry.api.OpenTelemetry.noop().getTracer("test"), false);
         AgentService service = new AgentService(
                 new WorkflowFactory(),
                 llmClient,
@@ -134,7 +141,8 @@ class AgentServiceTest {
                 invoker,
                 blackboardStore,
                 evaluator,
-                planner);
+                planner,
+                tracer);
 
         AgentService.ExecutionResult result =
                 service.run(new AgentService.AgentRunRequest("demo", true, List.of()));
