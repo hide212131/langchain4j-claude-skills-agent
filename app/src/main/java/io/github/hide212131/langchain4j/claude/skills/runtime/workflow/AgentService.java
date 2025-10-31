@@ -112,13 +112,19 @@ public final class AgentService {
 
     public ExecutionResult run(AgentRunRequest request) {
         Objects.requireNonNull(request, "request");
-        blackboardStore.clear();
-        List<StageVisit> stageVisits = new ArrayList<>();
-    LangChain4jLlmClient.CompletionResult finalPlanCompletion = null;
-    PlanModels.PlanResult finalPlan = null;
-        ActResult finalActResult = null;
-        ReflectEvaluator.EvaluationResult finalEvaluation = null;
-        int maxAttempts = 2;
+        
+        return tracer.trace("agent.execution", Map.of(
+            "goal", request.goal(),
+            "dryRun", request.dryRun(),
+            "forcedSkillIds", String.join(",", request.forcedSkillIds())
+        ), () -> {
+            blackboardStore.clear();
+            List<StageVisit> stageVisits = new ArrayList<>();
+        LangChain4jLlmClient.CompletionResult finalPlanCompletion = null;
+        PlanModels.PlanResult finalPlan = null;
+            ActResult finalActResult = null;
+            ReflectEvaluator.EvaluationResult finalEvaluation = null;
+            int maxAttempts = 2;
 
     for (int attempt = 0; attempt < maxAttempts; attempt++) {
             int attemptIndex = attempt;
@@ -286,6 +292,25 @@ public final class AgentService {
                 logger.warn("Reflect could not satisfy requirements within retry budget.");
             }
         }
+        
+        // Add comprehensive tracing events for execution summary
+        tracer.addEvent("execution.completed", Map.of(
+            "stageVisits", String.valueOf(stageVisits.size()),
+            "llmCalls", String.valueOf(metricsSnapshot.callCount()),
+            "totalTokens", String.valueOf(metricsSnapshot.totalTokenCount()),
+            "inputTokens", String.valueOf(metricsSnapshot.totalInputTokens()),
+            "outputTokens", String.valueOf(metricsSnapshot.totalOutputTokens()),
+            "totalDurationMs", String.valueOf(metricsSnapshot.totalDurationMs())
+        ));
+        
+        if (finalActResult != null) {
+            tracer.addEvent("execution.artifacts", Map.of(
+                "invokedSkills", String.join(",", finalActResult.invokedSkills()),
+                "hasArtifact", String.valueOf(finalActResult.hasArtifact()),
+                "artifactPath", finalActResult.hasArtifact() ? finalActResult.finalArtifact().toString() : ""
+            ));
+        }
+        
         return new ExecutionResult(
                 List.copyOf(stageVisits),
                 finalPlan,
@@ -294,6 +319,7 @@ public final class AgentService {
                 finalActResult,
                 finalEvaluation,
                 blackboardStore.snapshot());
+        });
     }
 
     private void writePlanGoal(AgenticScope scope, String goal) {
