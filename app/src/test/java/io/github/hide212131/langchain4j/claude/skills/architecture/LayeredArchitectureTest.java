@@ -46,7 +46,8 @@ class LayeredArchitectureTest {
                             "org.slf4j..",
                             "dev.langchain4j..",
                             "org.yaml..",
-                            "com.fasterxml.jackson..");
+                            "com.fasterxml.jackson..",
+                            "io.opentelemetry..");
 
     @ArchTest
     static final ArchRule infraModuleShouldBeLeafLayer =
@@ -55,5 +56,10 @@ class LayeredArchitectureTest {
                     .resideInAPackage(INFRA)
                     .should()
                     .onlyDependOnClassesThat()
-                    .resideInAnyPackage(INFRA, "java..", "javax..", "org.slf4j..");
+                    .resideInAnyPackage(
+                            INFRA, 
+                            "java..", 
+                            "javax..", 
+                            "org.slf4j..",
+                            "io.opentelemetry..");
 }

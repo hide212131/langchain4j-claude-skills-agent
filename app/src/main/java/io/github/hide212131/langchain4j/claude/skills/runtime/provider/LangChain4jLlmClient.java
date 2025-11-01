@@ -9,6 +9,8 @@ import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiChatRequestParameters;
 import dev.langchain4j.model.output.TokenUsage;
+import io.github.hide212131.langchain4j.claude.skills.infra.observability.ObservabilityConfig;
+import io.opentelemetry.api.OpenTelemetry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -37,7 +39,8 @@ public final class LangChain4jLlmClient {
     }
 
     public static LangChain4jLlmClient forOpenAi(EnvironmentVariables environment) {
-        return forOpenAi(environment, new OpenAiChatModelFactory(), Clock.systemUTC());
+        ObservabilityConfig observability = ObservabilityConfig.fromEnvironment();
+        return forOpenAi(environment, new OpenAiChatModelFactory(observability), Clock.systemUTC());
     }
 
     static LangChain4jLlmClient forOpenAi(
@@ -124,8 +127,18 @@ public final class LangChain4jLlmClient {
     }
 
     private static final class OpenAiChatModelFactory implements ChatModelFactory {
+
+        OpenAiChatModelFactory(ObservabilityConfig observabilityConfig) {
+            // observabilityConfig is passed for future extensibility but not currently used
+            // OpenTelemetry integration is handled via global OpenTelemetry instance
+        }
+
         @Override
         public ChatModel create(OpenAiConfig config) {
+            // Note: OpenTelemetry integration is handled via global OpenTelemetry instance
+            // LangChain4j 1.7.1 uses the global OpenTelemetry instance for automatic instrumentation
+            // The observability config sets up and registers the global instance via buildAndRegisterGlobal()
+            
             return OpenAiChatModel.builder()
                     .apiKey(config.apiKey)
                     .modelName(config.modelName)
