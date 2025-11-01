@@ -20,7 +20,6 @@ import java.util.concurrent.TimeUnit;
 public final class ObservabilityConfig {
 
     private static final String DEFAULT_SERVICE_NAME = "langchain4j-skills-agent";
-    private static final String DEFAULT_OTLP_ENDPOINT = "http://localhost:4317";
     
     private final OpenTelemetry openTelemetry;
     private final Tracer tracer;
@@ -36,7 +35,7 @@ public final class ObservabilityConfig {
      * Creates observability configuration from environment variables.
      * 
      * Environment variables:
-     * - LANGFUSE_OTLP_ENDPOINT: LangFuse OTLP endpoint (default: http://localhost:4317)
+     * - LANGFUSE_OTLP_ENDPOINT: LangFuse OTLP endpoint (required; observability is disabled if not set)
      * - LANGFUSE_SERVICE_NAME: Service name for tracing (default: langchain4j-skills-agent)
      * 
      * Observability is enabled only if LANGFUSE_OTLP_ENDPOINT is set.
@@ -85,7 +84,7 @@ public final class ObservabilityConfig {
             } catch (Exception e) {
                 // Ignore shutdown errors
             }
-        }));
+        }, "opentelemetry-shutdown"));
         
         Tracer tracer = openTelemetry.getTracer("langchain4j-skills-agent");
         

@@ -116,7 +116,9 @@ public final class AgentService {
         return tracer.trace("agent.execution", Map.of(
             "goal", request.goal(),
             "dryRun", request.dryRun(),
-            "forcedSkillIds", String.join(",", request.forcedSkillIds())
+            "forcedSkillIds", request.forcedSkillIds().stream()
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.joining(","))
         ), () -> {
             blackboardStore.clear();
             List<StageVisit> stageVisits = new ArrayList<>();

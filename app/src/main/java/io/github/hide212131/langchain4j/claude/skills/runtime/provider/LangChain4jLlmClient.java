@@ -127,10 +127,10 @@ public final class LangChain4jLlmClient {
     }
 
     private static final class OpenAiChatModelFactory implements ChatModelFactory {
-        private final ObservabilityConfig observabilityConfig;
 
         OpenAiChatModelFactory(ObservabilityConfig observabilityConfig) {
-            this.observabilityConfig = observabilityConfig;
+            // observabilityConfig is passed for future extensibility but not currently used
+            // OpenTelemetry integration is handled via global OpenTelemetry instance
         }
 
         @Override

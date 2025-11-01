@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
+import io.github.hide212131.langchain4j.claude.skills.infra.observability.WorkflowTracer;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.ActState;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.BlackboardStore;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.ReflectFinalSummaryState;
@@ -22,6 +23,7 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect.R
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.AgenticPlanner;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.PlanModels;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.support.WorkflowFactory;
+import io.opentelemetry.api.OpenTelemetry;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -59,9 +61,8 @@ class AgentServiceTest {
                 new DefaultInvoker(tool, new SkillInvocationGuard(), blackboardStore, logger);
         LangChain4jLlmClient llmClient = LangChain4jLlmClient.fake();
         AgenticPlanner planner = new AgenticPlanner(index, llmClient, logger);
-        io.github.hide212131.langchain4j.claude.skills.infra.observability.WorkflowTracer tracer = 
-                new io.github.hide212131.langchain4j.claude.skills.infra.observability.WorkflowTracer(
-                    io.opentelemetry.api.OpenTelemetry.noop().getTracer("test"), false);
+        WorkflowTracer tracer = new WorkflowTracer(
+                OpenTelemetry.noop().getTracer("test"), false);
         AgentService service = new AgentService(
                 new WorkflowFactory(),
                 llmClient,
@@ -130,9 +131,8 @@ class AgentServiceTest {
         RetryingEvaluator evaluator = new RetryingEvaluator();
         LangChain4jLlmClient llmClient = LangChain4jLlmClient.fake();
         AgenticPlanner planner = new AgenticPlanner(index, llmClient, logger);
-        io.github.hide212131.langchain4j.claude.skills.infra.observability.WorkflowTracer tracer = 
-                new io.github.hide212131.langchain4j.claude.skills.infra.observability.WorkflowTracer(
-                    io.opentelemetry.api.OpenTelemetry.noop().getTracer("test"), false);
+        WorkflowTracer tracer = new WorkflowTracer(
+                OpenTelemetry.noop().getTracer("test"), false);
         AgentService service = new AgentService(
                 new WorkflowFactory(),
                 llmClient,
