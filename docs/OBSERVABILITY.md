@@ -1,6 +1,6 @@
 # LangFuse Observability Integration
 
-This project integrates LangFuse observability using LangChain4j's official OpenTelemetry support and OTLP (OpenTelemetry Protocol) gRPC exporter.
+This project integrates LangFuse observability using OpenTelemetry OTLP HTTP exporter with Basic authentication.
 
 ## Overview
 
@@ -34,15 +34,21 @@ The observability integration provides comprehensive tracing for:
 
 - Java 21
 - Access to a LangFuse instance (local or cloud)
-- LangFuse OTLP endpoint configured
+- LangFuse OTLP HTTP endpoint configured
 
 ### Environment Variables
 
 Configure observability using environment variables:
 
 ```bash
-# Required: LangFuse OTLP endpoint
-export LANGFUSE_OTLP_ENDPOINT=http://localhost:4317
+# Required: LangFuse OTLP HTTP endpoint (e.g., http://localhost:3000/api/public/otel)
+export LANGFUSE_OTLP_ENDPOINT=http://localhost:3000/api/public/otel
+
+# Required: LangFuse public key for Basic authentication
+export LANGFUSE_OTLP_USERNAME=pk-lf-...
+
+# Required: LangFuse secret key for Basic authentication
+export LANGFUSE_OTLP_PASSWORD=sk-lf-...
 
 # Optional: Service name for tracing (default: langchain4j-skills-agent)
 export LANGFUSE_SERVICE_NAME=my-custom-service-name
@@ -64,7 +70,7 @@ cd langfuse
 docker-compose up -d
 ```
 
-The default OTLP endpoint will be `http://localhost:4317`.
+The OTLP HTTP endpoint will be available at `http://localhost:3000/api/public/otel`.
 
 #### Access LangFuse UI
 
@@ -76,7 +82,8 @@ Once LangFuse is running, access the web UI at `http://localhost:3000` to view t
 
 1. **ObservabilityConfig** (`io.github.hide212131.langchain4j.claude.skills.infra.observability.ObservabilityConfig`)
    - Configures OpenTelemetry SDK
-   - Sets up OTLP gRPC exporter
+   - Sets up OTLP HTTP exporter with Basic authentication
+   - Enables GenAI semantic conventions
    - Manages tracer lifecycle
    - Provides global OpenTelemetry instance
 
@@ -159,7 +166,9 @@ The observability integration is automatic when environment variables are set:
 
 ```bash
 # Set environment variables
-export LANGFUSE_OTLP_ENDPOINT=http://localhost:4317
+export LANGFUSE_OTLP_ENDPOINT=http://localhost:3000/api/public/otel
+export LANGFUSE_OTLP_USERNAME=pk-lf-your-public-key
+export LANGFUSE_OTLP_PASSWORD=sk-lf-your-secret-key
 export OPENAI_API_KEY=your-api-key
 
 # Run the application
