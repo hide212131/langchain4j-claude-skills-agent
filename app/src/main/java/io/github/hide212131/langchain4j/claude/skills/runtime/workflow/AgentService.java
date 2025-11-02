@@ -3,9 +3,12 @@ package io.github.hide212131.langchain4j.claude.skills.runtime.workflow;
 import dev.langchain4j.agentic.AgenticServices;
 import dev.langchain4j.agentic.UntypedAgent;
 import dev.langchain4j.agentic.scope.AgenticScope;
+import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.openai.OpenAiChatModel;
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
 import io.github.hide212131.langchain4j.claude.skills.infra.observability.ObservabilityConfig;
 import io.github.hide212131.langchain4j.claude.skills.infra.observability.WorkflowTracer;
+import io.github.hide212131.langchain4j.claude.skills.runtime.observability.InstrumentedChatModel;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.BlackboardStore;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.PlanCandidateStepsState;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.PlanConstraintsState;
@@ -30,6 +33,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -63,17 +67,25 @@ public final class AgentService {
         BlackboardStore blackboardStore = new BlackboardStore();
         ObservabilityConfig observability = ObservabilityConfig.fromEnvironment();
         WorkflowTracer tracer = new WorkflowTracer(observability.tracer(), observability.isEnabled());
-    SkillRuntime runtime = dryRun
-        ? new SkillRuntime(
-            skillIndex,
-            Path.of("build", "out"),
-            logger,
-            new DryRunSkillRuntimeOrchestrator())
-        : new SkillRuntime(
-            skillIndex,
-            Path.of("build", "out"),
-            logger,
-            llmClient.chatModel());
+        ChatModel runtimeChatModel = llmClient.chatModel();
+        if (!dryRun && observability.isEnabled()) {
+            runtimeChatModel = new InstrumentedChatModel(
+                    runtimeChatModel,
+                    observability.tracer(),
+                    determineProvider(runtimeChatModel),
+                    llmClient.defaultModelName());
+        }
+        SkillRuntime runtime = dryRun
+                ? new SkillRuntime(
+                        skillIndex,
+                        Path.of("build", "out"),
+                        logger,
+                        new DryRunSkillRuntimeOrchestrator())
+                : new SkillRuntime(
+                        skillIndex,
+                        Path.of("build", "out"),
+                        logger,
+                        runtimeChatModel);
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
         SkillInvocationGuard guard = new SkillInvocationGuard();
         DefaultInvoker invoker = new DefaultInvoker(tool, guard, blackboardStore, logger);
@@ -390,5 +402,12 @@ public final class AgentService {
             }
             Objects.requireNonNull(stage, "stage");
         }
+    }
+
+    private static String determineProvider(ChatModel chatModel) {
+        if (chatModel instanceof OpenAiChatModel) {
+            return "openai";
+        }
+        return chatModel.getClass().getSimpleName().toLowerCase(Locale.ROOT);
     }
 }

@@ -11,7 +11,7 @@ class ObservabilityConfigTest {
     @Test
     void fromEnvironment_whenNoEndpoint_shouldReturnDisabledConfig() {
         // When: No LANGFUSE_OTLP_ENDPOINT environment variable is set
-        ObservabilityConfig config = ObservabilityConfig.fromEnvironment();
+        ObservabilityConfig config = ObservabilityConfig.fromEnvironment(name -> null);
 
         // Then: Observability should be disabled
         assertThat(config.isEnabled()).isFalse();
@@ -22,7 +22,13 @@ class ObservabilityConfigTest {
     @Test
     void fromEnvironment_shouldCreateValidConfiguration() {
         // When: Creating configuration from environment
-        ObservabilityConfig config = ObservabilityConfig.fromEnvironment();
+        ObservabilityConfig config = ObservabilityConfig.fromEnvironment(name -> switch (name) {
+            case "LANGFUSE_OTLP_ENDPOINT" -> "https://example.com";
+            case "LANGFUSE_OTLP_USERNAME" -> "public";
+            case "LANGFUSE_OTLP_PASSWORD" -> "secret";
+            case "LANGFUSE_PROJECT_ID" -> "project-123";
+            default -> null;
+        });
 
         // Then: Configuration should be valid
         assertThat(config).isNotNull();
@@ -33,7 +39,12 @@ class ObservabilityConfigTest {
     @Test
     void openTelemetry_shouldReturnNonNullInstance() {
         // Given: A configuration
-        ObservabilityConfig config = ObservabilityConfig.fromEnvironment();
+        ObservabilityConfig config = ObservabilityConfig.fromEnvironment(name -> switch (name) {
+            case "LANGFUSE_OTLP_ENDPOINT" -> "https://example.com";
+            case "LANGFUSE_OTLP_USERNAME" -> "public";
+            case "LANGFUSE_OTLP_PASSWORD" -> "secret";
+            default -> null;
+        });
 
         // When: Getting OpenTelemetry instance
         OpenTelemetry openTelemetry = config.openTelemetry();
@@ -45,7 +56,12 @@ class ObservabilityConfigTest {
     @Test
     void tracer_shouldReturnNonNullInstance() {
         // Given: A configuration
-        ObservabilityConfig config = ObservabilityConfig.fromEnvironment();
+        ObservabilityConfig config = ObservabilityConfig.fromEnvironment(name -> switch (name) {
+            case "LANGFUSE_OTLP_ENDPOINT" -> "https://example.com";
+            case "LANGFUSE_OTLP_USERNAME" -> "public";
+            case "LANGFUSE_OTLP_PASSWORD" -> "secret";
+            default -> null;
+        });
 
         // When: Getting tracer instance
         Tracer tracer = config.tracer();

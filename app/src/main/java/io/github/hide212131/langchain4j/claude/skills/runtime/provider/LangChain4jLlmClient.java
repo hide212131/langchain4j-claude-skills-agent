@@ -8,6 +8,7 @@ import dev.langchain4j.model.chat.request.ChatRequestParameters;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiChatRequestParameters;
+import io.github.hide212131.langchain4j.claude.skills.runtime.observability.InstrumentedChatModel;
 import dev.langchain4j.model.output.TokenUsage;
 import java.time.Clock;
 import java.time.Duration;
@@ -61,8 +62,9 @@ public final class LangChain4jLlmClient {
 
     public CompletionResult complete(String prompt) {
         Instant start = clock.instant();
+        ChatModel providerModel = unwrap(chatModel);
         ChatRequestParameters parameters;
-        if (chatModel instanceof OpenAiChatModel) {
+        if (providerModel instanceof OpenAiChatModel) {
             var builder = OpenAiChatRequestParameters.builder();
             if (defaultModelName != null && !defaultModelName.isBlank()) {
                 builder.modelName(defaultModelName);
@@ -86,6 +88,10 @@ public final class LangChain4jLlmClient {
 
     public ChatModel chatModel() {
         return chatModel;
+    }
+
+    public String defaultModelName() {
+        return defaultModelName;
     }
 
     public ProviderMetrics metrics() {
@@ -164,5 +170,12 @@ public final class LangChain4jLlmClient {
                 cumulativeOutputTokens.addAndGet(usage.outputTokenCount());
             }
         }
+    }
+
+    private ChatModel unwrap(ChatModel model) {
+        if (model instanceof InstrumentedChatModel instrumented) {
+            return instrumented.delegate();
+        }
+        return model;
     }
 }
