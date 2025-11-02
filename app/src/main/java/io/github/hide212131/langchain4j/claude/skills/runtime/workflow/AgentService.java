@@ -3,6 +3,7 @@ package io.github.hide212131.langchain4j.claude.skills.runtime.workflow;
 import dev.langchain4j.agentic.AgenticServices;
 import dev.langchain4j.agentic.UntypedAgent;
 import dev.langchain4j.agentic.scope.AgenticScope;
+import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
 import io.github.hide212131.langchain4j.claude.skills.infra.observability.ObservabilityConfig;
 import io.github.hide212131.langchain4j.claude.skills.infra.observability.WorkflowTracer;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.BlackboardStore;
@@ -11,7 +12,7 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.PlanCon
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.PlanEvaluationCriteriaState;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.PlanInputsState;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.PlanState;
-import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
+import io.github.hide212131.langchain4j.claude.skills.runtime.guard.SkillInvocationGuard;
 import io.github.hide212131.langchain4j.claude.skills.runtime.provider.LangChain4jLlmClient;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.DryRunSkillRuntimeOrchestrator;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillIndex;
@@ -24,7 +25,7 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.Plan
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect.DefaultEvaluator;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect.ReflectEvaluator;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.support.WorkflowFactory;
-import io.github.hide212131.langchain4j.claude.skills.runtime.guard.SkillInvocationGuard;
+import io.opentelemetry.api.trace.Span;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -113,15 +114,17 @@ public final class AgentService {
     public ExecutionResult run(AgentRunRequest request) {
         Objects.requireNonNull(request, "request");
         
-        return tracer.trace("agent.execution", Map.of(
-            "goal", request.goal(),
-            "dryRun", request.dryRun(),
-            "forcedSkillIds", request.forcedSkillIds().stream()
+        return tracer.trace("agent.execution", Map.ofEntries(
+            Map.entry("goal", request.goal()),
+            Map.entry("input", request.goal()),
+            Map.entry("dryRun", request.dryRun()),
+            Map.entry("forcedSkillIds", request.forcedSkillIds().stream()
                 .filter(Objects::nonNull)
-                .collect(java.util.stream.Collectors.joining(","))
+                .collect(java.util.stream.Collectors.joining(",")))
         ), () -> {
             blackboardStore.clear();
             List<StageVisit> stageVisits = new ArrayList<>();
+        Span.current().setAttribute("input", request.goal());
         LangChain4jLlmClient.CompletionResult finalPlanCompletion = null;
         PlanModels.PlanResult finalPlan = null;
             ActResult finalActResult = null;
@@ -146,6 +149,7 @@ public final class AgentService {
                                 "goal", request.goal(),
                                 "mode", request.dryRun() ? "dry-run" : "live"
                             ), () -> {
+                                Span.current().setAttribute("input", request.goal());
                                 stageVisits.add(new StageVisit(attemptNumber, "plan"));
                                 writePlanGoal(scope, request.goal());
                                 scope.writeState(
@@ -167,6 +171,9 @@ public final class AgentService {
                         ? planner.planWithFixedOrder(request.goal(), forcedSkillIds)
                         : planner.plan(request.goal());
                                 planRef.set(plan);
+                Span.current().setAttribute(
+                    "plan.selectedSkills",
+                    String.join(",", plan.orderedSkillIds()));
                                 scope.writeState(
                                         PlanCandidateStepsState.KEY,
                                         plan.steps().stream()
@@ -194,6 +201,7 @@ public final class AgentService {
                         attemptNumber,
                         plan.orderedSkillIds());
                     }
+                                Span.current().setAttribute("output", assistantDraft);
                                 scope.writeState(
                                         PlanEvaluationCriteriaState.KEY,
                                         Map.of(
@@ -218,8 +226,16 @@ public final class AgentService {
                                 if (plan == null) {
                                     throw new IllegalStateException("Plan stage must complete before Act");
                                 }
+                                Span.current().setAttribute(
+                                        "input",
+                                        String.join(",", plan.orderedSkillIds()));
                                 ActResult result = invoker.invoke(scope, plan);
                                 actRef.set(result);
+                                Span.current().setAttribute(
+                                        "output",
+                                        result.hasArtifact()
+                                            ? result.finalArtifact().toString()
+                                            : String.join(",", result.invokedSkills()));
                                 
                                 // Add tracing attributes for act results
                                 tracer.addEvent("act.completed", Map.of(
@@ -237,6 +253,16 @@ public final class AgentService {
                                 ReflectEvaluator.EvaluationResult evaluation = evaluator.evaluate(
                                         scope, plan, actRef.get(), attemptIndex, maxAttempts);
                                 evaluationRef.set(evaluation);
+                                if (plan != null) {
+                                    Span.current().setAttribute(
+                                            "input",
+                                            String.join(",", plan.orderedSkillIds()));
+                                }
+                                if (evaluation != null) {
+                                    Span.current().setAttribute(
+                                            "output",
+                                            evaluation.finalSummary());
+                                }
                                 
                                 // Add tracing attributes for reflect results
                                 tracer.addEvent("reflect.completed", Map.of(
@@ -311,6 +337,14 @@ public final class AgentService {
                 "hasArtifact", String.valueOf(finalActResult.hasArtifact()),
                 "artifactPath", finalActResult.hasArtifact() ? finalActResult.finalArtifact().toString() : ""
             ));
+        }
+
+        if (finalEvaluation != null) {
+            Span.current().setAttribute("output", finalEvaluation.finalSummary());
+        } else if (finalActResult != null && finalActResult.hasArtifact()) {
+            Span.current().setAttribute("output", finalActResult.finalArtifact().toString());
+        } else if (finalPlanCompletion != null && finalPlanCompletion.content() != null) {
+            Span.current().setAttribute("output", finalPlanCompletion.content());
         }
         
         return new ExecutionResult(
