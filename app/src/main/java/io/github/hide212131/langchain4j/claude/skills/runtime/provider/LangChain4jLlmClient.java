@@ -75,7 +75,7 @@ public final class LangChain4jLlmClient {
                 .messages(List.of(UserMessage.from(prompt)))
                 .parameters(parameters)
                 .build();
-        ChatResponse response = chatModel.doChat(request);
+    ChatResponse response = chatModel.doChat(request);
         long durationMs = Duration.between(start, clock.instant()).toMillis();
         AiMessage aiMessage = response.aiMessage();
         String content = aiMessage != null ? aiMessage.text() : "";
@@ -124,8 +124,14 @@ public final class LangChain4jLlmClient {
     }
 
     private static final class OpenAiChatModelFactory implements ChatModelFactory {
+
+        OpenAiChatModelFactory() {
+        }
+
         @Override
         public ChatModel create(OpenAiConfig config) {
+            // Wrap the provider with an observable chat model when tracing is enabled so that
+            // prompts and responses show up inside Langfuse traces for Plan/Act stages.
             return OpenAiChatModel.builder()
                     .apiKey(config.apiKey)
                     .modelName(config.modelName)

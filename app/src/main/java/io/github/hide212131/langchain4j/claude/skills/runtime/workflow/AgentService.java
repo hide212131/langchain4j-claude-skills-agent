@@ -3,13 +3,16 @@ package io.github.hide212131.langchain4j.claude.skills.runtime.workflow;
 import dev.langchain4j.agentic.AgenticServices;
 import dev.langchain4j.agentic.UntypedAgent;
 import dev.langchain4j.agentic.scope.AgenticScope;
+import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
+import io.github.hide212131.langchain4j.claude.skills.infra.observability.ObservabilityConfig;
+import io.github.hide212131.langchain4j.claude.skills.infra.observability.WorkflowTracer;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.BlackboardStore;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.PlanCandidateStepsState;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.PlanConstraintsState;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.PlanEvaluationCriteriaState;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.PlanInputsState;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.PlanState;
-import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
+import io.github.hide212131.langchain4j.claude.skills.runtime.guard.SkillInvocationGuard;
 import io.github.hide212131.langchain4j.claude.skills.runtime.provider.LangChain4jLlmClient;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.DryRunSkillRuntimeOrchestrator;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillIndex;
@@ -22,7 +25,7 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.Plan
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect.DefaultEvaluator;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect.ReflectEvaluator;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.support.WorkflowFactory;
-import io.github.hide212131.langchain4j.claude.skills.runtime.guard.SkillInvocationGuard;
+import io.opentelemetry.api.trace.Span;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +45,7 @@ public final class AgentService {
     private final DefaultInvoker invoker;
     private final BlackboardStore blackboardStore;
     private final ReflectEvaluator evaluator;
+    private final WorkflowTracer tracer;
 
     public static AgentService withDefaults(
         WorkflowFactory workflowFactory,
@@ -57,6 +61,8 @@ public final class AgentService {
         boolean dryRun) {
         WorkflowLogger logger = new WorkflowLogger();
         BlackboardStore blackboardStore = new BlackboardStore();
+        ObservabilityConfig observability = ObservabilityConfig.fromEnvironment();
+        WorkflowTracer tracer = new WorkflowTracer(observability.tracer(), observability.isEnabled());
     SkillRuntime runtime = dryRun
         ? new SkillRuntime(
             skillIndex,
@@ -80,7 +86,8 @@ public final class AgentService {
                 invoker,
                 blackboardStore,
                 evaluator,
-                new AgenticPlanner(skillIndex, llmClient, logger));
+                new AgenticPlanner(skillIndex, llmClient, logger),
+                tracer);
     }
 
     public AgentService(
@@ -91,7 +98,8 @@ public final class AgentService {
             DefaultInvoker invoker,
             BlackboardStore blackboardStore,
             ReflectEvaluator evaluator,
-            AgenticPlanner planner) {
+            AgenticPlanner planner,
+            WorkflowTracer tracer) {
         this.workflowFactory = Objects.requireNonNull(workflowFactory, "workflowFactory");
         this.llmClient = Objects.requireNonNull(llmClient, "llmClient");
         this.logger = Objects.requireNonNull(logger, "logger");
@@ -100,17 +108,28 @@ public final class AgentService {
         this.blackboardStore = Objects.requireNonNull(blackboardStore, "blackboardStore");
         this.evaluator = Objects.requireNonNull(evaluator, "evaluator");
         this.planner = Objects.requireNonNull(planner, "planner");
+        this.tracer = Objects.requireNonNull(tracer, "tracer");
     }
 
     public ExecutionResult run(AgentRunRequest request) {
         Objects.requireNonNull(request, "request");
-        blackboardStore.clear();
-        List<StageVisit> stageVisits = new ArrayList<>();
-    LangChain4jLlmClient.CompletionResult finalPlanCompletion = null;
-    PlanModels.PlanResult finalPlan = null;
-        ActResult finalActResult = null;
-        ReflectEvaluator.EvaluationResult finalEvaluation = null;
-        int maxAttempts = 2;
+        
+        return tracer.trace("agent.execution", Map.ofEntries(
+            Map.entry("goal", request.goal()),
+            Map.entry("input", request.goal()),
+            Map.entry("dryRun", request.dryRun()),
+            Map.entry("forcedSkillIds", request.forcedSkillIds().stream()
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.joining(",")))
+        ), () -> {
+            blackboardStore.clear();
+            List<StageVisit> stageVisits = new ArrayList<>();
+        Span.current().setAttribute("input", request.goal());
+        LangChain4jLlmClient.CompletionResult finalPlanCompletion = null;
+        PlanModels.PlanResult finalPlan = null;
+            ActResult finalActResult = null;
+            ReflectEvaluator.EvaluationResult finalEvaluation = null;
+            int maxAttempts = 2;
 
     for (int attempt = 0; attempt < maxAttempts; attempt++) {
             int attemptIndex = attempt;
@@ -125,77 +144,132 @@ public final class AgentService {
                 builder.output(scope -> scope.state());
                 builder.subAgents(
                         AgenticServices.agentAction(scope -> {
-                            stageVisits.add(new StageVisit(attemptNumber, "plan"));
-                            writePlanGoal(scope, request.goal());
-                            scope.writeState(
-                                    PlanInputsState.KEY,
-                                    Map.of(
-                                            "goal", request.goal(),
-                                            "mode", request.dryRun() ? "dry-run" : "live",
-                                            "attempt", attemptNumber));
-                            scope.writeState(
-                                    PlanConstraintsState.KEY,
-                                    Map.of(
-                                            "tokenBudget", 0,
-                                            "maxToolCalls", 3,
-                                            "maxAttempts", maxAttempts,
-                                            "attempt", attemptNumber));
-                List<String> forcedSkillIds = request.forcedSkillIds();
-                boolean hasForcedSkillIds = !forcedSkillIds.isEmpty();
-                PlanModels.PlanResult plan = hasForcedSkillIds
-                    ? planner.planWithFixedOrder(request.goal(), forcedSkillIds)
-                    : planner.plan(request.goal());
-                            planRef.set(plan);
-                            scope.writeState(
-                                    PlanCandidateStepsState.KEY,
-                                    plan.steps().stream()
-                                            .map(step -> Map.of(
-                                                    "skillId", step.skillId(),
-                                                    "name", step.name(),
-                                                    "description", step.description(),
-                                                    "keywords", step.keywords(),
-                                                    "skillRoot", step.skillRoot().toString()))
-                                            .toList());
-                LangChain4jLlmClient.CompletionResult completion = null;
-                String assistantDraft;
-                if (hasForcedSkillIds) {
-                assistantDraft = "Planner bypassed via forced skill sequence.";
-                logger.info(
-                    "Plan attempt {} using forced skill sequence {}",
-                    attemptNumber,
-                    plan.orderedSkillIds());
-                } else {
-                completion = llmClient.complete(request.goal());
-                planResultRef.set(completion);
-                assistantDraft = completion != null ? completion.content() : "";
-                logger.info(
-                    "Plan attempt {} candidate steps: {}",
-                    attemptNumber,
-                    plan.orderedSkillIds());
-                }
-                            scope.writeState(
-                                    PlanEvaluationCriteriaState.KEY,
-                                    Map.of(
-                                            "systemPromptL1", plan.systemPromptSummary(),
-                                            "assistantDraft",
-                        assistantDraft,
-                                            "attempt", attemptNumber));
+                            tracer.trace("workflow.plan", Map.of(
+                                "attempt", attemptNumber,
+                                "goal", request.goal(),
+                                "mode", request.dryRun() ? "dry-run" : "live"
+                            ), () -> {
+                                Span.current().setAttribute("input", request.goal());
+                                stageVisits.add(new StageVisit(attemptNumber, "plan"));
+                                writePlanGoal(scope, request.goal());
+                                scope.writeState(
+                                        PlanInputsState.KEY,
+                                        Map.of(
+                                                "goal", request.goal(),
+                                                "mode", request.dryRun() ? "dry-run" : "live",
+                                                "attempt", attemptNumber));
+                                scope.writeState(
+                                        PlanConstraintsState.KEY,
+                                        Map.of(
+                                                "tokenBudget", 0,
+                                                "maxToolCalls", 3,
+                                                "maxAttempts", maxAttempts,
+                                                "attempt", attemptNumber));
+                    List<String> forcedSkillIds = request.forcedSkillIds();
+                    boolean hasForcedSkillIds = !forcedSkillIds.isEmpty();
+                    PlanModels.PlanResult plan = hasForcedSkillIds
+                        ? planner.planWithFixedOrder(request.goal(), forcedSkillIds)
+                        : planner.plan(request.goal());
+                                planRef.set(plan);
+                Span.current().setAttribute(
+                    "plan.selectedSkills",
+                    String.join(",", plan.orderedSkillIds()));
+                                scope.writeState(
+                                        PlanCandidateStepsState.KEY,
+                                        plan.steps().stream()
+                                                .map(step -> Map.of(
+                                                        "skillId", step.skillId(),
+                                                        "name", step.name(),
+                                                        "description", step.description(),
+                                                        "keywords", step.keywords(),
+                                                        "skillRoot", step.skillRoot().toString()))
+                                                .toList());
+                    LangChain4jLlmClient.CompletionResult completion = null;
+                    String assistantDraft;
+                    if (hasForcedSkillIds) {
+                    assistantDraft = "Planner bypassed via forced skill sequence.";
+                    logger.info(
+                        "Plan attempt {} using forced skill sequence {}",
+                        attemptNumber,
+                        plan.orderedSkillIds());
+                    } else {
+                    completion = llmClient.complete(request.goal());
+                    planResultRef.set(completion);
+                    assistantDraft = completion != null ? completion.content() : "";
+                    logger.info(
+                        "Plan attempt {} candidate steps: {}",
+                        attemptNumber,
+                        plan.orderedSkillIds());
+                    }
+                                Span.current().setAttribute("output", assistantDraft);
+                                scope.writeState(
+                                        PlanEvaluationCriteriaState.KEY,
+                                        Map.of(
+                                                "systemPromptL1", plan.systemPromptSummary(),
+                                                "assistantDraft",
+                            assistantDraft,
+                                                "attempt", attemptNumber));
+                                
+                                // Add tracing attributes for plan results
+                                tracer.addEvent("plan.completed", Map.of(
+                                    "selectedSkills", String.join(",", plan.orderedSkillIds()),
+                                    "skillCount", String.valueOf(plan.orderedSkillIds().size())
+                                ));
+                            });
                         }),
                         AgenticServices.agentAction(scope -> {
-                            stageVisits.add(new StageVisit(attemptNumber, "act"));
-                            PlanModels.PlanResult plan = planRef.get();
-                            if (plan == null) {
-                                throw new IllegalStateException("Plan stage must complete before Act");
-                            }
-                            ActResult result = invoker.invoke(scope, plan);
-                            actRef.set(result);
+                            tracer.trace("workflow.act", Map.of(
+                                "attempt", attemptNumber
+                            ), () -> {
+                                stageVisits.add(new StageVisit(attemptNumber, "act"));
+                                PlanModels.PlanResult plan = planRef.get();
+                                if (plan == null) {
+                                    throw new IllegalStateException("Plan stage must complete before Act");
+                                }
+                                Span.current().setAttribute(
+                                        "input",
+                                        String.join(",", plan.orderedSkillIds()));
+                                ActResult result = invoker.invoke(scope, plan);
+                                actRef.set(result);
+                                Span.current().setAttribute(
+                                        "output",
+                                        result.hasArtifact()
+                                            ? result.finalArtifact().toString()
+                                            : String.join(",", result.invokedSkills()));
+                                
+                                // Add tracing attributes for act results
+                                tracer.addEvent("act.completed", Map.of(
+                                    "invokedSkills", String.join(",", result.invokedSkills()),
+                                    "hasArtifact", String.valueOf(result.hasArtifact())
+                                ));
+                            });
                         }),
                         AgenticServices.agentAction(scope -> {
-                            stageVisits.add(new StageVisit(attemptNumber, "reflect"));
-                            PlanModels.PlanResult plan = planRef.get();
-                            ReflectEvaluator.EvaluationResult evaluation = evaluator.evaluate(
-                                    scope, plan, actRef.get(), attemptIndex, maxAttempts);
-                            evaluationRef.set(evaluation);
+                            tracer.trace("workflow.reflect", Map.of(
+                                "attempt", attemptNumber
+                            ), () -> {
+                                stageVisits.add(new StageVisit(attemptNumber, "reflect"));
+                                PlanModels.PlanResult plan = planRef.get();
+                                ReflectEvaluator.EvaluationResult evaluation = evaluator.evaluate(
+                                        scope, plan, actRef.get(), attemptIndex, maxAttempts);
+                                evaluationRef.set(evaluation);
+                                if (plan != null) {
+                                    Span.current().setAttribute(
+                                            "input",
+                                            String.join(",", plan.orderedSkillIds()));
+                                }
+                                if (evaluation != null) {
+                                    Span.current().setAttribute(
+                                            "output",
+                                            evaluation.finalSummary());
+                                }
+                                
+                                // Add tracing attributes for reflect results
+                                tracer.addEvent("reflect.completed", Map.of(
+                                    "needsRetry", String.valueOf(evaluation.needsRetry()),
+                                    "summary", evaluation.finalSummary()
+                                ));
+                            });
                         }));
             });
 
@@ -246,6 +320,33 @@ public final class AgentService {
                 logger.warn("Reflect could not satisfy requirements within retry budget.");
             }
         }
+        
+        // Add comprehensive tracing events for execution summary
+        tracer.addEvent("execution.completed", Map.of(
+            "stageVisits", String.valueOf(stageVisits.size()),
+            "llmCalls", String.valueOf(metricsSnapshot.callCount()),
+            "totalTokens", String.valueOf(metricsSnapshot.totalTokenCount()),
+            "inputTokens", String.valueOf(metricsSnapshot.totalInputTokens()),
+            "outputTokens", String.valueOf(metricsSnapshot.totalOutputTokens()),
+            "totalDurationMs", String.valueOf(metricsSnapshot.totalDurationMs())
+        ));
+        
+        if (finalActResult != null) {
+            tracer.addEvent("execution.artifacts", Map.of(
+                "invokedSkills", String.join(",", finalActResult.invokedSkills()),
+                "hasArtifact", String.valueOf(finalActResult.hasArtifact()),
+                "artifactPath", finalActResult.hasArtifact() ? finalActResult.finalArtifact().toString() : ""
+            ));
+        }
+
+        if (finalEvaluation != null) {
+            Span.current().setAttribute("output", finalEvaluation.finalSummary());
+        } else if (finalActResult != null && finalActResult.hasArtifact()) {
+            Span.current().setAttribute("output", finalActResult.finalArtifact().toString());
+        } else if (finalPlanCompletion != null && finalPlanCompletion.content() != null) {
+            Span.current().setAttribute("output", finalPlanCompletion.content());
+        }
+        
         return new ExecutionResult(
                 List.copyOf(stageVisits),
                 finalPlan,
@@ -254,6 +355,7 @@ public final class AgentService {
                 finalActResult,
                 finalEvaluation,
                 blackboardStore.snapshot());
+        });
     }
 
     private void writePlanGoal(AgenticScope scope, String goal) {

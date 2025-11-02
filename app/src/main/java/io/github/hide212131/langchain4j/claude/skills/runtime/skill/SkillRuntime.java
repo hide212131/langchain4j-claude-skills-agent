@@ -13,11 +13,14 @@ import dev.langchain4j.agentic.supervisor.SupervisorResponseStrategy;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.service.V;
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.trace.Span;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.UncheckedIOException;
+import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.FileVisitResult;
@@ -93,7 +96,9 @@ public final class SkillRuntime {
     SkillToolbox toolbox = new SkillToolbox(context);
 
     String prompt = buildPrompt(metadata, safeInputs, expectedOutputs);
+    recordSkillPrompt(metadata.id(), prompt);
     String rawResponse = orchestrator.run(toolbox, metadata, safeInputs, expectedOutputs, prompt);
+    recordSkillResponse(metadata.id(), rawResponse);
 
         Map<String, String> parsed = parseFinalResponse(rawResponse);
         Map<String, Object> outputs = new LinkedHashMap<>();
@@ -212,6 +217,43 @@ public final class SkillRuntime {
             return List.of(str.trim());
         }
         return List.of("artifactPath");
+    }
+
+    private void recordSkillPrompt(String skillId, String prompt) {
+        Span span = Span.current();
+        if (!span.isRecording() || prompt == null || prompt.isBlank()) {
+            return;
+        }
+        String keyPrefix = "act.skill." + sanitiseForAttribute(skillId);
+        span.setAttribute(keyPrefix + ".prompt", prompt);
+        span.addEvent(
+                "skill.llm.prompt",
+                Attributes.builder()
+                        .put("skillId", skillId)
+                        .put("prompt", prompt)
+                        .build());
+    }
+
+    private void recordSkillResponse(String skillId, String response) {
+        Span span = Span.current();
+        if (!span.isRecording() || response == null || response.isBlank()) {
+            return;
+        }
+        String keyPrefix = "act.skill." + sanitiseForAttribute(skillId);
+        span.setAttribute(keyPrefix + ".response", response);
+        span.addEvent(
+                "skill.llm.response",
+                Attributes.builder()
+                        .put("skillId", skillId)
+                        .put("response", response)
+                        .build());
+    }
+
+    private String sanitiseForAttribute(String skillId) {
+        if (skillId == null || skillId.isBlank()) {
+            return "unknown";
+        }
+        return skillId.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
     private void prepareOutputDirectory(Path directory) {
@@ -375,6 +417,10 @@ public final class SkillRuntime {
                     - Use readRef to resolve any additional references (L3).
                     - Persist artefacts only through writeArtifact (paths relative to build/out).
                     - Invoke validateExpectedOutputs before finishing.
+            - When you issue an agent invocation (JSON), every argument value MUST be a simple string.
+              * Join multiple values with commas, e.g. "args": "--flag1,--flag2".
+              * Provide dependencies as "dependencies": "pip:python-pptx".
+              * Do not emit JSON arrays or objects inside the arguments map.
                     Always respond with key=value pairs when completing the task.
                     Expected outputs: %s
                     """.formatted(metadata.id(), expected);
@@ -433,10 +479,56 @@ public final class SkillRuntime {
         public ScriptResult run(
                 @V("skillId") String skillId,
                 @V("path") String path,
-                @V("args") List<String> args,
-                @V("dependencies") List<String> dependencies,
+                @V("args") Object args,
+                @V("dependencies") Object dependencies,
                 @V("timeoutSeconds") Integer timeoutSeconds) {
-            return toolbox.runScript(skillId, path, args, dependencies, timeoutSeconds);
+            return toolbox.runScript(
+                    skillId,
+                    path,
+                    coerceToList(args),
+                    coerceToList(dependencies),
+                    timeoutSeconds);
+        }
+
+        private List<String> coerceToList(Object value) {
+            if (value == null) {
+                return List.of();
+            }
+            if (value instanceof List<?> list) {
+                List<String> cleaned = new ArrayList<>();
+                for (Object element : list) {
+                    if (element == null) {
+                        continue;
+                    }
+                    String text = element.toString().trim();
+                    if (!text.isEmpty()) {
+                        cleaned.addAll(splitTokens(text));
+                    }
+                }
+                return cleaned.isEmpty() ? List.of() : List.copyOf(cleaned);
+            }
+            String text = value.toString().trim();
+            if (text.isEmpty()) {
+                return List.of();
+            }
+            List<String> tokens = splitTokens(text);
+            return tokens.isEmpty() ? List.of() : List.copyOf(tokens);
+        }
+
+        private List<String> splitTokens(String raw) {
+            if (raw == null || raw.isBlank()) {
+                return List.of();
+            }
+            String normalised = raw.replace("[", "").replace("]", "");
+            String[] parts = normalised.split("[\\n,]+");
+            List<String> tokens = new ArrayList<>();
+            for (String part : parts) {
+                String token = part.trim();
+                if (!token.isEmpty()) {
+                    tokens.add(token);
+                }
+            }
+            return tokens;
         }
     }
 
@@ -530,25 +622,34 @@ public final class SkillRuntime {
             validateSkillId(skillId, metadata.id());
             try {
                 List<Path> resolved = resolveReferencePaths(metadata, reference);
-                List<ReferenceDocument> documents = new ArrayList<>();
-                for (Path path : resolved) {
-                    String detail;
-                    String kind = Files.isDirectory(path) ? "directory" : "file";
-                    if (Files.isDirectory(path)) {
-                        detail = "(directory)";
-                    } else {
-                        detail = Files.readString(path, StandardCharsets.UTF_8);
-                    }
-                    logger.info("Act[L3] {} -> {} — {}", metadata.id(), path, summariseForLog(detail));
-                    context.addDisclosure(new DisclosureEvent(
-                            DisclosureLevel.L3, path.toString(), summariseForLog(detail)));
-                    context.recordReferenced(path);
-                    documents.add(new ReferenceDocument(path.toString(), detail, kind));
-                }
-                context.recordInvocation(
-                        "readRef",
-                        Map.of("skillId", skillId, "reference", reference),
-                        Map.of("resolvedCount", documents.size()));
+        List<ReferenceDocument> documents = new ArrayList<>();
+        for (Path path : resolved) {
+            String kind = Files.isDirectory(path) ? "directory" : "file";
+            ReferenceDocumentContent documentContent = readReferenceContent(path);
+            logger.info(
+                "Act[L3] {} -> {} — {}",
+                metadata.id(),
+                path,
+                summariseForLog(documentContent.summaryText()));
+            context.addDisclosure(new DisclosureEvent(
+                DisclosureLevel.L3,
+                path.toString(),
+                summariseForLog(documentContent.summaryText())));
+            context.recordReferenced(path);
+            documents.add(new ReferenceDocument(
+                path.toString(),
+                documentContent.detail(),
+                kind,
+                documentContent.binary()));
+        }
+        context.recordInvocation(
+            "readRef",
+            Map.of("skillId", skillId, "reference", reference),
+            Map.of(
+                "resolvedCount",
+                documents.size(),
+                "containsBinary",
+                documents.stream().anyMatch(ReferenceDocument::binary)));
         context.recordSkill(metadata.id());
         return new ReferenceDocuments(reference, documents);
             } catch (IOException e) {
@@ -823,6 +924,30 @@ public final class SkillRuntime {
                 }
             }
             return matches.stream().collect(Collectors.toCollection(ArrayList::new));
+        }
+
+        private ReferenceDocumentContent readReferenceContent(Path path) throws IOException {
+            if (Files.isDirectory(path)) {
+                return new ReferenceDocumentContent("(directory)", "(directory)", false);
+            }
+            try {
+                String text = Files.readString(path, StandardCharsets.UTF_8);
+                String limited = limitChars(text, 16384);
+                return new ReferenceDocumentContent(limited, limited, false);
+            } catch (MalformedInputException ex) {
+                byte[] bytes = Files.readAllBytes(path);
+                String preview = summarisePreview(bytes);
+                if (preview == null || preview.isBlank()) {
+                    preview = "(binary preview suppressed)";
+                }
+                String detail = """
+                        [Binary file]
+                        Path: %s
+                        Size: %d bytes
+                        Preview: %s
+                        """.formatted(path.toString(), bytes.length, preview);
+                return new ReferenceDocumentContent(detail.strip(), preview, true);
+            }
         }
 
         private Set<String> expandOutputReferenceVariants(Path outputBase, String reference) {
@@ -1316,6 +1441,8 @@ public final class SkillRuntime {
             String text = new String(bytes, StandardCharsets.UTF_8);
             return summariseForLog(text);
         }
+
+        private record ReferenceDocumentContent(String detail, String summaryText, boolean binary) {}
     }
 
     private record ProcessResult(
@@ -1457,7 +1584,7 @@ public final class SkillRuntime {
 
     public record ReferenceDocuments(String reference, List<ReferenceDocument> documents) {}
 
-    public record ReferenceDocument(String path, String content, String kind) {}
+    public record ReferenceDocument(String path, String content, String kind, boolean binary) {}
 
     public record ScriptResult(
             String path,
