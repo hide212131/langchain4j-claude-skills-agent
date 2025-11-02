@@ -30,6 +30,7 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.PathMatcher;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -351,6 +352,8 @@ public final class SkillRuntime {
         List<String> dependencies,
         Integer timeoutSeconds);
 
+        DeploymentResult deployScripts(String skillId, String sourceDir, String targetDir);
+
         ValidationResult validateExpectedOutputs(Map<String, Object> expected, Map<String, Object> observed);
     }
 
@@ -400,6 +403,7 @@ public final class SkillRuntime {
                     .subAgents(
                 new ReadSkillMdAgent(toolbox),
                 new ReadReferenceAgent(toolbox),
+                new ScriptDeployAgent(toolbox),
                 new RunScriptAgent(toolbox),
                 new WriteArtifactAgent(toolbox)
                 // new ValidateExpectedOutputsAgent(toolbox)
@@ -418,11 +422,13 @@ public final class SkillRuntime {
                     - Call readSkillMd first to load SKILL.md (L2) for skill %s.
                     - Use readRef to resolve any additional references (L3).
                     - Persist artefacts only through writeArtifact (paths relative to build/out).
+                    - Use deployScripts to copy auxiliary files before executing a script. Provide source and target directories (under build/out).
                     - When calling writeArtifact, explicitly set base64Encoded to false unless you are saving Base64 content.
                     - Invoke validateExpectedOutputs before finishing.
             - When you issue an agent invocation (JSON), every argument value MUST be a simple string.
               * Join multiple values with commas, e.g. "args": "--flag1,--flag2".
               * Provide dependencies as "dependencies": "pip:python-pptx".
+              * Provide deploy arguments as directory paths, e.g. "sourceDir": "scripts", "targetDir": "workdir".
               * Do not emit JSON arrays or objects inside the arguments map.
                     Always respond with key=value pairs when completing the task.
                     Expected outputs: %s
@@ -607,6 +613,26 @@ public final class SkillRuntime {
         }
     }
 
+    public static final class ScriptDeployAgent {
+
+        private final Toolbox toolbox;
+
+        public ScriptDeployAgent(Toolbox toolbox) {
+            this.toolbox = Objects.requireNonNull(toolbox, "toolbox");
+        }
+
+        @Agent(
+                name = "deployScripts",
+                description = "Copies supporting script files into a working directory under build/out",
+                outputName = "deploymentResult")
+        public DeploymentResult deploy(
+                @V("skillId") String skillId,
+                @V("sourceDir") String sourceDir,
+                @V("targetDir") String targetDir) {
+            return toolbox.deployScripts(skillId, sourceDir, targetDir);
+        }
+    }
+
     public static final class WriteArtifactAgent {
 
         private final Toolbox toolbox;
@@ -774,9 +800,19 @@ public final class SkillRuntime {
             String stdinPayload = toJsonPayload(argsList);
             List<String> command = buildScriptCommand(extension, scriptPath, argsList);
             Map<String, String> environmentOverrides = buildScriptEnvironment(extension, metadata, context);
+            Path workingDirectory = scriptPath.getParent();
+            if (workingDirectory == null) {
+                throw new IllegalStateException("Script path does not have a parent directory");
+            }
+            Path normalisedWorkingDirectory = workingDirectory.toAbsolutePath().normalize();
+            if (!normalisedWorkingDirectory.startsWith(context.outputDirectory())
+                    && !normalisedWorkingDirectory.startsWith(metadata.skillRoot())) {
+                throw new IllegalArgumentException(
+                        "Working directory must reside under the skill root or output directory");
+            }
             ProcessResult execution = executeProcess(
                     command,
-                    metadata.skillRoot(),
+                    normalisedWorkingDirectory,
                     stdinPayload,
                     Duration.ofSeconds(effectiveTimeout),
                     environmentOverrides);
@@ -796,6 +832,7 @@ public final class SkillRuntime {
             Map<String, Object> invocationArgs = new LinkedHashMap<>();
             invocationArgs.put("skillId", skillId);
             invocationArgs.put("path", scriptPath.toString());
+            invocationArgs.put("workingDirectory", normalisedWorkingDirectory.toString());
             invocationArgs.put("timeoutSeconds", effectiveTimeout);
             if (!argsList.isEmpty()) {
                 invocationArgs.put("args", argsList);
@@ -821,6 +858,7 @@ public final class SkillRuntime {
             context.recordInvocation("runScript", invocationArgs, invocationResult);
             context.recordSkill(metadata.id());
             context.recordReferenced(scriptPath);
+            context.recordReferenced(normalisedWorkingDirectory);
 
             return new ScriptResult(
                     scriptPath.toString(),
@@ -831,6 +869,50 @@ public final class SkillRuntime {
                     stderrLimited,
                     durationMillis,
                     dependencyCalls);
+        }
+
+        @Tool(name = "deployScripts", returnBehavior = ReturnBehavior.TO_LLM)
+        @Override
+        public DeploymentResult deployScripts(
+                @P("skillId") String skillId,
+                @P("sourceDir") String sourceDir,
+                @P("targetDir") String targetDir) {
+            SkillIndex.SkillMetadata metadata = context.metadata();
+            validateSkillId(skillId, metadata.id());
+            if (sourceDir == null || sourceDir.isBlank()) {
+                throw new IllegalArgumentException("sourceDir must be provided when calling deployScripts");
+            }
+            if (targetDir == null || targetDir.isBlank()) {
+                throw new IllegalArgumentException("targetDir must be provided when calling deployScripts");
+            }
+            Path sourcePath = resolveDeploymentSource(metadata.skillRoot(), context.outputDirectory(), sourceDir);
+            if (!Files.isDirectory(sourcePath)) {
+                throw new IllegalArgumentException("Deployment source must be a directory: " + sourcePath);
+            }
+            Path targetPath = resolveDeploymentTarget(context.outputDirectory(), targetDir);
+            DeploymentResult deployment = copyDirectoryTree(sourcePath, targetPath);
+            logger.info(
+                    "Act[deploy] {} — {} -> {} (filesCopied={}, directoriesCreated={})",
+                    metadata.id(),
+                    sourcePath,
+                    targetPath,
+                    deployment.filesCopied(),
+                    deployment.directoriesCreated());
+            context.recordInvocation(
+                    "deployScripts",
+                    Map.of(
+                            "skillId", skillId,
+                            "sourceDir", sourceDir,
+                            "targetDir", targetDir),
+                    Map.of(
+                            "source", deployment.source(),
+                            "target", deployment.target(),
+                            "filesCopied", deployment.filesCopied(),
+                            "directoriesCreated", deployment.directoriesCreated()));
+            context.recordSkill(metadata.id());
+            context.recordReferenced(sourcePath);
+            context.recordReferenced(targetPath);
+            return deployment;
         }
 
         @Tool(name = "writeArtifact", returnBehavior = ReturnBehavior.TO_LLM)
@@ -1128,6 +1210,95 @@ public final class SkillRuntime {
                 return "";
             }
             return name.substring(index).toLowerCase();
+        }
+
+        private Path resolveDeploymentSource(Path skillRoot, Path outputDir, String sourceDir) {
+            Path candidate = Path.of(sourceDir);
+            List<Path> searchOrder = new ArrayList<>();
+            if (candidate.isAbsolute()) {
+                searchOrder.add(candidate);
+            } else {
+                searchOrder.add(outputDir.resolve(candidate));
+                searchOrder.add(skillRoot.resolve(candidate));
+            }
+            for (Path option : searchOrder) {
+                Path normalised = option.toAbsolutePath().normalize();
+                if (Files.exists(normalised)
+                        && Files.isDirectory(normalised)
+                        && (normalised.startsWith(skillRoot) || normalised.startsWith(outputDir))) {
+                    return normalised;
+                }
+            }
+            throw new IllegalArgumentException(
+                    "Deployment source '" + sourceDir + "' could not be resolved for skill '" + context.metadata().id() + "'");
+        }
+
+        private Path resolveDeploymentTarget(Path outputDir, String targetDir) {
+            Path candidate = Path.of(targetDir);
+            Path resolved = candidate.isAbsolute() ? candidate : outputDir.resolve(candidate);
+            Path normalised = resolved.toAbsolutePath().normalize();
+            if (!normalised.startsWith(outputDir)) {
+                throw new IllegalArgumentException("Deployment target must remain under " + outputDir);
+            }
+            return normalised;
+        }
+
+        private DeploymentResult copyDirectoryTree(Path source, Path target) {
+            try {
+                Files.createDirectories(target);
+            } catch (IOException e) {
+                throw new IllegalStateException("Failed to prepare deployment target: " + target, e);
+            }
+            int[] filesCopied = {0};
+            int[] directoriesCreated = {0};
+            try (var stream = Files.walk(source)) {
+                List<Path> entries = stream
+                        .sorted((left, right) -> {
+                            int depthCompare = Integer.compare(left.getNameCount(), right.getNameCount());
+                            if (depthCompare != 0) {
+                                return depthCompare;
+                            }
+                            boolean leftDir = Files.isDirectory(left);
+                            boolean rightDir = Files.isDirectory(right);
+                            if (leftDir != rightDir) {
+                                return leftDir ? -1 : 1;
+                            }
+                            return left.compareTo(right);
+                        })
+                        .collect(Collectors.toCollection(ArrayList::new));
+                for (Path entry : entries) {
+                    Path relative = source.relativize(entry);
+                    Path destination = target.resolve(relative.toString()).toAbsolutePath().normalize();
+                    if (!destination.startsWith(target)) {
+                        throw new IllegalArgumentException("Deployment would escape target directory: " + destination);
+                    }
+                    try {
+                        if (Files.isDirectory(entry)) {
+                            Files.createDirectories(destination);
+                            if (!relative.toString().isEmpty()) {
+                                directoriesCreated[0]++;
+                            }
+                        } else {
+                            Path parent = destination.getParent();
+                            if (parent != null) {
+                                Files.createDirectories(parent);
+                            }
+                            Files.copy(entry, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+                            filesCopied[0]++;
+                        }
+                    } catch (IOException e) {
+                        throw new IllegalStateException(
+                                "Failed to copy '" + entry + "' to '" + destination + "'", e);
+                    }
+                }
+            } catch (IOException e) {
+                throw new IllegalStateException("Failed to traverse deployment source: " + source, e);
+            }
+            return new DeploymentResult(
+                    source.toString(),
+                    target.toString(),
+                    filesCopied[0],
+                    directoriesCreated[0]);
         }
 
         private int determineTimeoutSeconds(Integer requestedSeconds) {
@@ -1735,6 +1906,13 @@ public final class SkillRuntime {
     }
 
     public record ArtifactHandle(String path, long bytesWritten, String preview) {}
+
+    public record DeploymentResult(String source, String target, int filesCopied, int directoriesCreated) {
+        public DeploymentResult {
+            Objects.requireNonNull(source, "source");
+            Objects.requireNonNull(target, "target");
+        }
+    }
 
     public record ValidationResult(boolean satisfied, List<String> missing) {}
 
