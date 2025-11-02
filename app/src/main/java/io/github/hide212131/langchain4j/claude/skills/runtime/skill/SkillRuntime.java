@@ -15,6 +15,7 @@ import dev.langchain4j.service.V;
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -50,6 +51,7 @@ public final class SkillRuntime {
     private static final Pattern LOCAL_REFERENCE_PATTERN =
             Pattern.compile("\\[[^\\]]*]\\((?!https?://)([^)]+)\\)");
     private static final Set<String> ALLOWED_SCRIPT_EXTENSIONS = Set.of(".py", ".sh", ".js");
+    private static final Set<String> SUPPORTED_DEPENDENCY_TOOLS = Set.of("pip", "npm");
     private static final int DEFAULT_SCRIPT_TIMEOUT_SECONDS = 20;
     private static final int MAX_SCRIPT_TIMEOUT_SECONDS = 120;
     private static final int DEFAULT_DEPENDENCY_TIMEOUT_SECONDS = 60;
@@ -416,6 +418,7 @@ public final class SkillRuntime {
                     - Call readSkillMd first to load SKILL.md (L2) for skill %s.
                     - Use readRef to resolve any additional references (L3).
                     - Persist artefacts only through writeArtifact (paths relative to build/out).
+                    - When calling writeArtifact, explicitly set base64Encoded to false unless you are saving Base64 content.
                     - Invoke validateExpectedOutputs before finishing.
             - When you issue an agent invocation (JSON), every argument value MUST be a simple string.
               * Join multiple values with commas, e.g. "args": "--flag1,--flag2".
@@ -486,7 +489,7 @@ public final class SkillRuntime {
                     skillId,
                     path,
                     coerceToList(args),
-                    coerceToList(dependencies),
+                    coerceDependencies(dependencies),
                     timeoutSeconds);
         }
 
@@ -529,6 +532,78 @@ public final class SkillRuntime {
                 }
             }
             return tokens;
+        }
+
+        private List<String> coerceDependencies(Object value) {
+            if (value == null) {
+                return List.of();
+            }
+            List<String> collected = new ArrayList<>();
+            if (value instanceof List<?> list) {
+                for (Object element : list) {
+                    if (element == null) {
+                        continue;
+                    }
+                    collected.addAll(splitDependencyTokens(element.toString()));
+                }
+            } else {
+                collected.addAll(splitDependencyTokens(value.toString()));
+            }
+            if (collected.isEmpty()) {
+                return List.of();
+            }
+            return List.copyOf(collected);
+        }
+
+        private List<String> splitDependencyTokens(String raw) {
+            if (raw == null) {
+                return List.of();
+            }
+            String normalised = raw.trim();
+            if (normalised.isEmpty()) {
+                return List.of();
+            }
+            normalised = normalised.replace("[", "").replace("]", "");
+            String[] parts = normalised.split("[\\n,]+");
+            List<String> result = new ArrayList<>();
+            StringBuilder current = null;
+            String currentTool = null;
+            for (String part : parts) {
+                String token = part.trim();
+                if (token.isEmpty()) {
+                    continue;
+                }
+                String tool = resolveToolPrefix(token);
+                if (tool != null) {
+                    if (current != null) {
+                        result.add(current.toString());
+                    }
+                    current = new StringBuilder(token);
+                    currentTool = tool;
+                    continue;
+                }
+                if (currentTool != null) {
+                    current.append(',').append(token);
+                } else {
+                    result.add(token);
+                }
+            }
+            if (current != null) {
+                result.add(current.toString());
+            }
+            return result.isEmpty() ? List.of() : List.copyOf(result);
+        }
+
+        private String resolveToolPrefix(String token) {
+            int separator = token.indexOf(':');
+            if (separator <= 0) {
+                return null;
+            }
+            String tool = token.substring(0, separator).trim().toLowerCase(Locale.ROOT);
+            if (SUPPORTED_DEPENDENCY_TOOLS.contains(tool)) {
+                return tool;
+            }
+            return null;
         }
     }
 
@@ -698,11 +773,13 @@ public final class SkillRuntime {
             int effectiveTimeout = determineTimeoutSeconds(timeoutSeconds);
             String stdinPayload = toJsonPayload(argsList);
             List<String> command = buildScriptCommand(extension, scriptPath, argsList);
+            Map<String, String> environmentOverrides = buildScriptEnvironment(extension, metadata, context);
             ProcessResult execution = executeProcess(
                     command,
                     metadata.skillRoot(),
                     stdinPayload,
-                    Duration.ofSeconds(effectiveTimeout));
+                    Duration.ofSeconds(effectiveTimeout),
+                    environmentOverrides);
 
             String stdoutLimited = limitChars(execution.stdout(), MAX_STDOUT_CHARS);
             String stderrLimited = limitText(execution.stderr(), MAX_STDERR_LINES, MAX_STDERR_CHARS);
@@ -1017,6 +1094,10 @@ public final class SkillRuntime {
             } else {
                 searchOrder.add(skillRoot.resolve(candidate));
                 searchOrder.add(outputDir.resolve(candidate));
+                Path projectRoot = SkillRuntime.this.skillIndex.skillsRoot().getParent();
+                if (projectRoot != null) {
+                    searchOrder.add(projectRoot.resolve(candidate));
+                }
             }
             for (Path option : searchOrder) {
                 Path normalised = option.toAbsolutePath().normalize();
@@ -1094,6 +1175,35 @@ public final class SkillRuntime {
                 command.addAll(args);
             }
             return List.copyOf(command);
+        }
+
+        private Map<String, String> buildScriptEnvironment(
+                String extension, SkillIndex.SkillMetadata metadata, SkillRuntimeContext context) {
+            if (!".js".equals(extension)) {
+                return Map.of();
+            }
+            Path envNodeModules = nodeEnvDirectory().resolve("node_modules").normalize();
+            Path skillNodeModules = metadata.skillRoot().resolve("node_modules").normalize();
+            Path outputNodeModules = context.outputDirectory().resolve("node_modules").normalize();
+            LinkedHashSet<String> nodePaths = new LinkedHashSet<>();
+            if (Files.isDirectory(envNodeModules)) {
+                nodePaths.add(envNodeModules.toString());
+            }
+            if (Files.isDirectory(skillNodeModules)) {
+                nodePaths.add(skillNodeModules.toString());
+            }
+            if (Files.isDirectory(outputNodeModules)) {
+                nodePaths.add(outputNodeModules.toString());
+            }
+            String existing = System.getenv("NODE_PATH");
+            if (existing != null && !existing.isBlank()) {
+                nodePaths.add(existing);
+            }
+            if (nodePaths.isEmpty()) {
+                return Map.of();
+            }
+            String joined = String.join(File.pathSeparator, nodePaths);
+            return Map.of("NODE_PATH", joined);
         }
 
         private List<Map<String, Object>> installDependencies(
@@ -1344,6 +1454,15 @@ public final class SkillRuntime {
 
         private ProcessResult executeProcess(
                 List<String> command, Path workingDirectory, String stdinPayload, Duration timeout) {
+            return executeProcess(command, workingDirectory, stdinPayload, timeout, Map.of());
+        }
+
+        private ProcessResult executeProcess(
+                List<String> command,
+                Path workingDirectory,
+                String stdinPayload,
+                Duration timeout,
+                Map<String, String> environmentOverrides) {
             Objects.requireNonNull(command, "command");
             Objects.requireNonNull(workingDirectory, "workingDirectory");
             Objects.requireNonNull(timeout, "timeout");
@@ -1352,6 +1471,17 @@ public final class SkillRuntime {
             ProcessBuilder builder = new ProcessBuilder(commandCopy);
             builder.directory(workingDirectory.toFile());
             builder.redirectErrorStream(false);
+            if (environmentOverrides != null && !environmentOverrides.isEmpty()) {
+                Map<String, String> environment = builder.environment();
+                for (Map.Entry<String, String> entry : environmentOverrides.entrySet()) {
+                    String value = entry.getValue();
+                    if (value == null) {
+                        environment.remove(entry.getKey());
+                    } else {
+                        environment.put(entry.getKey(), value);
+                    }
+                }
+            }
             Process process;
             try {
                 process = builder.start();
