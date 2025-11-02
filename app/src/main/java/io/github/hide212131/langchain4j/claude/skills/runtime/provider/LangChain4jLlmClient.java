@@ -127,17 +127,18 @@ public final class LangChain4jLlmClient {
     }
 
     private static final class OpenAiChatModelFactory implements ChatModelFactory {
+        private final ObservabilityConfig observabilityConfig;
 
         OpenAiChatModelFactory(ObservabilityConfig observabilityConfig) {
-            // observabilityConfig is passed for future extensibility but not currently used
-            // OpenTelemetry integration is handled via global OpenTelemetry instance
+            this.observabilityConfig = Objects.requireNonNull(observabilityConfig, "observabilityConfig");
         }
 
         @Override
         public ChatModel create(OpenAiConfig config) {
-            // Note: OpenTelemetry integration is handled via global OpenTelemetry instance
-            // LangChain4j 1.7.1 uses the global OpenTelemetry instance for automatic instrumentation
-            // The observability config sets up and registers the global instance via buildAndRegisterGlobal()
+            // NOTE: LangChain4j 1.7.1's OpenAiChatModel.builder() does not have an openTelemetry() method.
+            // The observability integration uses the OpenTelemetry instance passed to the model via
+            // a different mechanism (listeners/interceptors) which will be implemented separately.
+            // For now, we store the observabilityConfig for future use.
             
             return OpenAiChatModel.builder()
                     .apiKey(config.apiKey)

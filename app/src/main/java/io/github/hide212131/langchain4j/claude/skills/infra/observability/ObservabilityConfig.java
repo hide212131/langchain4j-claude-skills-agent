@@ -5,17 +5,21 @@ import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.propagation.ContextPropagators;
-import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
+import io.opentelemetry.exporter.otlp.http.trace.OtlpHttpSpanExporter;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.resources.Resource;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
 import io.opentelemetry.semconv.ResourceAttributes;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
  * Configures OpenTelemetry for LangFuse observability integration.
- * Uses OTLP gRPC exporter to send traces to LangFuse.
+ * Uses OTLP HTTP exporter with Basic authentication to send traces to LangFuse.
  */
 public final class ObservabilityConfig {
 
@@ -35,10 +39,13 @@ public final class ObservabilityConfig {
      * Creates observability configuration from environment variables.
      * 
      * Environment variables:
-     * - LANGFUSE_OTLP_ENDPOINT: LangFuse OTLP endpoint (required; observability is disabled if not set)
+     * - LANGFUSE_OTLP_ENDPOINT: LangFuse OTLP HTTP endpoint (required; observability is disabled if not set)
+     * - LANGFUSE_OTLP_USERNAME: LangFuse public key for Basic auth (required if endpoint is set)
+     * - LANGFUSE_OTLP_PASSWORD: LangFuse secret key for Basic auth (required if endpoint is set)
      * - LANGFUSE_SERVICE_NAME: Service name for tracing (default: langchain4j-skills-agent)
      * 
      * Observability is enabled only if LANGFUSE_OTLP_ENDPOINT is set.
+     * GenAI semantic conventions are enabled via OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental.
      */
     public static ObservabilityConfig fromEnvironment() {
         String endpoint = System.getenv("LANGFUSE_OTLP_ENDPOINT");
@@ -52,30 +59,50 @@ public final class ObservabilityConfig {
             );
         }
         
+        // Enable GenAI semantic conventions
+        System.setProperty("otel.semconv-stability.opt-in", "gen_ai_latest_experimental");
+        
         String serviceName = System.getenv("LANGFUSE_SERVICE_NAME");
         if (serviceName == null || serviceName.isBlank()) {
             serviceName = DEFAULT_SERVICE_NAME;
         }
+        
+        String username = System.getenv("LANGFUSE_OTLP_USERNAME");
+        String password = System.getenv("LANGFUSE_OTLP_PASSWORD");
         
         Resource resource = Resource.getDefault()
             .merge(Resource.create(
                 Attributes.of(ResourceAttributes.SERVICE_NAME, serviceName)
             ));
         
-        OtlpGrpcSpanExporter spanExporter = OtlpGrpcSpanExporter.builder()
+        // Build HTTP exporter with Basic authentication for LangFuse
+        var exporterBuilder = OtlpHttpSpanExporter.builder()
             .setEndpoint(endpoint)
-            .setTimeout(30, TimeUnit.SECONDS)
-            .build();
+            .setTimeout(30, TimeUnit.SECONDS);
+        
+        // Add Basic authentication headers if credentials are provided
+        if (username != null && !username.isBlank() && password != null && !password.isBlank()) {
+            String credentials = username + ":" + password;
+            String encodedCredentials = Base64.getEncoder().encodeToString(
+                credentials.getBytes(StandardCharsets.UTF_8)
+            );
+            Map<String, String> headers = new HashMap<>();
+            headers.put("Authorization", "Basic " + encodedCredentials);
+            exporterBuilder.setHeaders(() -> headers);
+        }
+        
+        var spanExporter = exporterBuilder.build();
         
         SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
             .addSpanProcessor(BatchSpanProcessor.builder(spanExporter).build())
             .setResource(resource)
             .build();
         
+        // Build without global registration to avoid conflicts in tests and multi-model scenarios
         OpenTelemetrySdk openTelemetry = OpenTelemetrySdk.builder()
             .setTracerProvider(tracerProvider)
             .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
-            .buildAndRegisterGlobal();
+            .build();
         
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
