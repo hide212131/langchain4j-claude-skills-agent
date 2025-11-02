@@ -9,8 +9,6 @@ import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiChatRequestParameters;
 import dev.langchain4j.model.output.TokenUsage;
-import io.github.hide212131.langchain4j.claude.skills.infra.observability.ObservabilityConfig;
-import io.opentelemetry.api.OpenTelemetry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -39,8 +37,7 @@ public final class LangChain4jLlmClient {
     }
 
     public static LangChain4jLlmClient forOpenAi(EnvironmentVariables environment) {
-        ObservabilityConfig observability = ObservabilityConfig.fromEnvironment();
-        return forOpenAi(environment, new OpenAiChatModelFactory(observability), Clock.systemUTC());
+        return forOpenAi(environment, new OpenAiChatModelFactory(), Clock.systemUTC());
     }
 
     static LangChain4jLlmClient forOpenAi(
@@ -78,7 +75,7 @@ public final class LangChain4jLlmClient {
                 .messages(List.of(UserMessage.from(prompt)))
                 .parameters(parameters)
                 .build();
-        ChatResponse response = chatModel.doChat(request);
+    ChatResponse response = chatModel.doChat(request);
         long durationMs = Duration.between(start, clock.instant()).toMillis();
         AiMessage aiMessage = response.aiMessage();
         String content = aiMessage != null ? aiMessage.text() : "";
@@ -127,19 +124,14 @@ public final class LangChain4jLlmClient {
     }
 
     private static final class OpenAiChatModelFactory implements ChatModelFactory {
-        private final ObservabilityConfig observabilityConfig;
 
-        OpenAiChatModelFactory(ObservabilityConfig observabilityConfig) {
-            this.observabilityConfig = Objects.requireNonNull(observabilityConfig, "observabilityConfig");
+        OpenAiChatModelFactory() {
         }
 
         @Override
         public ChatModel create(OpenAiConfig config) {
-            // NOTE: LangChain4j 1.7.1's OpenAiChatModel.builder() does not have an openTelemetry() method.
-            // The observability integration uses the OpenTelemetry instance passed to the model via
-            // a different mechanism (listeners/interceptors) which will be implemented separately.
-            // For now, we store the observabilityConfig for future use.
-            
+            // Wrap the provider with an observable chat model when tracing is enabled so that
+            // prompts and responses show up inside Langfuse traces for Plan/Act stages.
             return OpenAiChatModel.builder()
                     .apiKey(config.apiKey)
                     .modelName(config.modelName)

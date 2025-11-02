@@ -7,6 +7,7 @@ import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogg
 import io.github.hide212131.langchain4j.claude.skills.runtime.provider.LangChain4jLlmClient;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillIndex;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillIndex.SkillMetadata;
+import io.opentelemetry.api.trace.Span;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -66,6 +67,8 @@ public final class AgenticPlanner {
             logger.warn("Agentic planner call failed: {}", ex.getMessage());
             return PlanModels.empty(normalisedGoal, "No skills selected");
         }
+
+        recordPlanTelemetry(prompt, completion);
 
         List<String> orderedSkillIds = extractSkillOrder(completion.content(), presentedCandidates, candidates);
         if (orderedSkillIds.isEmpty()) {
@@ -311,5 +314,30 @@ public final class AgenticPlanner {
 
     private String normaliseGoal(String goal) {
         return goal == null ? "" : goal.trim();
+    }
+
+    private void recordPlanTelemetry(String prompt, LangChain4jLlmClient.CompletionResult completion) {
+        Span span = Span.current();
+        if (!span.isRecording()) {
+            return;
+        }
+        if (prompt != null && !prompt.isBlank()) {
+            span.setAttribute("plan.llm.prompt", prompt);
+        }
+        if (completion != null && completion.content() != null) {
+            span.setAttribute("plan.llm.response", completion.content());
+            span.setAttribute("plan.llm.durationMs", completion.durationMs());
+            if (completion.tokenUsage() != null) {
+                if (completion.tokenUsage().inputTokenCount() != null) {
+                    span.setAttribute("plan.llm.inputTokens", completion.tokenUsage().inputTokenCount());
+                }
+                if (completion.tokenUsage().outputTokenCount() != null) {
+                    span.setAttribute("plan.llm.outputTokens", completion.tokenUsage().outputTokenCount());
+                }
+                if (completion.tokenUsage().totalTokenCount() != null) {
+                    span.setAttribute("plan.llm.totalTokens", completion.tokenUsage().totalTokenCount());
+                }
+            }
+        }
     }
 }
