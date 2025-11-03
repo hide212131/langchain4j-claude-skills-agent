@@ -29,7 +29,9 @@ class LayeredArchitectureTest {
                             "java..",
                             "javax..",
                             "picocli..",
-                            "dev.langchain4j..");
+                            "dev.langchain4j..",
+                            "com.fasterxml.jackson..",
+                            "org.apache.http..");
 
     @ArchTest
     static final ArchRule runtimeModuleShouldNotDependOnAppNorOtherLayers =

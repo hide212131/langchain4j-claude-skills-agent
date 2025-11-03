@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.JavaExec
+
 plugins {
     `java-library`
     application
@@ -27,6 +29,7 @@ dependencies {
     implementation("info.picocli:picocli:4.7.6")
     implementation("org.yaml:snakeyaml:2.2")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.17.1")
+    implementation("org.apache.httpcomponents:httpclient:4.5.14")
     runtimeOnly("org.slf4j:slf4j-simple:2.0.13")
 
     annotationProcessor("info.picocli:picocli-codegen:4.7.6")
@@ -55,6 +58,38 @@ testing {
 application {
     mainClass.set("io.github.hide212131.langchain4j.claude.skills.app.cli.SkillsCliApp")
     applicationName = "skills"
+}
+
+val langfusePrompt by tasks.registering(JavaExec::class) {
+    group = "langfuse"
+    description = "Prints workflow.act llm.chat prompts from Langfuse"
+    mainClass.set("io.github.hide212131.langchain4j.claude.skills.app.langfuse.LangfusePromptTool")
+    classpath = sourceSets["main"].runtimeClasspath
+
+    val traceId = (project.findProperty("traceId") as? String)?.takeIf { it.isNotBlank() }
+    traceId?.let {
+        args("--trace-id", it)
+    }
+
+    project.findProperty("index")?.toString()?.takeIf { it.isNotBlank() }?.let {
+        args("--index", it)
+    }
+
+    project.findProperty("all")?.toString()?.let {
+        if (it.equals("true", ignoreCase = true)) {
+            args("--all")
+        }
+    }
+
+    project.findProperty("baseUrl")?.toString()?.takeIf { it.isNotBlank() }?.let {
+        args("--base-url", it)
+    }
+    project.findProperty("publicKey")?.toString()?.takeIf { it.isNotBlank() }?.let {
+        args("--public-key", it)
+    }
+    project.findProperty("secretKey")?.toString()?.takeIf { it.isNotBlank() }?.let {
+        args("--secret-key", it)
+    }
 }
 
 tasks.named("run") {
