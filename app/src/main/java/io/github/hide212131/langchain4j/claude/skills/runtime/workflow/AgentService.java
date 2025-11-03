@@ -162,6 +162,7 @@ public final class AgentService {
                                 "mode", request.dryRun() ? "dry-run" : "live"
                             ), () -> {
                                 Span.current().setAttribute("input", request.goal());
+                                setGenAiAttributes(Span.current(), request.goal(), null);
                                 stageVisits.add(new StageVisit(attemptNumber, "plan"));
                                 writePlanGoal(scope, request.goal());
                                 scope.writeState(
@@ -214,6 +215,7 @@ public final class AgentService {
                         plan.orderedSkillIds());
                     }
                                 Span.current().setAttribute("output", assistantDraft);
+                                setGenAiAttributes(Span.current(), request.goal(), assistantDraft);
                                 scope.writeState(
                                         PlanEvaluationCriteriaState.KEY,
                                         Map.of(
@@ -248,6 +250,12 @@ public final class AgentService {
                                         result.hasArtifact()
                                             ? result.finalArtifact().toString()
                                             : String.join(",", result.invokedSkills()));
+                setGenAiAttributes(
+                    Span.current(),
+                    String.join(",", plan.orderedSkillIds()),
+                    result.hasArtifact()
+                        ? result.finalArtifact().toString()
+                        : String.join(",", result.invokedSkills()));
                                 
                                 // Add tracing attributes for act results
                                 tracer.addEvent("act.completed", Map.of(
@@ -274,6 +282,12 @@ public final class AgentService {
                                     Span.current().setAttribute(
                                             "output",
                                             evaluation.finalSummary());
+                    setGenAiAttributes(
+                        Span.current(),
+                        plan != null
+                            ? String.join(",", plan.orderedSkillIds())
+                            : null,
+                        evaluation.finalSummary());
                                 }
                                 
                                 // Add tracing attributes for reflect results
@@ -353,10 +367,13 @@ public final class AgentService {
 
         if (finalEvaluation != null) {
             Span.current().setAttribute("output", finalEvaluation.finalSummary());
+            setGenAiAttributes(Span.current(), request.goal(), finalEvaluation.finalSummary());
         } else if (finalActResult != null && finalActResult.hasArtifact()) {
             Span.current().setAttribute("output", finalActResult.finalArtifact().toString());
+            setGenAiAttributes(Span.current(), request.goal(), finalActResult.finalArtifact().toString());
         } else if (finalPlanCompletion != null && finalPlanCompletion.content() != null) {
             Span.current().setAttribute("output", finalPlanCompletion.content());
+            setGenAiAttributes(Span.current(), request.goal(), finalPlanCompletion.content());
         }
         
         return new ExecutionResult(
@@ -409,5 +426,17 @@ public final class AgentService {
             return "openai";
         }
         return chatModel.getClass().getSimpleName().toLowerCase(Locale.ROOT);
+    }
+
+    private static void setGenAiAttributes(Span span, String input, String output) {
+        if (span == null) {
+            return;
+        }
+        if (input != null && !input.isBlank()) {
+            span.setAttribute("gen_ai.request.prompt", input);
+        }
+        if (output != null && !output.isBlank()) {
+            span.setAttribute("gen_ai.response.completion", output);
+        }
     }
 }
