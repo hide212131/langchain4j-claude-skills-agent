@@ -43,6 +43,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -163,16 +164,7 @@ public final class SkillRuntime {
                 Constraints: %s
                 Expected Outputs: %s of artifacts aligned with the goal
 
-                Use the available tools to gather instructions and source material.
-                Guidelines:
-                - Call readSkillMd before performing other actions.
-                - Use readRef for any additional resources referenced in the skill.
-                - Generate artefacts with writeArtifact (paths are relative to build/out by default).
-                - If you have devised a procedure after reading the resource, save that procedure using `writeArtifact`. Subsequently, use `readRef` to reference it and incorporate it as new knowledge.
-                - If you need to run an existing script to resolve an issue, devise the appropriate arguments and execute it using runScript.
-                ‐ Should you need to create a new script to resolve the issue, please use writeArtifact to save its contents. Subsequently, employ the runScript tool to execute the script.
-                - If you are unsure, please devise and proceed with the most appropriate method yourself, as you will not receive answers to any additional questions you may ask users.
-                - When you are done, reply with key=value lines containing at least:
+                Apply the supervisor instructions to decide which tools to call. When you finish, respond with key=value lines containing at least:
                   artifactPath=<absolute path to the generated artefact>
                   summary=<one-line summary>
                 """.formatted(
@@ -354,7 +346,7 @@ public final class SkillRuntime {
 
         DeploymentResult deployScripts(String skillId, String sourceDir, String targetDir);
 
-        ValidationResult validateExpectedOutputs(Map<String, Object> expected, Map<String, Object> observed);
+        ValidationResult validateExpectedOutputs(Object expected, Object observed);
     }
 
     public interface SkillAgentOrchestrator {
@@ -405,8 +397,8 @@ public final class SkillRuntime {
                 new ReadReferenceAgent(toolbox),
                 new ScriptDeployAgent(toolbox),
                 new RunScriptAgent(toolbox),
-                new WriteArtifactAgent(toolbox)
-                // new ValidateExpectedOutputsAgent(toolbox)
+                new WriteArtifactAgent(toolbox),
+                new ValidateExpectedOutputsAgent(toolbox)
                 )
                     .build();
         }
@@ -422,14 +414,18 @@ public final class SkillRuntime {
                     - Call readSkillMd first to load SKILL.md (L2) for skill %s.
                     - Use readRef to resolve any additional references (L3).
                     - Persist artefacts only through writeArtifact (paths relative to build/out).
-                    - Use deployScripts to copy auxiliary files before executing a script. Provide source and target directories (under build/out).
+                    - Capture derived procedures with writeArtifact and then reference them with readRef when you need that knowledge again.
+                    - Use deployScripts to copy auxiliary files before executing a script. Provide sourceDir relative to the skill root (e.g. "scripts") and targetDir under build/out (e.g. "workdir").
+                    - Run existing scripts with runScript after preparing arguments and deployment targets.
+                    - Create new scripts with writeArtifact before running them via runScript.
                     - When calling writeArtifact, explicitly set base64Encoded to false unless you are saving Base64 content.
                     - Invoke validateExpectedOutputs before finishing.
-            - When you issue an agent invocation (JSON), every argument value MUST be a simple string.
-              * Join multiple values with commas, e.g. "args": "--flag1,--flag2".
-              * Provide dependencies as "dependencies": "pip:python-pptx".
-              * Provide deploy arguments as directory paths, e.g. "sourceDir": "scripts", "targetDir": "workdir".
-              * Do not emit JSON arrays or objects inside the arguments map.
+                    - When you issue an agent invocation (JSON), every argument value MUST be a simple string.
+                        * Join multiple values with commas, e.g. "args": "--flag1,--flag2".
+                        * Provide dependencies as "dependencies": "pip:python-pptx".
+                        * Provide deploy arguments as directory paths, e.g. "sourceDir": "scripts", "targetDir": "workdir".
+                        * Do not emit JSON arrays or objects inside the arguments map.
+                    - If you are unsure, choose the most appropriate next action yourself; you will not receive extra guidance from the user.
                     Always respond with key=value pairs when completing the task.
                     Expected outputs: %s
                     """.formatted(metadata.id(), expected);
@@ -668,8 +664,8 @@ public final class SkillRuntime {
                 description = "Validates that expected outputs have been produced",
                 outputName = "validationResult")
         public ValidationResult validate(
-                @V("expected") Map<String, Object> expected,
-                @V("observed") Map<String, Object> observed) {
+                @V("expected") Object expected,
+                @V("observed") Object observed) {
             return toolbox.validateExpectedOutputs(expected, observed);
         }
     }
@@ -968,12 +964,11 @@ public final class SkillRuntime {
         @Tool(name = "validateExpectedOutputs", returnBehavior = ReturnBehavior.TO_LLM)
         @Override
         public ValidationResult validateExpectedOutputs(
-                @P(value = "expected", required = false) Map<String, Object> expected,
-                @P(value = "observed", required = false) Map<String, Object> observed) {
-            List<String> expectedKeys = resolveExpectedKeys(expected);
-            Map<String, Object> observedMap = observed == null
-                    ? Map.of()
-                    : Map.copyOf(observed);
+                @P(value = "expected", required = false) Object expected,
+                @P(value = "observed", required = false) Object observed) {
+            Map<String, Object> expectedOverrides = normaliseExpectedOverrides(expected);
+            List<String> expectedKeys = resolveExpectedKeys(expectedOverrides);
+            Map<String, Object> observedMap = normaliseObservedResults(observed);
             if (context.artifactPath() != null) {
                 Map<String, Object> merged = new LinkedHashMap<>(observedMap);
                 merged.putIfAbsent("artifactPath", context.artifactPath().toString());
@@ -983,10 +978,13 @@ public final class SkillRuntime {
                     expectedKeys, observedMap, context.artifactPath());
             context.setValidation(validation);
             Map<String, Object> invocationArgs = new LinkedHashMap<>();
-            if (expected != null && !expected.isEmpty()) {
-                invocationArgs.put("expected", new LinkedHashMap<>(expected));
+            if (!expectedOverrides.isEmpty()) {
+                invocationArgs.put("expected", expectedOverrides);
             }
             invocationArgs.put("expectedKeys", expectedKeys);
+            if (!observedMap.isEmpty()) {
+                invocationArgs.put("observed", observedMap);
+            }
             context.recordInvocation(
                     "validateExpectedOutputs",
                     invocationArgs,
@@ -995,6 +993,26 @@ public final class SkillRuntime {
                             "missing", validation.missingOutputs()));
             context.recordSkill(context.metadata().id());
             return new ValidationResult(validation.expectedOutputsSatisfied(), validation.missingOutputs());
+        }
+
+        private Map<String, Object> normaliseExpectedOverrides(Object overrides) {
+            if (overrides == null) {
+                return Map.of();
+            }
+            if (overrides instanceof Map<?, ?> map) {
+                return copyWithStringKeys(map, Function.identity());
+            }
+            if (overrides instanceof List<?> list) {
+                LinkedHashMap<String, Object> result = new LinkedHashMap<>();
+                for (Object element : list) {
+                    if (element == null) {
+                        continue;
+                    }
+                    addExpectedToken(result, element.toString());
+                }
+                return result.isEmpty() ? Map.of() : Map.copyOf(result);
+            }
+            return tokensToExpectedMap(overrides.toString());
         }
 
         private List<String> resolveExpectedKeys(Map<String, Object> overrides) {
@@ -1015,6 +1033,123 @@ public final class SkillRuntime {
                 return context.expectedOutputs();
             }
             return List.copyOf(keys);
+        }
+
+        private Map<String, Object> normaliseObservedResults(Object observed) {
+            if (observed == null) {
+                return Map.of();
+            }
+            if (observed instanceof Map<?, ?> map) {
+                return copyWithStringKeys(map, Function.identity());
+            }
+            LinkedHashMap<String, Object> result = new LinkedHashMap<>();
+            if (observed instanceof List<?> list) {
+                for (Object element : list) {
+                    if (element == null) {
+                        continue;
+                    }
+                    parseObservedEntry(element.toString(), result);
+                }
+                if (!result.isEmpty()) {
+                    return Map.copyOf(result);
+                }
+            }
+            String text = observed.toString().trim();
+            if (text.isEmpty()) {
+                return Map.of();
+            }
+            if (!parseObservedEntry(text, result)) {
+                List<String> expectedOutputs = context.expectedOutputs();
+                String defaultKey;
+                if (expectedOutputs.isEmpty()) {
+                    defaultKey = "artifactPath";
+                } else if (expectedOutputs.size() == 1) {
+                    defaultKey = expectedOutputs.get(0);
+                } else {
+                    defaultKey = "value";
+                }
+                result.put(defaultKey, text);
+            }
+            return Map.copyOf(result);
+        }
+
+        private Map<String, Object> copyWithStringKeys(
+                Map<?, ?> map, Function<Object, Object> valueMapper) {
+            LinkedHashMap<String, Object> result = new LinkedHashMap<>();
+            map.forEach((key, value) -> {
+                String stringKey = Objects.toString(key, "").trim();
+                if (stringKey.isEmpty()) {
+                    return;
+                }
+                Object mappedValue = valueMapper.apply(value);
+                result.put(stringKey, mappedValue);
+            });
+            return result.isEmpty() ? Map.of() : Map.copyOf(result);
+        }
+
+        private Map<String, Object> tokensToExpectedMap(String raw) {
+            String cleaned = Objects.toString(raw, "").trim();
+            if (cleaned.isEmpty()) {
+                return Map.of();
+            }
+            LinkedHashMap<String, Object> result = new LinkedHashMap<>();
+            boolean added = false;
+            for (String token : cleaned.split("[\\n,]")) {
+                added |= addExpectedToken(result, token);
+            }
+            if (!added) {
+                addExpectedToken(result, cleaned);
+            }
+            return result.isEmpty() ? Map.of() : Map.copyOf(result);
+        }
+
+        private boolean addExpectedToken(Map<String, Object> target, String token) {
+            String trimmed = Objects.toString(token, "").trim();
+            if (trimmed.isEmpty()) {
+                return false;
+            }
+            List<String> expectedOutputs = context.expectedOutputs();
+            if (expectedOutputs.contains(trimmed)) {
+                target.put(trimmed, Boolean.TRUE);
+                return true;
+            }
+            if (looksLikePath(trimmed)) {
+                String key;
+                if (expectedOutputs.isEmpty()) {
+                    key = "artifactPath";
+                } else {
+                    key = expectedOutputs.get(0);
+                }
+                target.put(key, trimmed);
+                return true;
+            }
+            target.put(trimmed, Boolean.TRUE);
+            return true;
+        }
+
+        private boolean parseObservedEntry(String entry, Map<String, Object> accumulator) {
+            String trimmed = Objects.toString(entry, "").trim();
+            if (trimmed.isEmpty()) {
+                return false;
+            }
+            int separator = trimmed.indexOf('=');
+            if (separator > 0) {
+                String key = trimmed.substring(0, separator).trim();
+                String value = trimmed.substring(separator + 1).trim();
+                if (!key.isEmpty()) {
+                    accumulator.put(key, value);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private boolean looksLikePath(String value) {
+            if (value.indexOf('/') >= 0 || value.indexOf('\\') >= 0) {
+                return true;
+            }
+            int dot = value.lastIndexOf('.');
+            return dot > 0 && dot < value.length() - 1;
         }
 
         private void validateSkillId(String requested, String actual) {
