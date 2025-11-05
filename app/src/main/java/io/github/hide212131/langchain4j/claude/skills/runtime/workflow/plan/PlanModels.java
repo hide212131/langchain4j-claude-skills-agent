@@ -26,12 +26,18 @@ public final class PlanModels {
     }
 
     public record PlanStep(
-            String skillId, String name, String description, List<String> keywords, Path skillRoot) {
+            String skillId,
+            String name,
+            String description,
+            List<String> keywords,
+            String stepGoal,
+            Path skillRoot) {
         public PlanStep {
             Objects.requireNonNull(skillId, "skillId");
             Objects.requireNonNull(name, "name");
             Objects.requireNonNull(description, "description");
             Objects.requireNonNull(keywords, "keywords");
+            Objects.requireNonNull(stepGoal, "stepGoal");
             Objects.requireNonNull(skillRoot, "skillRoot");
         }
     }

@@ -70,18 +70,33 @@ public final class AgenticPlanner {
 
         recordPlanTelemetry(prompt, completion);
 
-        List<String> orderedSkillIds = extractSkillOrder(completion.content(), presentedCandidates, candidates);
-        if (orderedSkillIds.isEmpty()) {
+        List<OrderedStep> orderedSteps =
+                extractOrderedSteps(completion.content(), presentedCandidates, candidates);
+        if (orderedSteps.isEmpty()) {
             logger.warn("Agentic planner returned no recognizable skills for goal '{}'", normalisedGoal);
             return PlanModels.empty(normalisedGoal, "No skills selected");
         }
 
         Map<String, PlanModels.PlanStep> stepById = candidates.stream()
                 .collect(Collectors.toMap(PlanModels.PlanStep::skillId, step -> step, (a, b) -> a));
-        List<PlanModels.PlanStep> selectedSteps = orderedSkillIds.stream()
-                .map(stepById::get)
-                .filter(Objects::nonNull)
-                .toList();
+        List<PlanModels.PlanStep> selectedSteps = new ArrayList<>();
+        List<String> orderedSkillIds = new ArrayList<>();
+
+        for (OrderedStep orderedStep : orderedSteps) {
+            PlanModels.PlanStep metadata = stepById.get(orderedStep.skillId());
+            if (metadata == null) {
+                continue;
+            }
+            PlanModels.PlanStep resolved = new PlanModels.PlanStep(
+                    metadata.skillId(),
+                    metadata.name(),
+                    metadata.description(),
+                    metadata.keywords(),
+                    normaliseStepGoal(orderedStep.stepGoal()),
+                    metadata.skillRoot());
+            selectedSteps.add(resolved);
+            orderedSkillIds.add(resolved.skillId());
+        }
 
         if (selectedSteps.isEmpty()) {
             logger.warn("Agentic planner referenced unknown skills; returning empty plan");
@@ -158,6 +173,7 @@ public final class AgenticPlanner {
                 metadata.name(),
                 metadata.description(),
                 metadata.keywords(),
+                "",
                 metadata.skillRoot());
     }
 
@@ -173,27 +189,31 @@ public final class AgenticPlanner {
 
         return "You are an expert workflow planner. Given a user goal in Japanese "
                 + "or English, choose the minimal ordered list of skills required to satisfy it. "
-                + "Reply strictly as JSON with a root object containing `skill_ids`, an array of "
-                + "skill identifiers in execution order. Only use identifiers from the list below." + "\n\n"
+                + "Reply strictly as JSON with a root object containing `skill_steps`, an array where each "
+                + "element has `skill_id` and `goal`. The goal must describe the artifact produced by the "
+                + "step and, when useful, how the skill will be used to create it. Use only skill identifiers "
+                + "from the list below. Also include `skill_ids`, mirroring the identifiers in order for "
+                + "backward compatibility." + "\n\n"
                 + "Goal: " + goal + "\n\n"
                 + "Available skills (top candidates):\n"
                 + candidateBlock + "\n\n"
-                + "JSON schema: {\"skill_ids\": [\"id-1\", \"id-2\"]}";
+                + "JSON schema: {\"skill_steps\": [{\"skill_id\": \"id-1\", \"goal\": \"artifact description\"}], "
+                + "\"skill_ids\": [\"id-1\", \"id-2\"]}";
     }
 
-    private List<String> extractSkillOrder(
+    private List<OrderedStep> extractOrderedSteps(
             String response, List<PlanModels.PlanStep> presentedCandidates, List<PlanModels.PlanStep> allCandidates) {
         if (response == null || response.isBlank()) {
             return List.of();
         }
-        List<String> parsed = parseJsonSkillIds(response);
+        List<OrderedStep> parsed = parseJsonSteps(response);
         if (!parsed.isEmpty()) {
             return filterToCandidates(parsed, presentedCandidates, allCandidates);
         }
         return inferByOccurrence(response, presentedCandidates);
     }
 
-    private List<String> parseJsonSkillIds(String content) {
+    private List<OrderedStep> parseJsonSteps(String content) {
         try {
             return parseJsonNode(objectMapper.readTree(content));
         } catch (JsonProcessingException ex) {
@@ -212,57 +232,65 @@ public final class AgenticPlanner {
         return List.of();
     }
 
-    private List<String> parseJsonNode(JsonNode node) {
-        if (node == null) {
+    private List<OrderedStep> parseJsonNode(JsonNode node) {
+        if (node == null || node.isNull()) {
             return List.of();
         }
-        List<String> results = new ArrayList<>();
         if (node.isArray()) {
+            List<OrderedStep> results = new ArrayList<>();
             for (JsonNode child : node) {
                 results.addAll(parseJsonNode(child));
             }
-            return dedupe(results);
+            return results;
         }
         if (node.isObject()) {
-            if (node.has("skill_ids")) {
-                results.addAll(parseJsonNode(node.get("skill_ids")));
-            }
-            if (node.has("skills")) {
-                results.addAll(parseJsonNode(node.get("skills")));
-            }
-            if (node.has("plan")) {
-                results.addAll(parseJsonNode(node.get("plan")));
-            }
-            if (node.has("steps")) {
-                results.addAll(parseJsonNode(node.get("steps")));
-            }
-            if (results.isEmpty()) {
-                results.addAll(node.findValuesAsText("skill_id"));
-                results.addAll(node.findValuesAsText("skillId"));
-                if (results.isEmpty() && node.has("id") && node.get("id").isTextual()) {
-                    results.add(node.get("id").asText());
+            if (node.has("skill_steps")) {
+                List<OrderedStep> steps = parseJsonNode(node.get("skill_steps"));
+                if (!steps.isEmpty()) {
+                    return steps;
                 }
             }
-            return dedupe(results);
+            if (node.has("skill_ids")) {
+                List<OrderedStep> ids = parseJsonNode(node.get("skill_ids"));
+                if (!ids.isEmpty()) {
+                    return ids;
+                }
+            }
+            OrderedStep step = toOrderedStep(node);
+            if (step != null) {
+                return List.of(step);
+            }
+            List<OrderedStep> nested = new ArrayList<>();
+            node.fields().forEachRemaining(entry -> nested.addAll(parseJsonNode(entry.getValue())));
+            return nested;
         }
         if (node.isTextual()) {
-            return List.of(node.asText());
+            return List.of(new OrderedStep(node.asText(), ""));
         }
         return List.of();
     }
 
-    private List<String> dedupe(List<String> values) {
-        LinkedHashSet<String> seen = new LinkedHashSet<>();
-        for (String value : values) {
-            if (value != null && !value.isBlank()) {
-                seen.add(value.trim());
-            }
+    private OrderedStep toOrderedStep(JsonNode node) {
+        String id = textValue(node, "skill_id", "skillId", "id");
+        if (id == null || id.isBlank()) {
+            return null;
         }
-        return new ArrayList<>(seen);
+        String goal = textValue(node, "goal", "step_goal", "stepGoal");
+        return new OrderedStep(id, goal == null ? "" : goal);
     }
 
-    private List<String> filterToCandidates(
-            List<String> orderedIds,
+    private String textValue(JsonNode node, String... candidates) {
+        for (String field : candidates) {
+            JsonNode child = node.get(field);
+            if (child != null && child.isTextual()) {
+                return child.asText();
+            }
+        }
+        return null;
+    }
+
+    private List<OrderedStep> filterToCandidates(
+            List<OrderedStep> orderedSteps,
             List<PlanModels.PlanStep> presentedCandidates,
             List<PlanModels.PlanStep> allCandidates) {
         Set<String> validIds = presentedCandidates.stream()
@@ -273,20 +301,21 @@ public final class AgenticPlanner {
                     .map(PlanModels.PlanStep::skillId)
                     .collect(Collectors.toSet());
         }
-        List<String> filtered = new ArrayList<>();
-        for (String id : orderedIds) {
-            if (id == null) {
+        LinkedHashSet<String> seen = new LinkedHashSet<>();
+        List<OrderedStep> filtered = new ArrayList<>();
+        for (OrderedStep step : orderedSteps) {
+            if (step == null || step.skillId() == null) {
                 continue;
             }
-            String trimmed = id.trim();
-            if (validIds.contains(trimmed) && !filtered.contains(trimmed)) {
-                filtered.add(trimmed);
+            String trimmed = step.skillId().trim();
+            if (!trimmed.isEmpty() && validIds.contains(trimmed) && seen.add(trimmed)) {
+                filtered.add(new OrderedStep(trimmed, normaliseStepGoal(step.stepGoal())));
             }
         }
         return filtered;
     }
 
-    private List<String> inferByOccurrence(String response, List<PlanModels.PlanStep> candidates) {
+    private List<OrderedStep> inferByOccurrence(String response, List<PlanModels.PlanStep> candidates) {
         String lower = response.toLowerCase(Locale.ROOT);
         record Match(String id, int index) {}
         List<Match> matches = new ArrayList<>();
@@ -298,23 +327,47 @@ public final class AgenticPlanner {
             }
         }
         matches.sort((a, b) -> Integer.compare(a.index(), b.index()));
-        return matches.stream().map(Match::id).distinct().toList();
+        return matches.stream()
+                .map(Match::id)
+                .distinct()
+                .map(id -> new OrderedStep(id, ""))
+                .toList();
     }
 
     private String summarize(List<PlanModels.PlanStep> steps) {
         return steps.stream()
-                .map(step -> String.format(
-                        "%s: %s — %s (keywords: %s)",
-                        step.skillId(),
-                        step.name(),
-                        step.description(),
-                        String.join(", ", step.keywords())))
+                .map(step -> {
+                    StringBuilder builder = new StringBuilder(String.format(
+                            "%s: %s — %s",
+                            step.skillId(),
+                            step.name(),
+                            step.description()));
+                    if (!step.stepGoal().isBlank()) {
+                        builder.append(" Goal: ").append(step.stepGoal());
+                    }
+                    if (!step.keywords().isEmpty()) {
+                        builder.append(" (keywords: ")
+                                .append(String.join(", ", step.keywords()))
+                                .append(')');
+                    }
+                    return builder.toString();
+                })
                 .collect(Collectors.joining("\n"));
+    }
+
+    private String normaliseStepGoal(String goal) {
+        if (goal == null) {
+            return "";
+        }
+        String trimmed = goal.trim();
+        return trimmed;
     }
 
     private String normaliseGoal(String goal) {
         return goal == null ? "" : goal.trim();
     }
+
+    private record OrderedStep(String skillId, String stepGoal) {}
 
     private void recordPlanTelemetry(String prompt, LangChain4jLlmClient.CompletionResult completion) {
         Span span = Span.current();

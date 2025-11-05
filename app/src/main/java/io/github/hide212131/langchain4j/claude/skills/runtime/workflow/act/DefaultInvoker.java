@@ -61,7 +61,7 @@ public final class DefaultInvoker {
             guard.checkBudgets(new BudgetSnapshot(steps.size() - invokedSkills.size(), Integer.MAX_VALUE));
 
             Map<String, Object> inputBundle = Map.of(
-                    "goal", plan.goal(),
+                    "goal", step.stepGoal(),
                     "skillId", step.skillId(),
                     "description", step.description(),
                     "keywords", step.keywords(),

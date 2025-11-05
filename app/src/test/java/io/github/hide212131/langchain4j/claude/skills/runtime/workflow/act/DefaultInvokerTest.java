@@ -56,24 +56,26 @@ class DefaultInvokerTest {
         DefaultInvoker invoker =
                 new DefaultInvoker(tool, new SkillInvocationGuard(), blackboardStore, logger);
 
-    List<PlanModels.PlanStep> steps = List.of(
-        new PlanModels.PlanStep(
-            "brand-guidelines",
-            "Brand Guidelines",
-            "Summarise brand rules",
-            List.of("brand"),
-            skillsRoot.resolve("brand-guidelines")),
-        new PlanModels.PlanStep(
-            "document-skills/pptx",
-            "PPTX Generator",
-            "Build slide decks",
-            List.of("pptx"),
-            skillsRoot.resolve("document-skills/pptx")));
-    PlanModels.PlanResult plan = new PlanModels.PlanResult(
-        "Create a brand aligned deck",
-        steps,
-        "brand-guidelines: Brand Guidelines — Summarise brand rules (keywords: brand)\n"
-            + "document-skills/pptx: PPTX Generator — Build slide decks (keywords: pptx)");
+        List<PlanModels.PlanStep> steps = List.of(
+                new PlanModels.PlanStep(
+                        "brand-guidelines",
+                        "Brand Guidelines",
+                        "Summarise brand rules",
+                        List.of("brand"),
+                        "Extract the latest brand positioning guidance",
+                        skillsRoot.resolve("brand-guidelines")),
+                new PlanModels.PlanStep(
+                        "document-skills/pptx",
+                        "PPTX Generator",
+                        "Build slide decks",
+                        List.of("pptx"),
+                        "Apply the brand rules to craft a slide deck",
+                        skillsRoot.resolve("document-skills/pptx")));
+        PlanModels.PlanResult plan = new PlanModels.PlanResult(
+                "Create a brand aligned deck",
+                steps,
+                "brand-guidelines: Brand Guidelines — Summarise brand rules Goal: Extract the latest brand positioning guidance (keywords: brand)\n"
+                        + "document-skills/pptx: PPTX Generator — Build slide decks Goal: Apply the brand rules to craft a slide deck (keywords: pptx)");
         RecordingAgenticScope scope = new RecordingAgenticScope();
 
         DefaultInvoker.ActResult result = invoker.invoke(scope, plan);
