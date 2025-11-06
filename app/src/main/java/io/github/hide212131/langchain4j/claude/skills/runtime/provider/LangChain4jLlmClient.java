@@ -136,11 +136,11 @@ public final class LangChain4jLlmClient {
 
         @Override
         public ChatModel create(OpenAiConfig config) {
-            // Wrap the provider with an observable chat model when tracing is enabled so that
-            // prompts and responses show up inside Langfuse traces for Plan/Act stages.
             return OpenAiChatModel.builder()
                     .apiKey(config.apiKey)
                     .modelName(config.modelName)
+                    .logRequests(true)
+                    .logResponses(true)
                     .build();
         }
     }

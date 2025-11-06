@@ -1,43 +1,35 @@
 package io.github.hide212131.langchain4j.claude.skills.runtime.observability;
 
 import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.listener.ChatModelErrorContext;
+import dev.langchain4j.model.chat.listener.ChatModelRequestContext;
+import dev.langchain4j.model.chat.listener.ChatModelResponseContext;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
-import dev.langchain4j.model.output.TokenUsage;
-import io.opentelemetry.api.common.AttributeKey;
-import io.opentelemetry.api.common.Attributes;
-import io.opentelemetry.api.trace.Span;
-import io.opentelemetry.api.trace.SpanKind;
-import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
-import io.opentelemetry.context.Scope;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
-import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
-import java.util.StringJoiner;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * ChatModel wrapper that emits a GenAI CLIENT span for every LLM interaction.
+ * Transitional wrapper that delegates to the underlying {@link ChatModel} while routing
+ * observability concerns through {@link ObservabilityChatModelListener}.
  */
 public final class InstrumentedChatModel implements ChatModel {
 
-    private static final int MAX_TEXT_PREVIEW = 4096;
-
     private final ChatModel delegate;
-    private final Tracer tracer;
-    private final String system;
+    private final ObservabilityChatModelListener listener;
     private final String defaultModelName;
 
     public InstrumentedChatModel(ChatModel delegate, Tracer tracer, String system, String defaultModelName) {
         this.delegate = Objects.requireNonNull(delegate, "delegate");
-        this.tracer = Objects.requireNonNull(tracer, "tracer");
-        this.system = system == null || system.isBlank() ? delegate.getClass().getSimpleName() : system;
+        this.listener = new ObservabilityChatModelListener(
+                Objects.requireNonNull(tracer, "tracer"),
+                system == null || system.isBlank() ? delegate.getClass().getSimpleName() : system,
+                defaultModelName);
         this.defaultModelName = defaultModelName;
     }
 
@@ -46,68 +38,46 @@ public final class InstrumentedChatModel implements ChatModel {
     }
 
     @Override
+    public String chat(String prompt) {
+        ChatRequest.Builder builder = ChatRequest.builder()
+                .messages(prompt == null ? List.of() : List.of(UserMessage.from(prompt)));
+        if (defaultModelName != null && !defaultModelName.isBlank()) {
+            builder.parameters(dev.langchain4j.model.openai.OpenAiChatRequestParameters.builder()
+                    .modelName(defaultModelName)
+                    .build());
+        }
+        ChatRequest syntheticRequest = builder.build();
+        Map<Object, Object> attributes = new ConcurrentHashMap<>();
+        listener.onRequest(new ChatModelRequestContext(syntheticRequest, delegate.provider(), attributes));
+        try {
+            String reply = delegate.chat(prompt);
+            ChatResponse syntheticResponse = ChatResponse.builder()
+                    .aiMessage(reply == null ? null : AiMessage.from(reply))
+                    .build();
+            listener.onResponse(new ChatModelResponseContext(
+                    syntheticResponse, syntheticRequest, delegate.provider(), attributes));
+            return reply;
+        } catch (RuntimeException ex) {
+            listener.onError(new ChatModelErrorContext(ex, syntheticRequest, delegate.provider(), attributes));
+            throw ex;
+        }
+    }
+
+    @Override
     public ChatResponse doChat(ChatRequest request) {
         Objects.requireNonNull(request, "request");
         ChatRequest effectiveRequest = adaptRequest(request);
-        Span span = tracer.spanBuilder("llm.chat")
-                .setSpanKind(SpanKind.CLIENT)
-                .startSpan();
-        span.setAttribute("gen_ai.system", system);
-        String modelName = resolveModelName();
-        if (modelName != null && !modelName.isBlank()) {
-            span.setAttribute("gen_ai.request.model", modelName);
-        }
-        span.setAttribute("gen_ai.request.type", "chat");
-        String promptPreview = summariseMessages(effectiveRequest.messages());
-        if (!promptPreview.isBlank()) {
-            span.setAttribute("gen_ai.request.prompt", promptPreview);
-            span.addEvent("llm.prompt", Attributes.of(AttributeKey.stringKey("preview"), promptPreview));
-        }
-
-        Instant start = Instant.now();
-        try (Scope scope = span.makeCurrent()) {
+        Map<Object, Object> attributes = new ConcurrentHashMap<>();
+        listener.onRequest(new ChatModelRequestContext(effectiveRequest, delegate.provider(), attributes));
+        try {
             ChatResponse response = delegate.doChat(effectiveRequest);
-            handleResponse(span, response, Duration.between(start, Instant.now()));
-            span.setStatus(StatusCode.OK);
+            listener.onResponse(new ChatModelResponseContext(
+                    response, effectiveRequest, delegate.provider(), attributes));
             return response;
-        } catch (Exception ex) {
-            span.recordException(ex);
-            span.setStatus(StatusCode.ERROR, safeMessage(ex));
+        } catch (RuntimeException ex) {
+            listener.onError(new ChatModelErrorContext(ex, effectiveRequest, delegate.provider(), attributes));
             throw ex;
-        } finally {
-            span.end();
         }
-    }
-
-    private void handleResponse(Span span, ChatResponse response, Duration latency) {
-        if (latency != null) {
-            span.setAttribute("gen_ai.response.latency_ms", latency.toMillis());
-        }
-        if (response == null) {
-            return;
-        }
-        AiMessage aiMessage = response.aiMessage();
-        if (aiMessage != null && aiMessage.text() != null) {
-            String text = limit(aiMessage.text());
-            span.setAttribute("gen_ai.response.completion", text);
-            span.addEvent("llm.response", Attributes.of(AttributeKey.stringKey("preview"), text));
-        }
-        TokenUsage usage = response.tokenUsage();
-        if (usage != null) {
-            if (usage.inputTokenCount() != null) {
-                span.setAttribute("gen_ai.usage.input_tokens", usage.inputTokenCount());
-            }
-            if (usage.outputTokenCount() != null) {
-                span.setAttribute("gen_ai.usage.output_tokens", usage.outputTokenCount());
-            }
-            if (usage.totalTokenCount() != null) {
-                span.setAttribute("gen_ai.usage.total_tokens", usage.totalTokenCount());
-            }
-        }
-    }
-
-    private String resolveModelName() {
-        return defaultModelName;
     }
 
     private ChatRequest adaptRequest(ChatRequest request) {
@@ -126,53 +96,5 @@ public final class InstrumentedChatModel implements ChatModel {
                         .modelName(defaultModelName)
                         .build())
                 .build();
-    }
-
-    private String summariseMessages(List<ChatMessage> messages) {
-        if (messages == null || messages.isEmpty()) {
-            return "";
-        }
-        StringJoiner joiner = new StringJoiner("\n");
-        for (ChatMessage message : messages) {
-            if (message == null) {
-                continue;
-            }
-            String role = message.getClass().getSimpleName().replace("Message", "").toLowerCase(Locale.ROOT);
-            String content = limit(extractContent(message));
-            if (content.isEmpty()) {
-                continue;
-            }
-            joiner.add(role + ": " + content);
-        }
-        return joiner.toString();
-    }
-
-    private String extractContent(ChatMessage message) {
-        if (message instanceof UserMessage user) {
-            return user.singleText();
-        }
-        if (message instanceof SystemMessage systemMessage) {
-            return systemMessage.text();
-        }
-        return message.toString();
-    }
-
-    private String limit(String text) {
-        if (text == null) {
-            return "";
-        }
-        String cleaned = text.strip();
-        if (cleaned.length() <= MAX_TEXT_PREVIEW) {
-            return cleaned;
-        }
-        return cleaned.substring(0, MAX_TEXT_PREVIEW);
-    }
-
-    private String safeMessage(Exception ex) {
-        String message = ex.getMessage();
-        if (message == null) {
-            return ex.getClass().getSimpleName();
-        }
-        return message.length() <= MAX_TEXT_PREVIEW ? message : message.substring(0, MAX_TEXT_PREVIEW);
     }
 }
