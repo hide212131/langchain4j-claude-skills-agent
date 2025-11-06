@@ -296,9 +296,16 @@ public final class AgentService {
             int attemptNumber = attemptCounter.incrementAndGet();
             AgentWorkflowObserver observer = new AgentWorkflowObserver(tracer, request, attemptNumber);
 
-            PlanOperator planAgent = new PlanOperator(
+            DynamicPlanOperator dynamicPlanAgent = new DynamicPlanOperator(
                     planner,
                     llmClient,
+                    logger,
+                    request,
+                    attemptNumber,
+                    maxAttempts,
+                    observer);
+            ForcedPlanOperator forcedPlanAgent = new ForcedPlanOperator(
+                    planner,
                     logger,
                     request,
                     attemptNumber,
@@ -311,10 +318,16 @@ public final class AgentService {
                     maxAttempts,
                     observer);
 
+            UntypedAgent planBranch = AgenticServices.conditionalBuilder()
+                    .name("plan-branch")
+                    .subAgents(agenticScope -> !request.forcedSkillIds().isEmpty(), forcedPlanAgent)
+                    .subAgents(agenticScope -> request.forcedSkillIds().isEmpty(), dynamicPlanAgent)
+                    .build();
+
             UntypedAgent attemptWorkflow = workflowFactory.createWorkflow(builder -> {
                 builder.name("skills-plan-act-reflect-attempt");
                 builder.output(attemptScope -> assembleAttemptSnapshot(attemptScope, observer));
-                builder.subAgents(planAgent, actAgent, reflectAgent);
+                builder.subAgents(planBranch, actAgent, reflectAgent);
             });
 
             AttemptSnapshot snapshot = (AttemptSnapshot) attemptWorkflow.invoke(Map.of("goal", request.goal()));
@@ -333,7 +346,7 @@ public final class AgentService {
         }
     }
 
-    public static final class PlanOperator {
+    public static final class DynamicPlanOperator {
         private final AgenticPlanner planner;
         private final LangChain4jLlmClient llmClient;
         private final WorkflowLogger logger;
@@ -342,7 +355,7 @@ public final class AgentService {
         private final int maxAttempts;
         private final AgentWorkflowObserver observer;
 
-        PlanOperator(
+        DynamicPlanOperator(
                 AgenticPlanner planner,
                 LangChain4jLlmClient llmClient,
                 WorkflowLogger logger,
@@ -377,11 +390,10 @@ public final class AgentService {
                                 "maxToolCalls", 3,
                                 "maxAttempts", maxAttempts,
                                 "attempt", attemptNumber));
-                List<String> forcedSkillIds = request.forcedSkillIds();
-                boolean hasForcedSkillIds = !forcedSkillIds.isEmpty();
-                PlanModels.PlanResult plan = hasForcedSkillIds
-                        ? planner.planWithFixedOrder(request.goal(), forcedSkillIds)
-                        : planner.plan(request.goal());
+                if (!request.forcedSkillIds().isEmpty()) {
+                    throw new IllegalStateException("DynamicPlanOperator should not handle forced skill ids.");
+                }
+                PlanModels.PlanResult plan = planner.plan(request.goal());
                 scope.writeState(
                         PlanCandidateStepsState.KEY,
                         plan.steps().stream()
@@ -394,20 +406,12 @@ public final class AgentService {
                                 .toList());
                 LangChain4jLlmClient.CompletionResult completion = null;
                 String assistantDraft;
-                if (hasForcedSkillIds) {
-                    assistantDraft = "Planner bypassed via forced skill sequence.";
-                    logger.info(
-                            "Plan attempt {} using forced skill sequence {}",
-                            attemptNumber,
-                            plan.orderedSkillIds());
-                } else {
-                    completion = llmClient.complete(request.goal());
-                    assistantDraft = completion != null ? completion.content() : "";
-                    logger.info(
-                            "Plan attempt {} candidate steps: {}",
-                            attemptNumber,
-                            plan.orderedSkillIds());
-                }
+                completion = llmClient.complete(request.goal());
+                assistantDraft = completion != null ? completion.content() : "";
+                logger.info(
+                        "Plan attempt {} candidate steps: {}",
+                        attemptNumber,
+                        plan.orderedSkillIds());
                 scope.writeState(
                         PlanEvaluationCriteriaState.KEY,
                         Map.of(
@@ -416,9 +420,88 @@ public final class AgentService {
                                 "attempt", attemptNumber));
                 scope.writeState(WorkflowStateKeys.PLAN_RESULT, plan);
                 scope.writeState(WorkflowStateKeys.PLAN_DRAFT, completion);
-                PlanOperatorOutput output = new PlanOperatorOutput(plan, completion, assistantDraft);
+                PlanStageOutput output = new PlanStageOutput(plan, completion, assistantDraft);
                 scope.writeState(WorkflowStateKeys.PLAN_STAGE_OUTPUT, output);
                 observer.afterAgentInvocation(new AgentResponse(scope, "plan", Map.of("attempt", attemptNumber), output));
+            } catch (RuntimeException ex) {
+                observer.onStageError(ex);
+                throw ex;
+            }
+        }
+    }
+
+    public static final class ForcedPlanOperator {
+        private final AgenticPlanner planner;
+        private final WorkflowLogger logger;
+        private final AgentRunRequest request;
+        private final int attemptNumber;
+        private final int maxAttempts;
+        private final AgentWorkflowObserver observer;
+
+        ForcedPlanOperator(
+                AgenticPlanner planner,
+                WorkflowLogger logger,
+                AgentRunRequest request,
+                int attemptNumber,
+                int maxAttempts,
+                AgentWorkflowObserver observer) {
+            this.planner = planner;
+            this.logger = logger;
+            this.request = request;
+            this.attemptNumber = attemptNumber;
+            this.maxAttempts = maxAttempts;
+            this.observer = observer;
+        }
+
+        @Agent(name = "plan")
+        public void run(AgenticScope scope) {
+            observer.beforeAgentInvocation(new AgentRequest(scope, "plan", Map.of("attempt", attemptNumber, "mode", "forced")));
+            try {
+                List<String> forcedSkillIds = request.forcedSkillIds();
+                if (forcedSkillIds.isEmpty()) {
+                    throw new IllegalStateException("ForcedPlanOperator requires forced skill ids.");
+                }
+                writePlanGoal(scope, request.goal());
+                scope.writeState(
+                        PlanInputsState.KEY,
+                        Map.of(
+                                "goal", request.goal(),
+                                "mode", request.dryRun() ? "dry-run" : "live",
+                                "attempt", attemptNumber));
+                scope.writeState(
+                        PlanConstraintsState.KEY,
+                        Map.of(
+                                "tokenBudget", 0,
+                                "maxToolCalls", 3,
+                                "maxAttempts", maxAttempts,
+                                "attempt", attemptNumber));
+                PlanModels.PlanResult plan = planner.planWithFixedOrder(request.goal(), forcedSkillIds);
+                scope.writeState(
+                        PlanCandidateStepsState.KEY,
+                        plan.steps().stream()
+                                .map(step -> Map.of(
+                                        "skillId", step.skillId(),
+                                        "name", step.name(),
+                                        "description", step.description(),
+                                        "keywords", step.keywords(),
+                                        "skillRoot", step.skillRoot().toString()))
+                                .toList());
+                String assistantDraft = "Planner bypassed via forced skill sequence.";
+                scope.writeState(
+                        PlanEvaluationCriteriaState.KEY,
+                        Map.of(
+                                "systemPromptL1", plan.systemPromptSummary(),
+                                "assistantDraft", assistantDraft,
+                                "attempt", attemptNumber));
+                scope.writeState(WorkflowStateKeys.PLAN_RESULT, plan);
+                scope.writeState(WorkflowStateKeys.PLAN_DRAFT, null);
+                PlanStageOutput output = new PlanStageOutput(plan, null, assistantDraft);
+                scope.writeState(WorkflowStateKeys.PLAN_STAGE_OUTPUT, output);
+                logger.info(
+                        "Plan attempt {} using forced skill sequence {}",
+                        attemptNumber,
+                        plan.orderedSkillIds());
+                observer.afterAgentInvocation(new AgentResponse(scope, "plan", Map.of("attempt", attemptNumber, "mode", "forced"), output));
             } catch (RuntimeException ex) {
                 observer.onStageError(ex);
                 throw ex;
@@ -492,7 +575,7 @@ public final class AgentService {
         }
     }
 
-    public record PlanOperatorOutput(
+    public record PlanStageOutput(
             PlanModels.PlanResult plan,
             LangChain4jLlmClient.CompletionResult completion,
             String assistantDraft) {}

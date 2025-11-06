@@ -108,12 +108,12 @@ UntypedAgent loop = AgenticServices.loopBuilder()
 ### フェーズ4：強制スキル指定の分岐を `conditionalBuilder()` へ（if/else の外出し）
 
 - **やること**
-  - [ ] `forcedSkillIds` の有無で **固定順プラン** / **通常プラン** を選択する分岐を **Plan ステージ外側**へ。
-  - [ ] `conditionalBuilder().when(..., fixedPlanner).otherwise(dynamicPlanner)` に置換。
+  - [x] `forcedSkillIds` の有無で **固定順プラン** / **通常プラン** を選択する分岐を **Plan ステージ外側**へ。
+  - [x] `conditionalBuilder().when(..., fixedPlanner).otherwise(dynamicPlanner)` に置換。
 
 - **受け入れ基準**
-  - [ ] PlanOperator 内の分岐ロジックが**簡素化**している。
-  - [ ] 入力差に応じて分岐ログが before/after に記録される。
+  - [x] PlanOperator 内の分岐ロジックが**簡素化**している。
+  - [x] 入力差に応じて分岐ログが before/after に記録される。
 
 ---
 
