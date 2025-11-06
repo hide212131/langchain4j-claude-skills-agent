@@ -1,7 +1,5 @@
 package io.github.hide212131.langchain4j.claude.skills.runtime.observability;
 
-import static io.github.hide212131.langchain4j.claude.skills.runtime.observability.WorkflowTelemetry.setGenAiAttributes;
-
 import dev.langchain4j.agentic.agent.AgentRequest;
 import dev.langchain4j.agentic.agent.AgentResponse;
 import dev.langchain4j.agentic.scope.AgenticScope;
@@ -89,31 +87,9 @@ public final class AgentWorkflowObserver {
 
     private void applyStageInputAttributes(String stage, Span span, AgenticScope scope) {
         switch (stage) {
-            case "plan" -> {
-                span.setAttribute("input", runRequest.goal());
-                span.setAttribute("workflow.dryRun", runRequest.dryRun());
-                setGenAiAttributes(span, runRequest.goal(), null);
-            }
-            case "act" -> {
-                PlanModels.PlanResult plan = readPlan(scope);
-                if (plan != null) {
-                    String skills = String.join(",", plan.orderedSkillIds());
-                    span.setAttribute("input", skills);
-                    setGenAiAttributes(span, skills, null);
-                }
-            }
-            case "reflect" -> {
-                DefaultInvoker.ActResult actResult = readAct(scope);
-                if (actResult != null) {
-                    String input = actResult.hasArtifact()
-                            ? actResult.finalArtifact().toString()
-                            : String.join(",", actResult.invokedSkills());
-                    if (!input.isBlank()) {
-                        span.setAttribute("input", input);
-                        setGenAiAttributes(span, input, null);
-                    }
-                }
-            }
+            case "plan" -> annotatePlanInput(span);
+            case "act" -> annotateActInput(span, scope);
+            case "reflect" -> annotateReflectInput(span, scope);
             default -> { /* no-op */ }
         }
     }
@@ -133,35 +109,40 @@ public final class AgentWorkflowObserver {
             List<String> skills = plan.orderedSkillIds();
             if (!skills.isEmpty()) {
                 String selected = String.join(",", skills);
-                span.setAttribute("plan.selectedSkills", selected);
-                span.setAttribute("plan.skillCount", skills.size());
+                span.setAttribute("workflow.plan.selected_skills", selected);
+                span.setAttribute("workflow.plan.skill_count", skills.size());
+            }
+            if (hasText(plan.systemPromptSummary())) {
+                span.setAttribute("workflow.plan.summary", plan.systemPromptSummary());
             }
         }
         LangChain4jLlmClient.CompletionResult draft = readPlanDraft(scope);
-        String draftText = draft != null && draft.content() != null
-                ? draft.content()
-                : runRequest.forcedSkillIds().isEmpty()
-                        ? ""
-                        : "Planner bypassed via forced skill sequence.";
-        span.setAttribute("output", draftText);
-        setGenAiAttributes(span, runRequest.goal(), draftText);
+        if (draft != null && hasText(draft.content())) {
+            span.setAttribute("workflow.plan.assistant_draft", draft.content());
+        } else if (!runRequest.forcedSkillIds().isEmpty()) {
+            span.setAttribute("workflow.plan.assistant_draft", "Planner bypassed via forced skill sequence.");
+        }
     }
 
     private void handleActSpan(Span span, AgenticScope scope) {
         DefaultInvoker.ActResult actResult = readAct(scope);
-        PlanModels.PlanResult plan = readPlan(scope);
-        String input = plan != null ? String.join(",", plan.orderedSkillIds()) : "";
         if (actResult == null) {
             return;
         }
         String invoked = String.join(",", actResult.invokedSkills());
-        span.setAttribute("act.invokedSkills", invoked);
-        span.setAttribute("act.skillCallCount", actResult.invokedSkills().size());
+        if (!invoked.isEmpty()) {
+            span.setAttribute("workflow.act.invoked_skills", invoked);
+            span.setAttribute("workflow.act.skill_call_count", actResult.invokedSkills().size());
+        }
+        if (actResult.hasArtifact()) {
+            span.setAttribute("workflow.act.artifact_path", actResult.finalArtifact().toString());
+        }
         String output = actResult.hasArtifact()
                 ? actResult.finalArtifact().toString()
                 : invoked;
-        span.setAttribute("output", output);
-        setGenAiAttributes(span, input, output);
+        if (hasText(output)) {
+            span.setAttribute("workflow.act.output", output);
+        }
     }
 
     private void handleReflectSpan(Span span, AgenticScope scope) {
@@ -170,10 +151,43 @@ public final class AgentWorkflowObserver {
             return;
         }
         String summary = evaluation.finalSummary();
-        span.setAttribute("reflect.needsRetry", evaluation.needsRetry());
-        span.setAttribute("reflect.success", evaluation.success());
-        span.setAttribute("output", summary == null ? "" : summary);
-        setGenAiAttributes(span, runRequest.goal(), summary);
+        span.setAttribute("workflow.reflect.needs_retry", evaluation.needsRetry());
+        span.setAttribute("workflow.reflect.success", evaluation.success());
+        if (hasText(summary)) {
+            span.setAttribute("workflow.reflect.summary", summary);
+        }
+    }
+
+    private void annotatePlanInput(Span span) {
+        span.setAttribute("workflow.plan.goal", runRequest.goal());
+        span.setAttribute("workflow.plan.dry_run", runRequest.dryRun());
+        if (!runRequest.forcedSkillIds().isEmpty()) {
+            span.setAttribute("workflow.plan.forced_skills", String.join(",", runRequest.forcedSkillIds()));
+            span.setAttribute("workflow.plan.forced_skill_count", runRequest.forcedSkillIds().size());
+        }
+    }
+
+    private void annotateActInput(Span span, AgenticScope scope) {
+        PlanModels.PlanResult plan = readPlan(scope);
+        if (plan == null || plan.orderedSkillIds().isEmpty()) {
+            return;
+        }
+        span.setAttribute("workflow.act.plan_skills", String.join(",", plan.orderedSkillIds()));
+        span.setAttribute("workflow.act.plan_skill_count", plan.orderedSkillIds().size());
+    }
+
+    private void annotateReflectInput(Span span, AgenticScope scope) {
+        DefaultInvoker.ActResult actResult = readAct(scope);
+        if (actResult == null) {
+            return;
+        }
+        if (!actResult.invokedSkills().isEmpty()) {
+            span.setAttribute("workflow.reflect.invoked_skills", String.join(",", actResult.invokedSkills()));
+            span.setAttribute("workflow.reflect.skill_call_count", actResult.invokedSkills().size());
+        }
+        if (actResult.hasArtifact()) {
+            span.setAttribute("workflow.reflect.input_artifact", actResult.finalArtifact().toString());
+        }
     }
 
     private PlanModels.PlanResult readPlan(AgenticScope scope) {
@@ -210,6 +224,10 @@ public final class AgentWorkflowObserver {
             return error.getClass().getSimpleName();
         }
         return message;
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private record StageContext(String stage, Span span, Scope scope) {}

@@ -1,7 +1,5 @@
 package io.github.hide212131.langchain4j.claude.skills.runtime.workflow;
 
-import static io.github.hide212131.langchain4j.claude.skills.runtime.observability.WorkflowTelemetry.setGenAiAttributes;
-
 import dev.langchain4j.agentic.Agent;
 import dev.langchain4j.agentic.AgenticServices;
 import dev.langchain4j.agentic.UntypedAgent;
@@ -14,6 +12,7 @@ import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogg
 import io.github.hide212131.langchain4j.claude.skills.infra.observability.ObservabilityConfig;
 import io.github.hide212131.langchain4j.claude.skills.infra.observability.WorkflowTracer;
 import io.github.hide212131.langchain4j.claude.skills.runtime.observability.AgentWorkflowObserver;
+import io.github.hide212131.langchain4j.claude.skills.runtime.observability.ExecutionTelemetryReporter;
 import io.github.hide212131.langchain4j.claude.skills.runtime.observability.InstrumentedChatModel;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.BlackboardStore;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.PlanCandidateStepsState;
@@ -35,7 +34,6 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect.D
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect.ReflectEvaluator;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.support.WorkflowFactory;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.WorkflowStateKeys;
-import io.opentelemetry.api.trace.Span;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -58,6 +56,7 @@ public final class AgentService {
     private final BlackboardStore blackboardStore;
     private final ReflectEvaluator evaluator;
     private final WorkflowTracer tracer;
+    private final ExecutionTelemetryReporter telemetryReporter;
 
     public static AgentService withDefaults(
             WorkflowFactory workflowFactory,
@@ -129,22 +128,21 @@ public final class AgentService {
         this.evaluator = Objects.requireNonNull(evaluator, "evaluator");
         this.planner = Objects.requireNonNull(planner, "planner");
         this.tracer = Objects.requireNonNull(tracer, "tracer");
+        this.telemetryReporter = new ExecutionTelemetryReporter(this.tracer, this.logger);
     }
 
     public ExecutionResult run(AgentRunRequest request) {
         Objects.requireNonNull(request, "request");
 
-        return tracer.trace("agent.execution", Map.ofEntries(
-                Map.entry("goal", request.goal()),
-                Map.entry("input", request.goal()),
-                Map.entry("dryRun", request.dryRun()),
-                Map.entry("forcedSkillIds", request.forcedSkillIds().stream()
-                        .filter(Objects::nonNull)
-                        .collect(java.util.stream.Collectors.joining(",")))),
+    return tracer.trace("agent.execution", Map.ofEntries(
+        Map.entry("workflow.execution.goal", request.goal()),
+        Map.entry("workflow.execution.dry_run", request.dryRun()),
+        Map.entry("workflow.execution.forced_skills", request.forcedSkillIds().stream()
+            .filter(Objects::nonNull)
+            .collect(java.util.stream.Collectors.joining(",")))),
                 () -> {
                     blackboardStore.clear();
                     List<StageVisit> stageVisits = new ArrayList<>();
-                    Span.current().setAttribute("input", request.goal());
                     int maxAttempts = 2;
 
                     AtomicReference<AttemptSnapshot> lastSnapshot = new AtomicReference<>();
@@ -208,62 +206,20 @@ public final class AgentService {
         ReflectEvaluator.EvaluationResult finalEvaluation = snapshot != null ? snapshot.evaluation() : null;
 
         LangChain4jLlmClient.ProviderMetrics metricsSnapshot = llmClient.metrics();
-        if (finalPlanCompletion != null) {
-            logger.info(
-                    "Assistant response: {} (tokens in/out={}, durationMs={})",
-                    finalPlanCompletion.content(),
-                    finalPlanCompletion.tokenUsage(),
-                    finalPlanCompletion.durationMs());
-        }
-        if (metricsSnapshot.callCount() > 0) {
-            logger.info(
-                    "LLM usage summary: calls={}, tokens_in={}, tokens_out={}, durationMs={}",
-                    metricsSnapshot.callCount(),
-                    metricsSnapshot.totalInputTokens(),
-                    metricsSnapshot.totalOutputTokens(),
-                    metricsSnapshot.totalDurationMs());
-        }
-        if (finalActResult != null) {
-            logger.info("Act stage invoked skills: {}", finalActResult.invokedSkills());
-            if (finalActResult.hasArtifact()) {
-                logger.info("Final artefact generated at {}", finalActResult.finalArtifact());
-            }
-        }
-        if (finalEvaluation != null) {
-            logger.info("Reflect summary: {}", finalEvaluation.finalSummary());
-            if (finalEvaluation.needsRetry()) {
-                logger.warn("Reflect could not satisfy requirements within retry budget.");
-            }
+        if (finalEvaluation != null && finalEvaluation.needsRetry()) {
+            logger.warn("Reflect could not satisfy requirements within retry budget.");
         }
 
-        List<StageVisit> visitsSnapshot = List.copyOf(stageVisits);
+    List<StageVisit> visitsSnapshot = List.copyOf(stageVisits);
 
-        tracer.addEvent("execution.completed", Map.of(
-                "stageVisits", String.valueOf(visitsSnapshot.size()),
-                "llmCalls", String.valueOf(metricsSnapshot.callCount()),
-                "totalTokens", String.valueOf(metricsSnapshot.totalTokenCount()),
-                "inputTokens", String.valueOf(metricsSnapshot.totalInputTokens()),
-                "outputTokens", String.valueOf(metricsSnapshot.totalOutputTokens()),
-                "totalDurationMs", String.valueOf(metricsSnapshot.totalDurationMs())));
-
-        if (finalActResult != null) {
-            tracer.addEvent("execution.artifacts", Map.of(
-                    "invokedSkills", String.join(",", finalActResult.invokedSkills()),
-                    "hasArtifact", String.valueOf(finalActResult.hasArtifact()),
-                    "artifactPath",
-                    finalActResult.hasArtifact() ? finalActResult.finalArtifact().toString() : ""));
-        }
-
-        if (finalEvaluation != null) {
-            Span.current().setAttribute("output", finalEvaluation.finalSummary());
-            setGenAiAttributes(Span.current(), request.goal(), finalEvaluation.finalSummary());
-        } else if (finalActResult != null && finalActResult.hasArtifact()) {
-            Span.current().setAttribute("output", finalActResult.finalArtifact().toString());
-            setGenAiAttributes(Span.current(), request.goal(), finalActResult.finalArtifact().toString());
-        } else if (finalPlanCompletion != null && finalPlanCompletion.content() != null) {
-            Span.current().setAttribute("output", finalPlanCompletion.content());
-            setGenAiAttributes(Span.current(), request.goal(), finalPlanCompletion.content());
-        }
+        telemetryReporter.report(
+                request,
+                finalPlan,
+                finalPlanCompletion,
+                finalActResult,
+                finalEvaluation,
+        metricsSnapshot,
+        visitsSnapshot.size());
 
         return new ExecutionResult(
                 visitsSnapshot,

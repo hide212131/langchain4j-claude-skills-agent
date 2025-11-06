@@ -160,12 +160,12 @@ UntypedAgent workflow = AgenticServices.sequenceBuilder()
 ### フェーズ7：残置観測の重複排除・チューニング
 
 - **やること**
-  - [ ] モデルログ（`.logRequests/.logResponses`）、`ChatModelListener`、before/after の**役割が重複**している箇所を整理。
-  - [ ] トークン/レイテンシ/エラー指標は**一元出力**（ダッシュボード要件に合わせて）に集約。
+  - [x] モデルログ（`.logRequests/.logResponses`）、`ChatModelListener`、before/after の**役割が重複**している箇所を整理。
+  - [x] トークン/レイテンシ/エラー指標は**一元出力**（ダッシュボード要件に合わせて）に集約。
 
 - **受け入れ基準**
-  - [ ] ログの冗長がなく、**粒度と責務の境界**が明確。
-  - [ ] 観測の欠落がない（比較チェック）。
+  - [x] ログの冗長がなく、**粒度と責務の境界**が明確。
+  - [x] 観測の欠落がない（比較チェック）。
 
 ---
 

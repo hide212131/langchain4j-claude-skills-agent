@@ -139,8 +139,6 @@ public final class LangChain4jLlmClient {
             return OpenAiChatModel.builder()
                     .apiKey(config.apiKey)
                     .modelName(config.modelName)
-                    .logRequests(true)
-                    .logResponses(true)
                     .build();
         }
     }
