@@ -46,16 +46,16 @@ https://docs.langchain4j.dev/tutorials/observability
 ### フェーズ2：Plan/Act/Reflect をサブエージェント化（`agentAction` の置換）
 
 - **やること**
-  - [ ] **Non-AI エージェント**3種を新設：
+  - [x] **Non-AI エージェント**3種を新設：
     * `PlanOperator`：`planner.plan(...)` / `planWithFixedOrder(...)` を実行し `plan` を出力キーで保存。
     * `ActOperator`：`invoker.invoke(...)` を実行し成果物/実行スキルを保存。
     * `ReflectOperator`：`evaluator.evaluate(...)` を実行し `needsRetry` とサマリを保存。
   - [ ] （任意）Plan 補助の LLM 呼び出しがある場合は **Typed LLM エージェント**（例：`PlanDraftAgent`）を追加し、`assistantDraft` を `outputKey` で保存。
-  - [ ] 既存の **巨大 `agentAction` 3つを撤去**し、上記サブエージェントを **`sequenceBuilder`** で直列接続。
+  - [x] 既存の **巨大 `agentAction` 3つを撤去**し、上記サブエージェントを **`sequenceBuilder`** で直列接続。
 
 - **受け入れ基準**
-  - [ ] `AtomicReference` と `scope.write/readState` の**散在**が解消（必要箇所のみ残る）。
-  - [ ] ステージ間の契約（入出力）が**型で表現**される。
+  - [x] `AtomicReference` と `scope.write/readState` の**散在**が解消（必要箇所のみ残る）。
+  - [x] ステージ間の契約（入出力）が**型で表現**される。
 
 **サンプル（概念）**
 

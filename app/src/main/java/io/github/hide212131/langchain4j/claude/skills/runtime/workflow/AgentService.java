@@ -155,9 +155,20 @@ public final class AgentService {
                                 tracer,
                                 request,
                                 attemptNumber);
-                        PlanStageAgent planAgent = new PlanStageAgent(this, request, attemptNumber, maxAttempts, observer);
-                        ActStageAgent actAgent = new ActStageAgent(this, observer);
-                        ReflectStageAgent reflectAgent = new ReflectStageAgent(this, attemptNumber, maxAttempts, observer);
+                        PlanOperator planAgent = new PlanOperator(
+                                planner,
+                                llmClient,
+                                logger,
+                                request,
+                                attemptNumber,
+                                maxAttempts,
+                                observer);
+                        ActOperator actAgent = new ActOperator(invoker, observer);
+                        ReflectOperator reflectAgent = new ReflectOperator(
+                                evaluator,
+                                attemptNumber,
+                                maxAttempts,
+                                observer);
 
                         UntypedAgent workflow = workflowFactory.createWorkflow(builder -> {
                             builder.name("skills-plan-act-reflect");
@@ -263,107 +274,7 @@ public final class AgentService {
         return new AttemptSnapshot(plan, planDraft, actResult, evaluation, observer.visits());
     }
 
-    private void runPlanStage(AgenticScope scope, AgentRunRequest request, int attemptNumber, int maxAttempts, AgentWorkflowObserver observer) {
-        AgentRequest stageRequest = new AgentRequest(scope, "plan", Map.of());
-        observer.beforeAgentInvocation(stageRequest);
-        try {
-            writePlanGoal(scope, request.goal());
-            scope.writeState(
-                    PlanInputsState.KEY,
-                    Map.of(
-                            "goal", request.goal(),
-                            "mode", request.dryRun() ? "dry-run" : "live",
-                            "attempt", attemptNumber));
-            scope.writeState(
-                    PlanConstraintsState.KEY,
-                    Map.of(
-                            "tokenBudget", 0,
-                            "maxToolCalls", 3,
-                            "maxAttempts", maxAttempts,
-                            "attempt", attemptNumber));
-            List<String> forcedSkillIds = request.forcedSkillIds();
-            boolean hasForcedSkillIds = !forcedSkillIds.isEmpty();
-            PlanModels.PlanResult plan = hasForcedSkillIds
-                    ? planner.planWithFixedOrder(request.goal(), forcedSkillIds)
-                    : planner.plan(request.goal());
-            scope.writeState(
-                    PlanCandidateStepsState.KEY,
-                    plan.steps().stream()
-                            .map(step -> Map.of(
-                                    "skillId", step.skillId(),
-                                    "name", step.name(),
-                                    "description", step.description(),
-                                    "keywords", step.keywords(),
-                                    "skillRoot", step.skillRoot().toString()))
-                            .toList());
-            LangChain4jLlmClient.CompletionResult completion = null;
-            String assistantDraft;
-            if (hasForcedSkillIds) {
-                assistantDraft = "Planner bypassed via forced skill sequence.";
-                logger.info(
-                        "Plan attempt {} using forced skill sequence {}",
-                        attemptNumber,
-                        plan.orderedSkillIds());
-            } else {
-                completion = llmClient.complete(request.goal());
-                assistantDraft = completion != null ? completion.content() : "";
-                logger.info(
-                        "Plan attempt {} candidate steps: {}",
-                        attemptNumber,
-                        plan.orderedSkillIds());
-            }
-            scope.writeState(
-                    PlanEvaluationCriteriaState.KEY,
-                    Map.of(
-                            "systemPromptL1", plan.systemPromptSummary(),
-                            "assistantDraft", assistantDraft,
-                            "attempt", attemptNumber));
-            scope.writeState(WorkflowStateKeys.PLAN_RESULT, plan);
-            scope.writeState(WorkflowStateKeys.PLAN_DRAFT, completion);
-        } catch (RuntimeException ex) {
-            observer.onStageError(ex);
-            throw ex;
-        }
-        observer.afterAgentInvocation(new AgentResponse(scope, "plan", Map.of(), null));
-    }
-
-    private void runActStage(AgenticScope scope, AgentWorkflowObserver observer) {
-        AgentRequest stageRequest = new AgentRequest(scope, "act", Map.of());
-        observer.beforeAgentInvocation(stageRequest);
-        try {
-            PlanModels.PlanResult plan = readStateOrNull(scope, WorkflowStateKeys.PLAN_RESULT, PlanModels.PlanResult.class);
-            if (plan == null) {
-                throw new IllegalStateException("Plan stage must complete before Act");
-            }
-            ActResult result = invoker.invoke(scope, plan);
-            scope.writeState(WorkflowStateKeys.ACT_RESULT, result);
-        } catch (RuntimeException ex) {
-            observer.onStageError(ex);
-            throw ex;
-        }
-        observer.afterAgentInvocation(new AgentResponse(scope, "act", Map.of(), null));
-    }
-
-    private void runReflectStage(AgenticScope scope, int attemptNumber, int maxAttempts, AgentWorkflowObserver observer) {
-        AgentRequest stageRequest = new AgentRequest(scope, "reflect", Map.of());
-        observer.beforeAgentInvocation(stageRequest);
-        try {
-            PlanModels.PlanResult plan = readStateOrNull(scope, WorkflowStateKeys.PLAN_RESULT, PlanModels.PlanResult.class);
-            if (plan == null) {
-                throw new IllegalStateException("Plan stage must complete before Reflect");
-            }
-            ActResult actResult = readStateOrNull(scope, WorkflowStateKeys.ACT_RESULT, ActResult.class);
-            ReflectEvaluator.EvaluationResult evaluation =
-                    evaluator.evaluate(scope, plan, actResult, attemptNumber, maxAttempts);
-            scope.writeState(WorkflowStateKeys.REFLECT_RESULT, evaluation);
-        } catch (RuntimeException ex) {
-            observer.onStageError(ex);
-            throw ex;
-        }
-        observer.afterAgentInvocation(new AgentResponse(scope, "reflect", Map.of(), null));
-    }
-
-    private <T> T readStateOrNull(AgenticScope scope, String key, Class<T> type) {
+    private static <T> T readStateOrNull(AgenticScope scope, String key, Class<T> type) {
         if (scope == null || !scope.hasState(key)) {
             return null;
         }
@@ -377,20 +288,26 @@ public final class AgentService {
         return type.cast(value);
     }
 
-    public static final class PlanStageAgent {
-        private final AgentService service;
+    public static final class PlanOperator {
+        private final AgenticPlanner planner;
+        private final LangChain4jLlmClient llmClient;
+        private final WorkflowLogger logger;
         private final AgentRunRequest request;
         private final int attemptNumber;
         private final int maxAttempts;
         private final AgentWorkflowObserver observer;
 
-        PlanStageAgent(
-                AgentService service,
+        PlanOperator(
+                AgenticPlanner planner,
+                LangChain4jLlmClient llmClient,
+                WorkflowLogger logger,
                 AgentRunRequest request,
                 int attemptNumber,
                 int maxAttempts,
                 AgentWorkflowObserver observer) {
-            this.service = service;
+            this.planner = planner;
+            this.llmClient = llmClient;
+            this.logger = logger;
             this.request = request;
             this.attemptNumber = attemptNumber;
             this.maxAttempts = maxAttempts;
@@ -399,37 +316,111 @@ public final class AgentService {
 
         @Agent(name = "plan")
         public void run(AgenticScope scope) {
-            service.runPlanStage(scope, request, attemptNumber, maxAttempts, observer);
+            observer.beforeAgentInvocation(new AgentRequest(scope, "plan", Map.of("attempt", attemptNumber)));
+            try {
+                writePlanGoal(scope, request.goal());
+                scope.writeState(
+                        PlanInputsState.KEY,
+                        Map.of(
+                                "goal", request.goal(),
+                                "mode", request.dryRun() ? "dry-run" : "live",
+                                "attempt", attemptNumber));
+                scope.writeState(
+                        PlanConstraintsState.KEY,
+                        Map.of(
+                                "tokenBudget", 0,
+                                "maxToolCalls", 3,
+                                "maxAttempts", maxAttempts,
+                                "attempt", attemptNumber));
+                List<String> forcedSkillIds = request.forcedSkillIds();
+                boolean hasForcedSkillIds = !forcedSkillIds.isEmpty();
+                PlanModels.PlanResult plan = hasForcedSkillIds
+                        ? planner.planWithFixedOrder(request.goal(), forcedSkillIds)
+                        : planner.plan(request.goal());
+                scope.writeState(
+                        PlanCandidateStepsState.KEY,
+                        plan.steps().stream()
+                                .map(step -> Map.of(
+                                        "skillId", step.skillId(),
+                                        "name", step.name(),
+                                        "description", step.description(),
+                                        "keywords", step.keywords(),
+                                        "skillRoot", step.skillRoot().toString()))
+                                .toList());
+                LangChain4jLlmClient.CompletionResult completion = null;
+                String assistantDraft;
+                if (hasForcedSkillIds) {
+                    assistantDraft = "Planner bypassed via forced skill sequence.";
+                    logger.info(
+                            "Plan attempt {} using forced skill sequence {}",
+                            attemptNumber,
+                            plan.orderedSkillIds());
+                } else {
+                    completion = llmClient.complete(request.goal());
+                    assistantDraft = completion != null ? completion.content() : "";
+                    logger.info(
+                            "Plan attempt {} candidate steps: {}",
+                            attemptNumber,
+                            plan.orderedSkillIds());
+                }
+                scope.writeState(
+                        PlanEvaluationCriteriaState.KEY,
+                        Map.of(
+                                "systemPromptL1", plan.systemPromptSummary(),
+                                "assistantDraft", assistantDraft,
+                                "attempt", attemptNumber));
+                scope.writeState(WorkflowStateKeys.PLAN_RESULT, plan);
+                scope.writeState(WorkflowStateKeys.PLAN_DRAFT, completion);
+                PlanOperatorOutput output = new PlanOperatorOutput(plan, completion, assistantDraft);
+                scope.writeState(WorkflowStateKeys.PLAN_STAGE_OUTPUT, output);
+                observer.afterAgentInvocation(new AgentResponse(scope, "plan", Map.of("attempt", attemptNumber), output));
+            } catch (RuntimeException ex) {
+                observer.onStageError(ex);
+                throw ex;
+            }
         }
     }
 
-    public static final class ActStageAgent {
-        private final AgentService service;
+    public static final class ActOperator {
+        private final DefaultInvoker invoker;
         private final AgentWorkflowObserver observer;
 
-        ActStageAgent(AgentService service, AgentWorkflowObserver observer) {
-            this.service = service;
+        ActOperator(DefaultInvoker invoker, AgentWorkflowObserver observer) {
+            this.invoker = invoker;
             this.observer = observer;
         }
 
         @Agent(name = "act")
         public void run(AgenticScope scope) {
-            service.runActStage(scope, observer);
+            observer.beforeAgentInvocation(new AgentRequest(scope, "act", Map.of()));
+            try {
+                PlanModels.PlanResult plan = readStateOrNull(scope, WorkflowStateKeys.PLAN_RESULT, PlanModels.PlanResult.class);
+                if (plan == null) {
+                    throw new IllegalStateException("Plan stage must complete before Act");
+                }
+                ActResult result = invoker.invoke(scope, plan);
+                scope.writeState(WorkflowStateKeys.ACT_RESULT, result);
+                scope.writeState(WorkflowStateKeys.ACT_STAGE_OUTPUT, result);
+                observer.afterAgentInvocation(new AgentResponse(scope, "act", Map.of(), result));
+            } catch (RuntimeException ex) {
+                observer.onStageError(ex);
+                throw ex;
+            }
         }
     }
 
-    public static final class ReflectStageAgent {
-        private final AgentService service;
+    public static final class ReflectOperator {
+        private final ReflectEvaluator evaluator;
         private final int attemptNumber;
         private final int maxAttempts;
         private final AgentWorkflowObserver observer;
 
-        ReflectStageAgent(
-                AgentService service,
+        ReflectOperator(
+                ReflectEvaluator evaluator,
                 int attemptNumber,
                 int maxAttempts,
                 AgentWorkflowObserver observer) {
-            this.service = service;
+            this.evaluator = evaluator;
             this.attemptNumber = attemptNumber;
             this.maxAttempts = maxAttempts;
             this.observer = observer;
@@ -437,9 +428,29 @@ public final class AgentService {
 
         @Agent(name = "reflect")
         public void run(AgenticScope scope) {
-            service.runReflectStage(scope, attemptNumber, maxAttempts, observer);
+            observer.beforeAgentInvocation(new AgentRequest(scope, "reflect", Map.of("attempt", attemptNumber)));
+            try {
+                PlanModels.PlanResult plan = readStateOrNull(scope, WorkflowStateKeys.PLAN_RESULT, PlanModels.PlanResult.class);
+                if (plan == null) {
+                    throw new IllegalStateException("Plan stage must complete before Reflect");
+                }
+                ActResult actResult = readStateOrNull(scope, WorkflowStateKeys.ACT_RESULT, ActResult.class);
+                ReflectEvaluator.EvaluationResult evaluation =
+                        evaluator.evaluate(scope, plan, actResult, attemptNumber, maxAttempts);
+                scope.writeState(WorkflowStateKeys.REFLECT_RESULT, evaluation);
+                scope.writeState(WorkflowStateKeys.REFLECT_STAGE_OUTPUT, evaluation);
+                observer.afterAgentInvocation(new AgentResponse(scope, "reflect", Map.of("attempt", attemptNumber), evaluation));
+            } catch (RuntimeException ex) {
+                observer.onStageError(ex);
+                throw ex;
+            }
         }
     }
+
+    public record PlanOperatorOutput(
+            PlanModels.PlanResult plan,
+            LangChain4jLlmClient.CompletionResult completion,
+            String assistantDraft) {}
 
     private record AttemptSnapshot(
             PlanModels.PlanResult plan,
@@ -453,7 +464,7 @@ public final class AgentService {
         }
     }
 
-    private void writePlanGoal(AgenticScope scope, String goal) {
+    private static void writePlanGoal(AgenticScope scope, String goal) {
         if (goal == null || goal.isBlank()) {
             throw new IllegalArgumentException("goal must be provided");
         }

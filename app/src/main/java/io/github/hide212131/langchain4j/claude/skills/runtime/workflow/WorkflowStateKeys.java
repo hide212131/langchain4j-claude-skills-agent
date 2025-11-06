@@ -12,4 +12,7 @@ public final class WorkflowStateKeys {
     public static final String PLAN_DRAFT = "workflow.plan.draft";
     public static final String ACT_RESULT = "workflow.act.result";
     public static final String REFLECT_RESULT = "workflow.reflect.result";
+    public static final String PLAN_STAGE_OUTPUT = "workflow.plan.output";
+    public static final String ACT_STAGE_OUTPUT = "workflow.act.output";
+    public static final String REFLECT_STAGE_OUTPUT = "workflow.reflect.output";
 }
