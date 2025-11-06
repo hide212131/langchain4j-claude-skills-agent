@@ -147,13 +147,13 @@ UntypedAgent workflow = AgenticServices.sequenceBuilder()
 ### フェーズ6：State の型安全化＋構造化出力（壊れにくさとテスト容易性）
 
 - **やること**
-  - [ ] `PlanConstraints` 等の `Map` を **record/POJO** に置換。
-  - [ ] LLM 応答で配列/表構造を返す箇所は **構造化出力（JSON Schema / JSON モード）**で POJO に直接マッピング。
-  - [ ] State アクセスは `AgentState` のような薄いラッパ導入で **キー定数の重複**を排除。
+  - [x] `PlanConstraints` 等の `Map` を **record/POJO** に置換。
+  - [x] LLM 応答で配列/表構造を返す箇所は **構造化出力（JSON Schema / JSON モード）**で POJO に直接マッピング。
+  - [x] State アクセスは `AgentState` のような薄いラッパ導入で **キー定数の重複**を排除。
 
 - **受け入れ基準**
-  - [ ] 主要 State は**コンパイル時**に整合性チェック可能。
-  - [ ] 変換目的の `agentAction` が**残っていない**。
+  - [x] 主要 State は**コンパイル時**に整合性チェック可能。
+  - [x] 変換目的の `agentAction` が**残っていない**。
 
 ---
 

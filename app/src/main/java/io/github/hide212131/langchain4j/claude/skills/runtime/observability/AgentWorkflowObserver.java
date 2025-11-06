@@ -177,29 +177,29 @@ public final class AgentWorkflowObserver {
     }
 
     private PlanModels.PlanResult readPlan(AgenticScope scope) {
-        if (scope != null && scope.hasState(WorkflowStateKeys.PLAN_RESULT)) {
-            return (PlanModels.PlanResult) scope.readState(WorkflowStateKeys.PLAN_RESULT);
+        if (scope != null && WorkflowStateKeys.PLAN_RESULT.exists(scope)) {
+            return WorkflowStateKeys.PLAN_RESULT.readOrNull(scope);
         }
         return null;
     }
 
     private LangChain4jLlmClient.CompletionResult readPlanDraft(AgenticScope scope) {
-        if (scope != null && scope.hasState(WorkflowStateKeys.PLAN_DRAFT)) {
-            return (LangChain4jLlmClient.CompletionResult) scope.readState(WorkflowStateKeys.PLAN_DRAFT);
+        if (scope != null && WorkflowStateKeys.PLAN_DRAFT.exists(scope)) {
+            return WorkflowStateKeys.PLAN_DRAFT.readOrNull(scope);
         }
         return null;
     }
 
     private DefaultInvoker.ActResult readAct(AgenticScope scope) {
-        if (scope != null && scope.hasState(WorkflowStateKeys.ACT_RESULT)) {
-            return (DefaultInvoker.ActResult) scope.readState(WorkflowStateKeys.ACT_RESULT);
+        if (scope != null && WorkflowStateKeys.ACT_RESULT.exists(scope)) {
+            return WorkflowStateKeys.ACT_RESULT.readOrNull(scope);
         }
         return null;
     }
 
     private ReflectEvaluator.EvaluationResult readEvaluation(AgenticScope scope) {
-        if (scope != null && scope.hasState(WorkflowStateKeys.REFLECT_RESULT)) {
-            return (ReflectEvaluator.EvaluationResult) scope.readState(WorkflowStateKeys.REFLECT_RESULT);
+        if (scope != null && WorkflowStateKeys.REFLECT_RESULT.exists(scope)) {
+            return WorkflowStateKeys.REFLECT_RESULT.readOrNull(scope);
         }
         return null;
     }
