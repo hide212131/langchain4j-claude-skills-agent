@@ -120,20 +120,26 @@ UntypedAgent loop = AgenticServices.loopBuilder()
 ### フェーズ5：最終出力を `output(...)` に一元化（末尾の整形撤去）
 
 - **やること**
-  - [ ] `sequenceBuilder(...).output(scope -> new ExecutionResult(...))` に集約。
-  - [ ] `plan/act/evaluation/metrics` の組み立ては**ここだけ**で実施。末尾の重複整形を**撤去**。
+  - [x] `sequenceBuilder(...).output(scope -> new ExecutionResult(...))` に集約。
+  - [x] `plan/act/evaluation/metrics` の組み立ては**ここだけ**で実施。末尾の重複整形を**撤去**。
 
 - **受け入れ基準**
-  - [ ] 外部公開シグネチャは不変。
-  - [ ] `run(...)` は**配線コードのみ**に近づく。
+  - [x] 外部公開シグネチャは不変。
+  - [x] `run(...)` は**配線コードのみ**に近づく。
 
 ```java
+AtomicReference<AttemptSnapshot> lastAttempt = new AtomicReference<>();
+UntypedAgent loop = AgenticServices.loopBuilder()
+    .subAgents(attemptAgent)
+    .maxIterations(maxAttempts)
+    .exitCondition((scope, iteration) -> shouldExit(lastAttempt.get()))
+    .output(scope -> lastAttempt.get())
+    .build();
+
 UntypedAgent workflow = AgenticServices.sequenceBuilder()
-  .subAgents(loop)
-  .beforeAgentInvocation(obs::onBefore)
-  .afterAgentInvocation(obs::onAfter)
-  .output(scope -> assembleExecutionResult(scope))
-  .build();
+    .subAgents(loop)
+    .output(scope -> assembleExecutionResult(request, stageVisits, lastAttempt))
+    .build();
 ```
 
 ---

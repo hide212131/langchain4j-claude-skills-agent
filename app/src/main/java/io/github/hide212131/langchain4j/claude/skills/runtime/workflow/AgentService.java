@@ -145,10 +145,6 @@ public final class AgentService {
                     blackboardStore.clear();
                     List<StageVisit> stageVisits = new ArrayList<>();
                     Span.current().setAttribute("input", request.goal());
-                    PlanModels.PlanResult finalPlan = null;
-                    LangChain4jLlmClient.CompletionResult finalPlanCompletion = null;
-                    ActResult finalActResult = null;
-                    ReflectEvaluator.EvaluationResult finalEvaluation = null;
                     int maxAttempts = 2;
 
                     AtomicReference<AttemptSnapshot> lastSnapshot = new AtomicReference<>();
@@ -166,78 +162,13 @@ public final class AgentService {
                             .output(scope -> lastSnapshot.get())
                             .build();
 
-                    AttemptSnapshot snapshot =
-                            (AttemptSnapshot) workflow.invoke(Map.of("goal", request.goal()));
+                    UntypedAgent executionWorkflow = AgenticServices.sequenceBuilder()
+                            .name("skills-plan-act-reflect-root")
+                            .subAgents(workflow)
+                            .output(scope -> assembleExecutionResult(request, stageVisits, lastSnapshot))
+                            .build();
 
-                    finalPlan = snapshot.plan();
-                    finalPlanCompletion = snapshot.planCompletion();
-                    finalActResult = snapshot.actResult();
-                    finalEvaluation = snapshot.evaluation();
-
-                    LangChain4jLlmClient.ProviderMetrics metricsSnapshot = llmClient.metrics();
-                    if (finalPlanCompletion != null) {
-                        logger.info(
-                                "Assistant response: {} (tokens in/out={}, durationMs={})",
-                                finalPlanCompletion.content(),
-                                finalPlanCompletion.tokenUsage(),
-                                finalPlanCompletion.durationMs());
-                    }
-                    if (metricsSnapshot.callCount() > 0) {
-                        logger.info(
-                                "LLM usage summary: calls={}, tokens_in={}, tokens_out={}, durationMs={}",
-                                metricsSnapshot.callCount(),
-                                metricsSnapshot.totalInputTokens(),
-                                metricsSnapshot.totalOutputTokens(),
-                                metricsSnapshot.totalDurationMs());
-                    }
-                    if (finalActResult != null) {
-                        logger.info("Act stage invoked skills: {}", finalActResult.invokedSkills());
-                        if (finalActResult.hasArtifact()) {
-                            logger.info("Final artefact generated at {}", finalActResult.finalArtifact());
-                        }
-                    }
-                    if (finalEvaluation != null) {
-                        logger.info("Reflect summary: {}", finalEvaluation.finalSummary());
-                        if (finalEvaluation.needsRetry()) {
-                            logger.warn("Reflect could not satisfy requirements within retry budget.");
-                        }
-                    }
-
-                    tracer.addEvent("execution.completed", Map.of(
-                            "stageVisits", String.valueOf(stageVisits.size()),
-                            "llmCalls", String.valueOf(metricsSnapshot.callCount()),
-                            "totalTokens", String.valueOf(metricsSnapshot.totalTokenCount()),
-                            "inputTokens", String.valueOf(metricsSnapshot.totalInputTokens()),
-                            "outputTokens", String.valueOf(metricsSnapshot.totalOutputTokens()),
-                            "totalDurationMs", String.valueOf(metricsSnapshot.totalDurationMs())));
-
-                    if (finalActResult != null) {
-                        tracer.addEvent("execution.artifacts", Map.of(
-                                "invokedSkills", String.join(",", finalActResult.invokedSkills()),
-                                "hasArtifact", String.valueOf(finalActResult.hasArtifact()),
-                                "artifactPath",
-                                finalActResult.hasArtifact() ? finalActResult.finalArtifact().toString() : ""));
-                    }
-
-                    if (finalEvaluation != null) {
-                        Span.current().setAttribute("output", finalEvaluation.finalSummary());
-                        setGenAiAttributes(Span.current(), request.goal(), finalEvaluation.finalSummary());
-                    } else if (finalActResult != null && finalActResult.hasArtifact()) {
-                        Span.current().setAttribute("output", finalActResult.finalArtifact().toString());
-                        setGenAiAttributes(Span.current(), request.goal(), finalActResult.finalArtifact().toString());
-                    } else if (finalPlanCompletion != null && finalPlanCompletion.content() != null) {
-                        Span.current().setAttribute("output", finalPlanCompletion.content());
-                        setGenAiAttributes(Span.current(), request.goal(), finalPlanCompletion.content());
-                    }
-
-                    return new ExecutionResult(
-                            List.copyOf(stageVisits),
-                            finalPlan,
-                            finalPlanCompletion,
-                            metricsSnapshot,
-                            finalActResult,
-                            finalEvaluation,
-                            blackboardStore.snapshot());
+                    return (ExecutionResult) executionWorkflow.invoke(Map.of("goal", request.goal()));
                 });
     }
 
@@ -271,6 +202,86 @@ public final class AgentService {
         }
         ReflectEvaluator.EvaluationResult evaluation = snapshot.evaluation();
         return evaluation == null || !evaluation.needsRetry();
+    }
+
+    private ExecutionResult assembleExecutionResult(
+            AgentRunRequest request,
+            List<StageVisit> stageVisits,
+            AtomicReference<AttemptSnapshot> lastSnapshot) {
+
+        AttemptSnapshot snapshot = lastSnapshot.get();
+        PlanModels.PlanResult finalPlan = snapshot != null ? snapshot.plan() : null;
+        LangChain4jLlmClient.CompletionResult finalPlanCompletion =
+                snapshot != null ? snapshot.planCompletion() : null;
+        ActResult finalActResult = snapshot != null ? snapshot.actResult() : null;
+        ReflectEvaluator.EvaluationResult finalEvaluation = snapshot != null ? snapshot.evaluation() : null;
+
+        LangChain4jLlmClient.ProviderMetrics metricsSnapshot = llmClient.metrics();
+        if (finalPlanCompletion != null) {
+            logger.info(
+                    "Assistant response: {} (tokens in/out={}, durationMs={})",
+                    finalPlanCompletion.content(),
+                    finalPlanCompletion.tokenUsage(),
+                    finalPlanCompletion.durationMs());
+        }
+        if (metricsSnapshot.callCount() > 0) {
+            logger.info(
+                    "LLM usage summary: calls={}, tokens_in={}, tokens_out={}, durationMs={}",
+                    metricsSnapshot.callCount(),
+                    metricsSnapshot.totalInputTokens(),
+                    metricsSnapshot.totalOutputTokens(),
+                    metricsSnapshot.totalDurationMs());
+        }
+        if (finalActResult != null) {
+            logger.info("Act stage invoked skills: {}", finalActResult.invokedSkills());
+            if (finalActResult.hasArtifact()) {
+                logger.info("Final artefact generated at {}", finalActResult.finalArtifact());
+            }
+        }
+        if (finalEvaluation != null) {
+            logger.info("Reflect summary: {}", finalEvaluation.finalSummary());
+            if (finalEvaluation.needsRetry()) {
+                logger.warn("Reflect could not satisfy requirements within retry budget.");
+            }
+        }
+
+        List<StageVisit> visitsSnapshot = List.copyOf(stageVisits);
+
+        tracer.addEvent("execution.completed", Map.of(
+                "stageVisits", String.valueOf(visitsSnapshot.size()),
+                "llmCalls", String.valueOf(metricsSnapshot.callCount()),
+                "totalTokens", String.valueOf(metricsSnapshot.totalTokenCount()),
+                "inputTokens", String.valueOf(metricsSnapshot.totalInputTokens()),
+                "outputTokens", String.valueOf(metricsSnapshot.totalOutputTokens()),
+                "totalDurationMs", String.valueOf(metricsSnapshot.totalDurationMs())));
+
+        if (finalActResult != null) {
+            tracer.addEvent("execution.artifacts", Map.of(
+                    "invokedSkills", String.join(",", finalActResult.invokedSkills()),
+                    "hasArtifact", String.valueOf(finalActResult.hasArtifact()),
+                    "artifactPath",
+                    finalActResult.hasArtifact() ? finalActResult.finalArtifact().toString() : ""));
+        }
+
+        if (finalEvaluation != null) {
+            Span.current().setAttribute("output", finalEvaluation.finalSummary());
+            setGenAiAttributes(Span.current(), request.goal(), finalEvaluation.finalSummary());
+        } else if (finalActResult != null && finalActResult.hasArtifact()) {
+            Span.current().setAttribute("output", finalActResult.finalArtifact().toString());
+            setGenAiAttributes(Span.current(), request.goal(), finalActResult.finalArtifact().toString());
+        } else if (finalPlanCompletion != null && finalPlanCompletion.content() != null) {
+            Span.current().setAttribute("output", finalPlanCompletion.content());
+            setGenAiAttributes(Span.current(), request.goal(), finalPlanCompletion.content());
+        }
+
+        return new ExecutionResult(
+                visitsSnapshot,
+                finalPlan,
+                finalPlanCompletion,
+                metricsSnapshot,
+                finalActResult,
+                finalEvaluation,
+                blackboardStore.snapshot());
     }
 
     public final class AttemptAgent {
