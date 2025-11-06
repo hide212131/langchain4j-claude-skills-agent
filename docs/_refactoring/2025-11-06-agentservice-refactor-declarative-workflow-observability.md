@@ -80,24 +80,27 @@ public final class PlanOperator implements PlannerAgent {
 ### フェーズ3：手書きリトライを `loopBuilder()` へ（制御構造の宣言化）
 
 - **やること**
-  - [ ] 外側の `for (attempt...)` を削除し、**`loopBuilder()`** に移行。
-  - [ ] `exitCondition(scope -> !scope.readState("needsRetry", false))` を設定。
-  - [ ] `maxIterations` は現状の回数（例：2）を踏襲。`attempt` は scope またはループカウンタで供給。
+  - [x] 外側の `for (attempt...)` を削除し、**`loopBuilder()`** に移行。
+  - [x] Reflect ステージの `needsRetry` 判定を読む `exitCondition` を設定。
+  - [x] `maxIterations` は現状の回数（例：2）を踏襲。`attempt` は scope またはループカウンタで供給。
 
 - **受け入れ基準**
-  - [ ] 成功時は 1 回で終了、再試行必要時は最大回数で打ち切り。
-  - [ ] リトライ系テストが等価に通る。
+  - [x] 成功時は 1 回で終了、再試行必要時は最大回数で打ち切り。
+  - [x] リトライ系テストが等価に通る。
 
 ```java
-UntypedAgent attempt = AgenticServices.sequenceBuilder()
-  .subAgents(planOperator, actOperator, reflectOperator)
-  .build();
+AtomicReference<AttemptSnapshot> lastAttempt = new AtomicReference<>();
+AttemptAgent attemptAgent = new AttemptAgent(request, maxAttempts, stageVisits, lastAttempt);
 
 UntypedAgent loop = AgenticServices.loopBuilder()
-  .subAgents(attempt)
-  .maxIterations(2)
-  .exitCondition(scope -> !scope.readState("needsRetry", false))
-  .build();
+    .subAgents(attemptAgent)
+    .maxIterations(maxAttempts)
+    .exitCondition((scope, iteration) -> {
+        AttemptSnapshot snapshot = lastAttempt.get();
+        return snapshot == null || snapshot.evaluation() == null || !snapshot.evaluation().needsRetry();
+    })
+    .output(scope -> lastAttempt.get())
+    .build();
 ```
 
 ---

@@ -42,6 +42,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * High-level entry point that executes the Plan → Act → Reflect workflow.
@@ -149,53 +151,28 @@ public final class AgentService {
                     ReflectEvaluator.EvaluationResult finalEvaluation = null;
                     int maxAttempts = 2;
 
-                    for (int attempt = 0; attempt < maxAttempts; attempt++) {
-                        int attemptNumber = attempt + 1;
-                        AgentWorkflowObserver observer = new AgentWorkflowObserver(
-                                tracer,
-                                request,
-                                attemptNumber);
-                        PlanOperator planAgent = new PlanOperator(
-                                planner,
-                                llmClient,
-                                logger,
-                                request,
-                                attemptNumber,
-                                maxAttempts,
-                                observer);
-                        ActOperator actAgent = new ActOperator(invoker, observer);
-                        ReflectOperator reflectAgent = new ReflectOperator(
-                                evaluator,
-                                attemptNumber,
-                                maxAttempts,
-                                observer);
+                    AtomicReference<AttemptSnapshot> lastSnapshot = new AtomicReference<>();
+                    AttemptAgent attemptAgent = new AttemptAgent(
+                            request,
+                            maxAttempts,
+                            stageVisits,
+                            lastSnapshot);
 
-                        UntypedAgent workflow = workflowFactory.createWorkflow(builder -> {
-                            builder.name("skills-plan-act-reflect");
-                            builder.output(scope -> assembleAttemptSnapshot(scope, observer));
-                            builder.subAgents(planAgent, actAgent, reflectAgent);
-                        });
+                    UntypedAgent workflow = AgenticServices.loopBuilder()
+                            .name("skills-plan-act-reflect")
+                            .subAgents(attemptAgent)
+                            .maxIterations(maxAttempts)
+                            .exitCondition((scope, iteration) -> shouldExit(lastSnapshot.get()))
+                            .output(scope -> lastSnapshot.get())
+                            .build();
 
-                        AttemptSnapshot snapshot =
-                                (AttemptSnapshot) workflow.invoke(Map.of("goal", request.goal()));
+                    AttemptSnapshot snapshot =
+                            (AttemptSnapshot) workflow.invoke(Map.of("goal", request.goal()));
 
-                        finalPlan = snapshot.plan();
-                        finalPlanCompletion = snapshot.planCompletion();
-                        finalActResult = snapshot.actResult();
-                        finalEvaluation = snapshot.evaluation();
-                        stageVisits.addAll(snapshot.stageVisits());
-
-                        if (finalEvaluation == null || !finalEvaluation.needsRetry()) {
-                            break;
-                        }
-
-                        if (attemptNumber < maxAttempts) {
-                            logger.info(
-                                    "Reflect requested retry after attempt {} — clearing blackboard and retrying.",
-                                    attemptNumber);
-                            blackboardStore.clear();
-                        }
-                    }
+                    finalPlan = snapshot.plan();
+                    finalPlanCompletion = snapshot.planCompletion();
+                    finalActResult = snapshot.actResult();
+                    finalEvaluation = snapshot.evaluation();
 
                     LangChain4jLlmClient.ProviderMetrics metricsSnapshot = llmClient.metrics();
                     if (finalPlanCompletion != null) {
@@ -286,6 +263,74 @@ public final class AgentService {
             throw new IllegalStateException("Unexpected type for key " + key + ": " + value.getClass());
         }
         return type.cast(value);
+    }
+
+    private static boolean shouldExit(AttemptSnapshot snapshot) {
+        if (snapshot == null) {
+            return false;
+        }
+        ReflectEvaluator.EvaluationResult evaluation = snapshot.evaluation();
+        return evaluation == null || !evaluation.needsRetry();
+    }
+
+    public final class AttemptAgent {
+        private final AgentRunRequest request;
+        private final int maxAttempts;
+        private final List<StageVisit> stageVisits;
+        private final AtomicReference<AttemptSnapshot> lastSnapshot;
+        private final AtomicInteger attemptCounter = new AtomicInteger();
+
+        AttemptAgent(
+                AgentRunRequest request,
+                int maxAttempts,
+                List<StageVisit> stageVisits,
+                AtomicReference<AttemptSnapshot> lastSnapshot) {
+            this.request = request;
+            this.maxAttempts = maxAttempts;
+            this.stageVisits = stageVisits;
+            this.lastSnapshot = lastSnapshot;
+        }
+
+        @Agent(name = "attempt")
+        public AttemptSnapshot invoke(AgenticScope scope) {
+            int attemptNumber = attemptCounter.incrementAndGet();
+            AgentWorkflowObserver observer = new AgentWorkflowObserver(tracer, request, attemptNumber);
+
+            PlanOperator planAgent = new PlanOperator(
+                    planner,
+                    llmClient,
+                    logger,
+                    request,
+                    attemptNumber,
+                    maxAttempts,
+                    observer);
+            ActOperator actAgent = new ActOperator(invoker, observer);
+            ReflectOperator reflectAgent = new ReflectOperator(
+                    evaluator,
+                    attemptNumber,
+                    maxAttempts,
+                    observer);
+
+            UntypedAgent attemptWorkflow = workflowFactory.createWorkflow(builder -> {
+                builder.name("skills-plan-act-reflect-attempt");
+                builder.output(attemptScope -> assembleAttemptSnapshot(attemptScope, observer));
+                builder.subAgents(planAgent, actAgent, reflectAgent);
+            });
+
+            AttemptSnapshot snapshot = (AttemptSnapshot) attemptWorkflow.invoke(Map.of("goal", request.goal()));
+            lastSnapshot.set(snapshot);
+            stageVisits.addAll(snapshot.stageVisits());
+
+            ReflectEvaluator.EvaluationResult evaluation = snapshot.evaluation();
+            if (evaluation != null && evaluation.needsRetry() && attemptNumber < maxAttempts) {
+                logger.info(
+                        "Reflect requested retry after attempt {} — clearing blackboard and retrying.",
+                        attemptNumber);
+                blackboardStore.clear();
+            }
+
+            return snapshot;
+        }
     }
 
     public static final class PlanOperator {
