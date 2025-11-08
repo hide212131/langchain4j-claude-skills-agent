@@ -10,84 +10,72 @@ import java.util.Objects;
 public final class AgenticScopeBridge {
 
     public PlanState readPlanGoal(AgenticScope scope) {
-        String goal = (String) readRequiredState(scope, PlanState.GOAL_KEY);
-        return new PlanState(goal);
+        return PlanState.STATE.readRequired(scope);
     }
 
     public PlanInputsState readPlanInputs(AgenticScope scope) {
-        return new PlanInputsState(readRequiredState(scope, PlanInputsState.KEY));
+        return PlanInputsState.STATE.readRequired(scope);
     }
 
     public PlanCandidateStepsState readPlanCandidateSteps(AgenticScope scope) {
-        return new PlanCandidateStepsState(readRequiredState(scope, PlanCandidateStepsState.KEY));
+        return PlanCandidateStepsState.STATE.readRequired(scope);
     }
 
     public PlanConstraintsState readPlanConstraints(AgenticScope scope) {
-        return new PlanConstraintsState(readRequiredState(scope, PlanConstraintsState.KEY));
+        return PlanConstraintsState.STATE.readRequired(scope);
     }
 
     public PlanEvaluationCriteriaState readPlanEvaluationCriteria(AgenticScope scope) {
-        return new PlanEvaluationCriteriaState(readRequiredState(scope, PlanEvaluationCriteriaState.KEY));
+        return PlanEvaluationCriteriaState.STATE.readRequired(scope);
     }
 
     public ActState readActState(AgenticScope scope, String skillId) {
         AgenticScope nonNullScope = Objects.requireNonNull(scope, "scope");
         String key = ActState.outputKey(skillId);
-        requireKey(nonNullScope, key);
+        if (!nonNullScope.hasState(key)) {
+            throw new IllegalStateException("Missing required AgenticScope key: " + key);
+        }
         Object output = nonNullScope.readState(key);
         return new ActState(skillId, output);
     }
 
     public ActWindowState readActWindowState(AgenticScope scope) {
-        return new ActWindowState(readRequiredState(scope, ActWindowState.KEY));
+        return ActWindowState.STATE.readRequired(scope);
     }
 
     public ActCurrentStepState readActCurrentStep(AgenticScope scope) {
-        return new ActCurrentStepState(readRequiredState(scope, ActCurrentStepState.KEY));
+        return ActCurrentStepState.STATE.readRequired(scope);
     }
 
     public ActInputBundleState readActInputBundle(AgenticScope scope) {
-        return new ActInputBundleState(readRequiredState(scope, ActInputBundleState.KEY));
+        return ActInputBundleState.STATE.readRequired(scope);
     }
 
     public SharedBlackboardIndexState readSharedBlackboardIndex(AgenticScope scope) {
-        return new SharedBlackboardIndexState(readRequiredState(scope, SharedBlackboardIndexState.KEY));
+        return SharedBlackboardIndexState.STATE.readRequired(scope);
     }
 
     public ReflectReviewState readReflectReview(AgenticScope scope) {
-        return new ReflectReviewState(readRequiredState(scope, ReflectReviewState.KEY));
+        return ReflectReviewState.STATE.readRequired(scope);
     }
 
     public ReflectRetryAdviceState readReflectRetryAdvice(AgenticScope scope) {
-        return new ReflectRetryAdviceState(readRequiredState(scope, ReflectRetryAdviceState.KEY));
+        return ReflectRetryAdviceState.STATE.readRequired(scope);
     }
 
     public ReflectFinalSummaryState readReflectFinalSummary(AgenticScope scope) {
-        String summary = (String) readRequiredState(scope, ReflectFinalSummaryState.KEY);
-        return new ReflectFinalSummaryState(summary);
+        return ReflectFinalSummaryState.STATE.readRequired(scope);
     }
 
     public SharedContextSnapshotState readSharedContextSnapshot(AgenticScope scope) {
-        return new SharedContextSnapshotState(readRequiredState(scope, SharedContextSnapshotState.KEY));
+        return SharedContextSnapshotState.STATE.readRequired(scope);
     }
 
     public SharedGuardState readSharedGuardState(AgenticScope scope) {
-        return new SharedGuardState(readRequiredState(scope, SharedGuardState.KEY));
+        return SharedGuardState.STATE.readRequired(scope);
     }
 
     public SharedMetricsState readSharedMetrics(AgenticScope scope) {
-        return new SharedMetricsState(readRequiredState(scope, SharedMetricsState.KEY));
-    }
-
-    private Object readRequiredState(AgenticScope scope, String key) {
-        AgenticScope nonNullScope = Objects.requireNonNull(scope, "scope");
-        requireKey(nonNullScope, key);
-        return nonNullScope.readState(key);
-    }
-
-    private void requireKey(AgenticScope scope, String key) {
-        if (!scope.hasState(key)) {
-            throw new IllegalStateException("Missing required AgenticScope key: " + key);
-        }
+        return SharedMetricsState.STATE.readRequired(scope);
     }
 }

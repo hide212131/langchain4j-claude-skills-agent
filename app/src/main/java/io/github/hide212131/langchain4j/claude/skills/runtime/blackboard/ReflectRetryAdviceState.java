@@ -1,12 +1,16 @@
 package io.github.hide212131.langchain4j.claude.skills.runtime.blackboard;
 
-import java.util.Objects;
+import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.AgentStateKey;
 
-public record ReflectRetryAdviceState(Object value) {
+public record ReflectRetryAdviceState(String advice) {
 
     public static final String KEY = "reflect.retryAdvice";
+    public static final AgentStateKey<ReflectRetryAdviceState> STATE =
+            AgentStateKey.of(KEY, ReflectRetryAdviceState.class);
 
     public ReflectRetryAdviceState {
-        Objects.requireNonNull(value, "value");
+        if (advice == null) {
+            advice = "";
+        }
     }
 }

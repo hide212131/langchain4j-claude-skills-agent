@@ -86,20 +86,20 @@ class DefaultInvokerTest {
         assertThat(result.finalArtifact()).isEqualTo(tempDir.resolve("deck.pptx"));
         assertThat(invoker.blackboardStore().contains(ActState.outputKey("brand-guidelines"))).isTrue();
         assertThat(invoker.blackboardStore().contains(ActState.outputKey("document-skills/pptx"))).isTrue();
-        assertThat(scope.hasState(SharedBlackboardIndexState.KEY)).isTrue();
-        Object indexState = scope.readState(SharedBlackboardIndexState.KEY);
-        assertThat(indexState)
-                .isInstanceOf(List.class)
-                .asList()
-                .containsExactly("brand-guidelines", "document-skills/pptx");
+    assertThat(scope.hasState(SharedBlackboardIndexState.KEY)).isTrue();
+    Object indexState = scope.readState(SharedBlackboardIndexState.KEY);
+    assertThat(indexState)
+        .isInstanceOf(SharedBlackboardIndexState.class);
+    SharedBlackboardIndexState typedIndex = (SharedBlackboardIndexState) indexState;
+    assertThat(typedIndex.invokedSkillIds())
+        .containsExactly("brand-guidelines", "document-skills/pptx");
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> lastInputBundle = (Map<String, Object>) scope.readState(ActInputBundleState.KEY);
-        assertThat(lastInputBundle)
-                .isNotNull()
-                .containsEntry(
-                        "skillRoot",
-                        skillsRoot.resolve("document-skills/pptx").toAbsolutePath().normalize().toString());
+    Object lastInputBundle = scope.readState(ActInputBundleState.KEY);
+    assertThat(lastInputBundle)
+        .isInstanceOf(ActInputBundleState.class);
+    ActInputBundleState bundleState = (ActInputBundleState) lastInputBundle;
+    assertThat(bundleState.skillRoot())
+        .isEqualTo(skillsRoot.resolve("document-skills/pptx").toAbsolutePath().normalize());
     }
 
     private static final class RecordingAgenticScope implements AgenticScope {

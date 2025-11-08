@@ -49,46 +49,42 @@ public final class DefaultInvoker {
         Map<String, Object> outputs = new LinkedHashMap<>();
         Path lastArtifact = null;
 
-        scope.writeState(
-                ActWindowState.KEY,
-                Map.of(
-                        "goal", plan.goal(),
-                        "plannedSkillIds", plan.orderedSkillIds(),
-                        "remainingToolCalls", steps.size()));
+        List<String> orderedSkillIds = plan.orderedSkillIds();
+        ActWindowState windowState = ActWindowState.initial(plan.goal(), orderedSkillIds);
+        ActWindowState.STATE.write(scope, windowState);
 
         for (PlanModels.PlanStep step : steps) {
             guard.ensureAllowed(step.skillId());
             guard.checkBudgets(new BudgetSnapshot(steps.size() - invokedSkills.size(), Integer.MAX_VALUE));
 
-            Map<String, Object> inputBundle = Map.of(
+            ActCurrentStepState.STATE.write(scope, new ActCurrentStepState(step.skillId(), step.name()));
+            Map<String, Object> invocationInputs = Map.of(
                     "goal", step.stepGoal(),
                     "skillId", step.skillId(),
                     "description", step.description(),
                     "keywords", step.keywords(),
                     "skillRoot", step.skillRoot().toString());
-            scope.writeState(
-                    ActCurrentStepState.KEY,
-                    Map.of("skillId", step.skillId(), "name", step.name()));
-            scope.writeState(ActInputBundleState.KEY, inputBundle);
+            ActInputBundleState.STATE.write(scope, new ActInputBundleState(
+                    step.stepGoal(),
+                    step.skillId(),
+                    step.description(),
+                    step.keywords(),
+                    step.skillRoot()));
 
-            SkillRuntime.ExecutionResult executionResult = invokeSkillTool.invoke(step.skillId(), inputBundle);
+            SkillRuntime.ExecutionResult executionResult = invokeSkillTool.invoke(step.skillId(), invocationInputs);
             Object outputValue = executionResult.outputs();
             blackboardStore.put(ActState.outputKey(step.skillId()), outputValue);
             outputs.put(step.skillId(), outputValue);
             invokedSkills.add(step.skillId());
-            scope.writeState(
-                    ActWindowState.KEY,
-                    Map.of(
-                            "goal", plan.goal(),
-                            "plannedSkillIds", plan.orderedSkillIds(),
-                            "executedSkillCount", invokedSkills.size()));
+        windowState = windowState.progress(invokedSkills.size());
+        ActWindowState.STATE.write(scope, windowState);
             if (executionResult.hasArtifact()) {
                 lastArtifact = executionResult.artifactPath();
             }
             logger.info("Skill {} completed with outputs {}", step.skillId(), executionResult.outputs());
         }
 
-        scope.writeState(SharedBlackboardIndexState.KEY, List.copyOf(invokedSkills));
+    SharedBlackboardIndexState.STATE.write(scope, new SharedBlackboardIndexState(invokedSkills));
         return new ActResult(List.copyOf(invokedSkills), Map.copyOf(outputs), lastArtifact);
     }
 
