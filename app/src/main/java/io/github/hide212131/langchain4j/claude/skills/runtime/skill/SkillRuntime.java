@@ -320,8 +320,7 @@ public final class SkillRuntime {
     interface SkillActSupervisor {
     @Agent(
         name = "SkillActSupervisor",
-        description = "Supervisor coordinating Pure Act execution for a single skill. Goals must be set specifically in line with the purpose of the skill.",
-        outputName = "finalResponse")
+        description = "Supervisor coordinating Pure Act execution for a single skill. Goals must be set specifically in line with the purpose of the skill.")
     ResultWithAgenticScope<String> run(
         @V("request") String request,
         @V("skillId") String skillId,
@@ -390,7 +389,7 @@ public final class SkillRuntime {
                     .supervisorBuilder(SkillActSupervisor.class)
                     .chatModel(chatModel)
                     .contextGenerationStrategy(SupervisorContextStrategy.CHAT_MEMORY_AND_SUMMARIZATION)
-                    .responseStrategy(SupervisorResponseStrategy.LAST)
+                    .responseStrategy(SupervisorResponseStrategy.SUMMARY)
                     .supervisorContext(createSupervisorContext(metadata, expectedOutputs))
                     .subAgents(
                 new ReadSkillMdAgent(toolbox),
@@ -443,8 +442,7 @@ public final class SkillRuntime {
 
         @Agent(
                 name = "readSkillMd",
-                description = "Reads the SKILL.md document for the active skill",
-                outputName = "skillDocument")
+                description = "Reads the SKILL.md document for the active skill")
         public SkillDocumentResult read(@V("skillId") String skillId) {
             return toolbox.readSkillMd(skillId);
         }
@@ -460,8 +458,7 @@ public final class SkillRuntime {
 
         @Agent(
                 name = "readRef",
-                description = "Resolves and reads an additional reference for the active skill",
-                outputName = "referenceDocuments")
+                description = "Resolves and reads an additional reference for the active skill")
         public ReferenceDocuments read(
                 @V("skillId") String skillId,
                 @V("reference") String reference) {
@@ -479,8 +476,7 @@ public final class SkillRuntime {
 
         @Agent(
                 name = "runScript",
-                description = "Executes a script within the skill sandbox",
-                outputName = "scriptResult")
+                description = "Executes a script within the skill sandbox")
         public ScriptResult run(
                 @V("skillId") String skillId,
                 @V("path") String path,
@@ -619,8 +615,7 @@ public final class SkillRuntime {
 
         @Agent(
                 name = "deployScripts",
-                description = "Copies supporting script files into a working directory under build/out",
-                outputName = "deploymentResult")
+                description = "Copies supporting script files into a working directory under build/out")
         public DeploymentResult deploy(
                 @V("skillId") String skillId,
                 @V("sourceDir") String sourceDir,
@@ -639,8 +634,7 @@ public final class SkillRuntime {
 
         @Agent(
                 name = "writeArtifact",
-                description = "Persists generated artefacts under the build output directory. You can save either plain text or Base64-encoded content. Specify which using the base64Encoded parameter.",
-                outputName = "artifactHandle")
+                description = "Persists generated artefacts under the build output directory. You can save either plain text or Base64-encoded content. Specify which using the base64Encoded parameter.")
         public ArtifactHandle write(
                 @V("skillId") String skillId,
                 @V(value = "relativePath") String relativePath,
@@ -661,13 +655,42 @@ public final class SkillRuntime {
 
         @Agent(
                 name = "validateExpectedOutputs",
-                description = "Validates that expected outputs have been produced",
-                outputName = "validationResult")
+                description = "Validates that expected outputs have been produced")
         public ValidationResult validate(
                 @V("expected") Object expected,
                 @V("observed") Object observed) {
             return toolbox.validateExpectedOutputs(expected, observed);
         }
+    }
+
+    public interface OutputsValidatorAgent {
+        @dev.langchain4j.service.SystemMessage("""
+            You are a strict QA reviewer for software deliverables.
+            First, a deterministic contract check will run internally (no LLM).
+            Only if it passes, perform semantic QA.
+            Return a single JSON:
+              {
+                "pass": boolean,
+                "stage": "contract" | "semantic",
+                "missing": string[],
+                "violations": string[],
+                "rationale": string,
+                "metrics": { "files": int, "bytes": long }
+              }
+        """)
+        @dev.langchain4j.service.UserMessage("""
+            Expected outputs (contract + semantic expectations):
+            {{expectedOutputs}}
+
+            Produced artifacts index (name/path/size/kind/preview):
+            {{artifactsIndex}}
+        """)
+        @Agent(
+            name = "validateOutputs",
+            description = "Unified validator that performs contract (deterministic) and semantic (LLM) checks.")
+        String validate(
+            @V("expectedOutputs") String expectedOutputs,
+            @V("artifactsIndex") String artifactsIndex);
     }
 
     private final class SkillToolbox implements Toolbox {
@@ -1878,6 +1901,139 @@ public final class SkillRuntime {
             return summariseForLog(text);
         }
 
+        private String generateArtifactsIndex() {
+            try {
+                Path outputDir = context.outputDirectory();
+                if (!Files.exists(outputDir)) {
+                    return "(no artifacts directory)";
+                }
+                
+                StringBuilder index = new StringBuilder();
+                try (var stream = Files.walk(outputDir)) {
+                    stream.filter(Files::isRegularFile)
+                          .forEach(path -> {
+                              try {
+                                  String relativePath = outputDir.relativize(path).toString();
+                                  long size = Files.size(path);
+                                  String kind = determineFileKind(path);
+                                  String preview = generatePreview(path);
+                                  
+                                  index.append(String.format("""
+                                      - name: %s
+                                        path: %s
+                                        size: %d
+                                        kind: %s
+                                        preview: %s
+                                      """,
+                                      path.getFileName(),
+                                      relativePath,
+                                      size,
+                                      kind,
+                                      preview));
+                              } catch (IOException e) {
+                                  logger.debug("Failed to index artifact: {}", path, e);
+                              }
+                          });
+                }
+                return index.toString();
+            } catch (IOException e) {
+                logger.debug("Failed to generate artifacts index", e);
+                return "(error generating index)";
+            }
+        }
+
+        private String determineFileKind(Path path) {
+            String name = path.getFileName().toString().toLowerCase();
+            if (name.endsWith(".json")) return "json";
+            if (name.endsWith(".yaml") || name.endsWith(".yml")) return "yaml";
+            if (name.endsWith(".md")) return "markdown";
+            if (name.endsWith(".txt")) return "text";
+            if (name.endsWith(".py")) return "python";
+            if (name.endsWith(".js")) return "javascript";
+            if (name.endsWith(".sh")) return "shell";
+            return "binary";
+        }
+
+        private String generatePreview(Path path) {
+            try {
+                String kind = determineFileKind(path);
+                if (kind.equals("binary")) {
+                    return "(binary)";
+                }
+                String content = Files.readString(path, StandardCharsets.UTF_8);
+                return limitChars(content, 400);
+            } catch (Exception e) {
+                return "(preview unavailable)";
+            }
+        }
+
+        private ValidationReport performContractCheck(List<String> expectedOutputs) {
+            List<String> missing = new ArrayList<>();
+            List<String> violations = new ArrayList<>();
+            Path outputDir = context.outputDirectory();
+            
+            // Check if output directory exists
+            if (!Files.exists(outputDir)) {
+                violations.add("Output directory does not exist");
+                return new ValidationReport(
+                    false,
+                    "contract",
+                    List.of(),
+                    violations,
+                    "Output directory missing",
+                    new ValidationMetrics(0, 0));
+            }
+
+            // Count files and total bytes
+            int fileCount = 0;
+            long totalBytes = 0;
+            try (var stream = Files.walk(outputDir)) {
+                var files = stream.filter(Files::isRegularFile).toList();
+                fileCount = files.size();
+                for (Path file : files) {
+                    try {
+                        totalBytes += Files.size(file);
+                    } catch (IOException e) {
+                        logger.debug("Failed to get size for file: {}", file, e);
+                    }
+                }
+            } catch (IOException e) {
+                violations.add("Failed to walk output directory: " + e.getMessage());
+            }
+
+            // Check required files exist
+            for (String expected : expectedOutputs) {
+                if ("artifactPath".equals(expected)) {
+                    if (context.artifactPath() == null || !Files.exists(context.artifactPath())) {
+                        missing.add("artifactPath");
+                    }
+                }
+            }
+
+            // Check sandbox boundaries
+            Path artifactPath = context.artifactPath();
+            if (artifactPath != null) {
+                Path normalizedArtifact = artifactPath.toAbsolutePath().normalize();
+                Path normalizedOutput = outputDir.toAbsolutePath().normalize();
+                if (!normalizedArtifact.startsWith(normalizedOutput)) {
+                    violations.add("Artifact path is outside output directory sandbox");
+                }
+            }
+
+            boolean pass = missing.isEmpty() && violations.isEmpty();
+            String rationale = pass 
+                ? "All contract checks passed" 
+                : "Contract validation failed";
+
+            return new ValidationReport(
+                pass,
+                "contract",
+                missing,
+                violations,
+                rationale,
+                new ValidationMetrics(fileCount, totalBytes));
+        }
+
         private record ReferenceDocumentContent(String detail, String summaryText, boolean binary) {}
     }
 
@@ -2084,6 +2240,33 @@ public final class SkillRuntime {
     public record Validation(boolean expectedOutputsSatisfied, List<String> missingOutputs) {
         public Validation {
             Objects.requireNonNull(missingOutputs, "missingOutputs");
+        }
+    }
+
+    public record ValidationReport(
+            boolean pass,
+            String stage,
+            List<String> missing,
+            List<String> violations,
+            String rationale,
+            ValidationMetrics metrics) {
+        public ValidationReport {
+            Objects.requireNonNull(stage, "stage");
+            missing = missing == null ? List.of() : List.copyOf(missing);
+            violations = violations == null ? List.of() : List.copyOf(violations);
+            rationale = rationale == null ? "" : rationale;
+            Objects.requireNonNull(metrics, "metrics");
+        }
+    }
+
+    public record ValidationMetrics(int files, long bytes) {
+        public ValidationMetrics {
+            if (files < 0) {
+                throw new IllegalArgumentException("files must be non-negative");
+            }
+            if (bytes < 0) {
+                throw new IllegalArgumentException("bytes must be non-negative");
+            }
         }
     }
 
