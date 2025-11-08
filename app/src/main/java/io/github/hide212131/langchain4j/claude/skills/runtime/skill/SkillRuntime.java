@@ -683,21 +683,41 @@ public final class SkillRuntime {
                 @V("skillId") String skillId,
                 @V("expectedOutputs") List<String> expectedOutputs) {
             
+            WorkflowLogger logger = getLogger();
+            
             // Phase 1: Contract Check (deterministic, non-AI)
+            logger.info("Validation[contract] Starting contract checks for skill {}", skillId);
             ValidationReport contractResult = performContractCheckInternal(expectedOutputs);
             
             if (!contractResult.pass()) {
                 // Contract check failed, return immediately without LLM call
+                logger.warn("Validation[contract] Failed: {} violations, {} missing", 
+                    contractResult.violations().size(), contractResult.missing().size());
                 return contractResult;
             }
+            
+            logger.info("Validation[contract] Passed: {} files, {} bytes", 
+                contractResult.metrics().files(), contractResult.metrics().bytes());
             
             // Phase 2: Semantic Check (LLM-based, optional)
             if (!enableSemanticCheck || chatModel == null) {
                 // Semantic check disabled or no model available
+                logger.debug("Validation[semantic] Skipped (disabled or no model)");
                 return contractResult;
             }
             
-            return performSemanticCheck(expectedOutputs, contractResult);
+            logger.info("Validation[semantic] Starting semantic validation");
+            ValidationReport semanticResult = performSemanticCheck(expectedOutputs, contractResult);
+            logger.info("Validation[semantic] Completed: pass={}", semanticResult.pass());
+            
+            return semanticResult;
+        }
+
+        private WorkflowLogger getLogger() {
+            if (toolbox instanceof SkillToolbox skillToolbox) {
+                return skillToolbox.getContextLogger();
+            }
+            return new WorkflowLogger(); // Fallback
         }
 
         private ValidationReport performContractCheckInternal(List<String> expectedOutputs) {
@@ -775,6 +795,10 @@ public final class SkillRuntime {
 
         SkillToolbox(SkillRuntimeContext context) {
             this.context = context;
+        }
+
+        WorkflowLogger getContextLogger() {
+            return logger;
         }
 
         @Tool(name = "readSkillMd", returnBehavior = ReturnBehavior.TO_LLM)
