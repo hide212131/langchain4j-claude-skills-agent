@@ -29,6 +29,10 @@ public interface ProgressTrackerAgent {
         - [Description of completed action 1]
         - [Description of completed action 2]
         
+        **Note:** When an action involves writing an artifact, include:
+        - A brief summary of what was output
+        - The accurate relative path from 'build/out' (e.g., build/out/slides/presentation.html)
+        
         ## Current State
         [Describe acquired information, generated files, or system state]
         

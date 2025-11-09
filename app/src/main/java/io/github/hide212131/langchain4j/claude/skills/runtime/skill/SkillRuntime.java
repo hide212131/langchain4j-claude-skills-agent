@@ -442,6 +442,7 @@ public final class SkillRuntime {
                         * Join multiple values with commas, e.g. "args": "--flag1,--flag2".
                         * Provide dependencies as "dependencies": "pip:python-pptx".
                         * Provide deploy arguments as directory paths, e.g. "sourceDir": "scripts", "targetDir": "workdir".
+                        * EXCEPTION: boolean parameters (like base64Encoded) must be JSON booleans (true/false), not strings.
                         * Do not emit JSON arrays or objects inside the arguments map.
                     - If you are unsure, choose the most appropriate next action yourself; you will not receive extra guidance from the user.
                     Always respond with key=value pairs when completing the task.
