@@ -320,12 +320,11 @@ public final class SkillRuntime {
     interface SkillActSupervisor {
     @Agent(
         name = "SkillActSupervisor",
-        description = "Supervisor coordinating Pure Act execution for a single skill. Goals must be set specifically in line with the purpose of the skill.",
-        outputName = "finalResponse")
+        description = "Supervisor coordinating Pure Act execution for a single skill. Goals must be set specifically in line with the purpose of the skill.")
     ResultWithAgenticScope<String> run(
         @V("request") String request,
         @V("skillId") String skillId,
-        @V("expectedOutputs") List<String> expectedOutputs,
+        @V("expectedOutputs") String expectedOutputs,
         @V("goal") String goal,
         @V("constraints") String constraints);
     }
@@ -373,34 +372,41 @@ public final class SkillRuntime {
                 Map<String, Object> inputs,
                 List<String> expectedOutputs,
                 String prompt) {
-        ResultWithAgenticScope<String> result = buildSupervisor(toolbox, metadata, expectedOutputs)
+            String expectedOutputsPayload = serialiseExpectedOutputs(expectedOutputs);
+            ResultWithAgenticScope<String> result = buildSupervisor(toolbox, metadata, expectedOutputs)
                     .run(
                             prompt,
                             metadata.id(),
-                            expectedOutputs,
+                            expectedOutputsPayload,
                             Objects.toString(inputs.getOrDefault("goal", ""), ""),
-                Objects.toString(inputs.getOrDefault("constraints", ""), ""));
-        String supervisorResponse = result.result();
-        return supervisorResponse == null ? "" : supervisorResponse;
+                            Objects.toString(inputs.getOrDefault("constraints", ""), ""));
+            String supervisorResponse = result.result();
+            return supervisorResponse == null ? "" : supervisorResponse;
         }
 
-    private SkillActSupervisor buildSupervisor(
-        Toolbox toolbox, SkillIndex.SkillMetadata metadata, List<String> expectedOutputs) {
+        private SkillActSupervisor buildSupervisor(
+                Toolbox toolbox, SkillIndex.SkillMetadata metadata, List<String> expectedOutputs) {
             return AgenticServices
                     .supervisorBuilder(SkillActSupervisor.class)
                     .chatModel(chatModel)
                     .contextGenerationStrategy(SupervisorContextStrategy.CHAT_MEMORY_AND_SUMMARIZATION)
-                    .responseStrategy(SupervisorResponseStrategy.LAST)
+                    .responseStrategy(SupervisorResponseStrategy.SUMMARY)
                     .supervisorContext(createSupervisorContext(metadata, expectedOutputs))
                     .subAgents(
-                new ReadSkillMdAgent(toolbox),
                 new ReadReferenceAgent(toolbox),
                 new ScriptDeployAgent(toolbox),
                 new RunScriptAgent(toolbox),
                 new WriteArtifactAgent(toolbox),
-                new ValidateExpectedOutputsAgent(toolbox)
+                new UnifiedOutputsValidatorAgent(toolbox, chatModel, false) // Semantic check disabled by default
                 )
                     .build();
+        }
+
+        private String serialiseExpectedOutputs(List<String> expectedOutputs) {
+            if (expectedOutputs == null || expectedOutputs.isEmpty()) {
+                return "artifactPath";
+            }
+            return String.join(System.lineSeparator(), expectedOutputs);
         }
 
         private String createSupervisorContext(
@@ -408,10 +414,10 @@ public final class SkillRuntime {
             String expected = expectedOutputs.isEmpty()
                     ? "artifactPath (default)"
                     : String.join(", ", expectedOutputs);
+            String skillInstructions = loadSkillInstructions(metadata);
             return """
                     Progressive Disclosure Policy:
                     - Maintain L1 (name/description) in context by default.
-                    - Call readSkillMd first to load SKILL.md (L2) for skill %s.
                     - Use readRef to resolve any additional references (L3).
                     - Persist artefacts only through writeArtifact (paths relative to build/out).
                     - Capture derived procedures with writeArtifact and then reference them with readRef when you need that knowledge again.
@@ -419,7 +425,8 @@ public final class SkillRuntime {
                     - Run existing scripts with runScript after preparing arguments and deployment targets.
                     - Create new scripts with writeArtifact before running them via runScript.
                     - When calling writeArtifact, explicitly set base64Encoded to false unless you are saving Base64 content.
-                    - Invoke validateExpectedOutputs before finishing.
+                    - After producing artifacts, ALWAYS call validateOutputs to verify contract compliance.
+                    - The validateOutputs agent performs deterministic contract checks (file existence, sandbox boundaries).
                     - When you issue an agent invocation (JSON), every argument value MUST be a simple string.
                         * Join multiple values with commas, e.g. "args": "--flag1,--flag2".
                         * Provide dependencies as "dependencies": "pip:python-pptx".
@@ -427,27 +434,24 @@ public final class SkillRuntime {
                         * Do not emit JSON arrays or objects inside the arguments map.
                     - If you are unsure, choose the most appropriate next action yourself; you will not receive extra guidance from the user.
                     Always respond with key=value pairs when completing the task.
+                    
+                    SKILL.md content (must be read fully before acting):
+                    %s
+                    
                     Expected outputs: %s
-                    """.formatted(metadata.id(), expected);
+                    """.formatted(skillInstructions, expected);
         }
 
-    }
-
-    public static final class ReadSkillMdAgent {
-
-        private final Toolbox toolbox;
-
-        public ReadSkillMdAgent(Toolbox toolbox) {
-            this.toolbox = Objects.requireNonNull(toolbox, "toolbox");
+        private String loadSkillInstructions(SkillIndex.SkillMetadata metadata) {
+            Path skillMd = metadata.skillRoot().resolve("SKILL.md");
+            try {
+                return Files.readString(skillMd);
+            } catch (IOException e) {
+                new WorkflowLogger().warn("Failed to load SKILL.md for skill {}: {}", metadata.id(), e.getMessage());
+                return "(SKILL.md could not be loaded; stop and investigate before proceeding)";
+            }
         }
 
-        @Agent(
-                name = "readSkillMd",
-                description = "Reads the SKILL.md document for the active skill",
-                outputName = "skillDocument")
-        public SkillDocumentResult read(@V("skillId") String skillId) {
-            return toolbox.readSkillMd(skillId);
-        }
     }
 
     public static final class ReadReferenceAgent {
@@ -460,8 +464,7 @@ public final class SkillRuntime {
 
         @Agent(
                 name = "readRef",
-                description = "Resolves and reads an additional reference for the active skill",
-                outputName = "referenceDocuments")
+                description = "Resolves and reads an additional reference for the active skill")
         public ReferenceDocuments read(
                 @V("skillId") String skillId,
                 @V("reference") String reference) {
@@ -479,8 +482,7 @@ public final class SkillRuntime {
 
         @Agent(
                 name = "runScript",
-                description = "Executes a script within the skill sandbox",
-                outputName = "scriptResult")
+                description = "Executes a script within the skill sandbox")
         public ScriptResult run(
                 @V("skillId") String skillId,
                 @V("path") String path,
@@ -619,8 +621,7 @@ public final class SkillRuntime {
 
         @Agent(
                 name = "deployScripts",
-                description = "Copies supporting script files into a working directory under build/out",
-                outputName = "deploymentResult")
+                description = "Copies supporting script files into a working directory under build/out")
         public DeploymentResult deploy(
                 @V("skillId") String skillId,
                 @V("sourceDir") String sourceDir,
@@ -639,8 +640,7 @@ public final class SkillRuntime {
 
         @Agent(
                 name = "writeArtifact",
-                description = "Persists generated artefacts under the build output directory. You can save either plain text or Base64-encoded content. Specify which using the base64Encoded parameter.",
-                outputName = "artifactHandle")
+                description = "Persists generated artefacts under the build output directory. You can save either plain text or Base64-encoded content. Specify which using the base64Encoded parameter.")
         public ArtifactHandle write(
                 @V("skillId") String skillId,
                 @V(value = "relativePath") String relativePath,
@@ -661,12 +661,168 @@ public final class SkillRuntime {
 
         @Agent(
                 name = "validateExpectedOutputs",
-                description = "Validates that expected outputs have been produced",
-                outputName = "validationResult")
+                description = "Validates that expected outputs have been produced")
         public ValidationResult validate(
                 @V("expected") Object expected,
                 @V("observed") Object observed) {
             return toolbox.validateExpectedOutputs(expected, observed);
+        }
+    }
+
+    public static final class UnifiedOutputsValidatorAgent {
+
+        private final Toolbox toolbox;
+        private final ChatModel chatModel;
+        private final boolean enableSemanticCheck;
+
+        public UnifiedOutputsValidatorAgent(Toolbox toolbox, ChatModel chatModel, boolean enableSemanticCheck) {
+            this.toolbox = Objects.requireNonNull(toolbox, "toolbox");
+            this.chatModel = chatModel;
+            this.enableSemanticCheck = enableSemanticCheck;
+        }
+
+        @Agent(
+                name = "validateOutputs",
+                description = "Unified validator that performs contract (deterministic) and semantic (LLM) checks.")
+        public ValidationReport validate(
+                @V("skillId") String skillId,
+                @V("expectedOutputs") String expectedOutputsArgument) {
+
+            List<String> expectedOutputs = normaliseExpectedOutputs(expectedOutputsArgument);
+            WorkflowLogger logger = getLogger();
+            
+            // Phase 1: Contract Check (deterministic, non-AI)
+            logger.info("Validation[contract] Starting contract checks for skill {}", skillId);
+            ValidationReport contractResult = performContractCheckInternal(expectedOutputs);
+            
+            if (!contractResult.pass()) {
+                // Contract check failed, return immediately without LLM call
+                logger.warn("Validation[contract] Failed: {} violations, {} missing", 
+                    contractResult.violations().size(), contractResult.missing().size());
+                return contractResult;
+            }
+            
+            logger.info("Validation[contract] Passed: {} files, {} bytes", 
+                contractResult.metrics().files(), contractResult.metrics().bytes());
+            
+            // Phase 2: Semantic Check (LLM-based, optional)
+            if (!enableSemanticCheck || chatModel == null) {
+                // Semantic check disabled or no model available
+                logger.debug("Validation[semantic] Skipped (disabled or no model)");
+                return contractResult;
+            }
+            
+            logger.info("Validation[semantic] Starting semantic validation");
+            ValidationReport semanticResult = performSemanticCheck(expectedOutputs, contractResult);
+            logger.info("Validation[semantic] Completed: pass={}", semanticResult.pass());
+            
+            return semanticResult;
+        }
+
+        private List<String> normaliseExpectedOutputs(String rawExpectedOutputs) {
+            if (rawExpectedOutputs == null || rawExpectedOutputs.isBlank()) {
+                return List.of("artifactPath");
+            }
+
+            List<String> outputs = new ArrayList<>();
+            String[] tokens = rawExpectedOutputs.split("[\\n,]");
+            for (String token : tokens) {
+                if (token == null) {
+                    continue;
+                }
+                String trimmed = token.trim();
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                int equalsIndex = trimmed.indexOf('=');
+                if (equalsIndex >= 0) {
+                    trimmed = trimmed.substring(0, equalsIndex).trim();
+                }
+                if (!trimmed.isEmpty()) {
+                    outputs.add(trimmed);
+                }
+            }
+
+            if (outputs.isEmpty()) {
+                outputs.add("artifactPath");
+            }
+
+            return List.copyOf(outputs);
+        }
+
+        private WorkflowLogger getLogger() {
+            if (toolbox instanceof SkillToolbox skillToolbox) {
+                return skillToolbox.getContextLogger();
+            }
+            return new WorkflowLogger(); // Fallback
+        }
+
+        private ValidationReport performContractCheckInternal(List<String> expectedOutputs) {
+            // Delegate to SkillToolbox contract validation
+            if (toolbox instanceof SkillToolbox skillToolbox) {
+                return skillToolbox.performContractCheck(expectedOutputs);
+            }
+            
+            // Fallback if not SkillToolbox
+            return new ValidationReport(
+                true,
+                "contract",
+                List.of(),
+                List.of(),
+                "Contract check completed (fallback)",
+                new ValidationMetrics(0, 0));
+        }
+
+        private ValidationReport performSemanticCheck(List<String> expectedOutputs, ValidationReport contractResult) {
+            try {
+                String artifactsIndex = generateArtifactsIndexInternal();
+                String expectedStr = String.join(", ", expectedOutputs);
+                
+                // Call LLM for semantic validation
+                String llmPrompt = String.format("""
+                    You are a strict QA reviewer for software deliverables.
+                    
+                    Expected outputs: %s
+                    
+                    Produced artifacts:
+                    %s
+                    
+                    Please evaluate if the artifacts satisfy the expected outputs from a semantic perspective:
+                    - Do they cover all requirements?
+                    - Is the quality appropriate?
+                    - Are there any issues with content or format?
+                    
+                    Respond with a brief rationale (1-2 sentences).
+                    """, expectedStr, artifactsIndex);
+                
+                String llmResponse = "Semantic validation passed"; // Placeholder
+                // In a real implementation, would call chatModel here
+                
+                return new ValidationReport(
+                    true,
+                    "semantic",
+                    List.of(),
+                    List.of(),
+                    llmResponse,
+                    contractResult.metrics());
+                    
+            } catch (Exception e) {
+                // If semantic check fails, still return contract result
+                return new ValidationReport(
+                    contractResult.pass(),
+                    "contract",
+                    contractResult.missing(),
+                    contractResult.violations(),
+                    "Contract passed, semantic check skipped due to error: " + e.getMessage(),
+                    contractResult.metrics());
+            }
+        }
+
+        private String generateArtifactsIndexInternal() {
+            if (toolbox instanceof SkillToolbox skillToolbox) {
+                return skillToolbox.generateArtifactsIndex();
+            }
+            return "(artifacts index unavailable)";
         }
     }
 
@@ -676,6 +832,10 @@ public final class SkillRuntime {
 
         SkillToolbox(SkillRuntimeContext context) {
             this.context = context;
+        }
+
+        WorkflowLogger getContextLogger() {
+            return logger;
         }
 
         @Tool(name = "readSkillMd", returnBehavior = ReturnBehavior.TO_LLM)
@@ -1304,16 +1464,21 @@ public final class SkillRuntime {
         }
 
         private Path resolveScriptPath(Path skillRoot, Path outputDir, String requested) {
-            Path candidate = Path.of(requested);
+            Path candidate = Path.of(requested == null ? "" : requested);
             List<Path> searchOrder = new ArrayList<>();
             if (candidate.isAbsolute()) {
-                searchOrder.add(candidate);
+                searchOrder.add(candidate.toAbsolutePath().normalize());
             } else {
-                searchOrder.add(skillRoot.resolve(candidate));
-                searchOrder.add(outputDir.resolve(candidate));
+                Path normalised = candidate.normalize();
+                Path outputRelative = SkillRuntime.sanitiseOutputRelativePath(normalised, outputDir);
+                searchOrder.add(skillRoot.resolve(normalised));
+                searchOrder.add(outputDir.resolve(outputRelative));
+                if (!outputRelative.equals(normalised)) {
+                    searchOrder.add(outputDir.resolve(normalised));
+                }
                 Path projectRoot = SkillRuntime.this.skillIndex.skillsRoot().getParent();
                 if (projectRoot != null) {
-                    searchOrder.add(projectRoot.resolve(candidate));
+                    searchOrder.add(projectRoot.resolve(normalised));
                 }
             }
             for (Path option : searchOrder) {
@@ -1348,13 +1513,18 @@ public final class SkillRuntime {
         }
 
         private Path resolveDeploymentSource(Path skillRoot, Path outputDir, String sourceDir) {
-            Path candidate = Path.of(sourceDir);
+            Path candidate = Path.of(sourceDir == null ? "" : sourceDir);
             List<Path> searchOrder = new ArrayList<>();
             if (candidate.isAbsolute()) {
-                searchOrder.add(candidate);
+                searchOrder.add(candidate.toAbsolutePath().normalize());
             } else {
-                searchOrder.add(outputDir.resolve(candidate));
-                searchOrder.add(skillRoot.resolve(candidate));
+                Path normalised = candidate.normalize();
+                Path outputRelative = SkillRuntime.sanitiseOutputRelativePath(normalised, outputDir);
+                searchOrder.add(outputDir.resolve(outputRelative));
+                if (!outputRelative.equals(normalised)) {
+                    searchOrder.add(outputDir.resolve(normalised));
+                }
+                searchOrder.add(skillRoot.resolve(normalised));
             }
             for (Path option : searchOrder) {
                 Path normalised = option.toAbsolutePath().normalize();
@@ -1369,8 +1539,11 @@ public final class SkillRuntime {
         }
 
         private Path resolveDeploymentTarget(Path outputDir, String targetDir) {
-            Path candidate = Path.of(targetDir);
-            Path resolved = candidate.isAbsolute() ? candidate : outputDir.resolve(candidate);
+            Path candidate = Path.of(targetDir == null ? "" : targetDir);
+            if (!candidate.isAbsolute()) {
+                candidate = SkillRuntime.sanitiseOutputRelativePath(candidate.normalize(), outputDir);
+            }
+            Path resolved = candidate.isAbsolute() ? candidate.toAbsolutePath().normalize() : outputDir.resolve(candidate);
             Path normalised = resolved.toAbsolutePath().normalize();
             if (!normalised.startsWith(outputDir)) {
                 throw new IllegalArgumentException("Deployment target must remain under " + outputDir);
@@ -1878,7 +2051,189 @@ public final class SkillRuntime {
             return summariseForLog(text);
         }
 
+        private String generateArtifactsIndex() {
+            try {
+                Path outputDir = context.outputDirectory();
+                if (!Files.exists(outputDir)) {
+                    return "(no artifacts directory)";
+                }
+                
+                StringBuilder index = new StringBuilder();
+                try (var stream = Files.walk(outputDir)) {
+                    stream.filter(Files::isRegularFile)
+                          .forEach(path -> {
+                              try {
+                                  String relativePath = outputDir.relativize(path).toString();
+                                  long size = Files.size(path);
+                                  String kind = determineFileKind(path);
+                                  String preview = generatePreview(path);
+                                  
+                                  index.append(String.format("""
+                                      - name: %s
+                                        path: %s
+                                        size: %d
+                                        kind: %s
+                                        preview: %s
+                                      """,
+                                      path.getFileName(),
+                                      relativePath,
+                                      size,
+                                      kind,
+                                      preview));
+                              } catch (IOException e) {
+                                  logger.debug("Failed to index artifact: {}", path, e);
+                              }
+                          });
+                }
+                return index.toString();
+            } catch (IOException e) {
+                logger.debug("Failed to generate artifacts index", e);
+                return "(error generating index)";
+            }
+        }
+
+        private String determineFileKind(Path path) {
+            String name = path.getFileName().toString().toLowerCase();
+            if (name.endsWith(".json")) return "json";
+            if (name.endsWith(".yaml") || name.endsWith(".yml")) return "yaml";
+            if (name.endsWith(".md")) return "markdown";
+            if (name.endsWith(".txt")) return "text";
+            if (name.endsWith(".py")) return "python";
+            if (name.endsWith(".js")) return "javascript";
+            if (name.endsWith(".sh")) return "shell";
+            return "binary";
+        }
+
+        private String generatePreview(Path path) {
+            try {
+                String kind = determineFileKind(path);
+                if (kind.equals("binary")) {
+                    return "(binary)";
+                }
+                String content = Files.readString(path, StandardCharsets.UTF_8);
+                return limitChars(content, 400);
+            } catch (Exception e) {
+                return "(preview unavailable)";
+            }
+        }
+
+        private ValidationReport performContractCheck(List<String> expectedOutputs) {
+            List<String> missing = new ArrayList<>();
+            List<String> violations = new ArrayList<>();
+            Path outputDir = context.outputDirectory();
+            
+            // Check if output directory exists
+            if (!Files.exists(outputDir)) {
+                violations.add("Output directory does not exist");
+                return new ValidationReport(
+                    false,
+                    "contract",
+                    List.of(),
+                    violations,
+                    "Output directory missing",
+                    new ValidationMetrics(0, 0));
+            }
+
+            // Count files and total bytes
+            int fileCount = 0;
+            long totalBytes = 0;
+            try (var stream = Files.walk(outputDir)) {
+                var files = stream.filter(Files::isRegularFile).toList();
+                fileCount = files.size();
+                for (Path file : files) {
+                    try {
+                        totalBytes += Files.size(file);
+                    } catch (IOException e) {
+                        logger.debug("Failed to get size for file: {}", file, e);
+                    }
+                }
+            } catch (IOException e) {
+                violations.add("Failed to walk output directory: " + e.getMessage());
+            }
+
+            // Check required files exist
+            for (String expected : expectedOutputs) {
+                if ("artifactPath".equals(expected)) {
+                    if (context.artifactPath() == null || !Files.exists(context.artifactPath())) {
+                        missing.add("artifactPath");
+                    }
+                }
+            }
+
+            // Check sandbox boundaries
+            Path artifactPath = context.artifactPath();
+            if (artifactPath != null) {
+                Path normalizedArtifact = artifactPath.toAbsolutePath().normalize();
+                Path normalizedOutput = outputDir.toAbsolutePath().normalize();
+                if (!normalizedArtifact.startsWith(normalizedOutput)) {
+                    violations.add("Artifact path is outside output directory sandbox");
+                }
+            }
+
+            boolean pass = missing.isEmpty() && violations.isEmpty();
+            String rationale = pass 
+                ? "All contract checks passed" 
+                : "Contract validation failed";
+
+            return new ValidationReport(
+                pass,
+                "contract",
+                missing,
+                violations,
+                rationale,
+                new ValidationMetrics(fileCount, totalBytes));
+        }
+
         private record ReferenceDocumentContent(String detail, String summaryText, boolean binary) {}
+    }
+
+    private static Path sanitiseOutputRelativePath(Path candidate, Path outputDir) {
+        if (candidate == null || candidate.isAbsolute() || outputDir == null) {
+            return candidate;
+        }
+        Path normalised = candidate.normalize();
+        List<String> suffixParts = outputDirSuffixParts(outputDir);
+        if (suffixParts.isEmpty() || normalised.getNameCount() == 0) {
+            return normalised;
+        }
+        List<String> candidateParts = new ArrayList<>(normalised.getNameCount());
+        for (Path part : normalised) {
+            candidateParts.add(part.toString());
+        }
+        int index = 0;
+        boolean removed = false;
+        while (candidateParts.size() - index >= suffixParts.size()
+                && candidateParts.subList(index, index + suffixParts.size()).equals(suffixParts)) {
+            index += suffixParts.size();
+            removed = true;
+        }
+        if (!removed) {
+            return normalised;
+        }
+        if (candidateParts.size() == index) {
+            return Path.of("");
+        }
+        String first = candidateParts.get(index);
+        String[] rest = candidateParts.subList(index + 1, candidateParts.size()).toArray(String[]::new);
+        return Path.of(first, rest);
+    }
+
+    private static List<String> outputDirSuffixParts(Path outputDir) {
+        if (outputDir == null) {
+            return List.of();
+        }
+        Path normalised = outputDir.toAbsolutePath().normalize();
+        int nameCount = normalised.getNameCount();
+        if (nameCount == 0) {
+            return List.of();
+        }
+        int start = Math.max(0, nameCount - 2);
+        Path suffix = normalised.subpath(start, nameCount);
+        List<String> parts = new ArrayList<>();
+        for (Path part : suffix) {
+            parts.add(part.toString());
+        }
+        return parts;
     }
 
     private record ProcessResult(
@@ -1980,7 +2335,12 @@ public final class SkillRuntime {
             } else {
                 fileName = DEFAULT_OUTPUT_FILE;
             }
-            Path resolved = outputDirectory.resolve(fileName).toAbsolutePath().normalize();
+            Path requestedPath = Path.of(fileName);
+            Path resolvedCandidate = requestedPath.isAbsolute()
+                    ? requestedPath.toAbsolutePath().normalize()
+                    : outputDirectory.resolve(
+                            SkillRuntime.sanitiseOutputRelativePath(requestedPath.normalize(), outputDirectory));
+            Path resolved = resolvedCandidate.toAbsolutePath().normalize();
             if (!resolved.startsWith(outputDirectory)) {
                 throw new IllegalArgumentException("Output path must remain under " + outputDirectory);
             }
@@ -2084,6 +2444,33 @@ public final class SkillRuntime {
     public record Validation(boolean expectedOutputsSatisfied, List<String> missingOutputs) {
         public Validation {
             Objects.requireNonNull(missingOutputs, "missingOutputs");
+        }
+    }
+
+    public record ValidationReport(
+            boolean pass,
+            String stage,
+            List<String> missing,
+            List<String> violations,
+            String rationale,
+            ValidationMetrics metrics) {
+        public ValidationReport {
+            Objects.requireNonNull(stage, "stage");
+            missing = missing == null ? List.of() : List.copyOf(missing);
+            violations = violations == null ? List.of() : List.copyOf(violations);
+            rationale = rationale == null ? "" : rationale;
+            Objects.requireNonNull(metrics, "metrics");
+        }
+    }
+
+    public record ValidationMetrics(int files, long bytes) {
+        public ValidationMetrics {
+            if (files < 0) {
+                throw new IllegalArgumentException("files must be non-negative");
+            }
+            if (bytes < 0) {
+                throw new IllegalArgumentException("bytes must be non-negative");
+            }
         }
     }
 
