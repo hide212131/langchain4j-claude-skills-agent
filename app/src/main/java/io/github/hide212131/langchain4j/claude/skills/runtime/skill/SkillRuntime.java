@@ -324,7 +324,7 @@ public final class SkillRuntime {
     ResultWithAgenticScope<String> run(
         @V("request") String request,
         @V("skillId") String skillId,
-        @V("expectedOutputs") List<String> expectedOutputs,
+        @V("expectedOutputs") String expectedOutputs,
         @V("goal") String goal,
         @V("constraints") String constraints);
     }
@@ -372,19 +372,20 @@ public final class SkillRuntime {
                 Map<String, Object> inputs,
                 List<String> expectedOutputs,
                 String prompt) {
-        ResultWithAgenticScope<String> result = buildSupervisor(toolbox, metadata, expectedOutputs)
+            String expectedOutputsPayload = serialiseExpectedOutputs(expectedOutputs);
+            ResultWithAgenticScope<String> result = buildSupervisor(toolbox, metadata, expectedOutputs)
                     .run(
                             prompt,
                             metadata.id(),
-                            expectedOutputs,
+                            expectedOutputsPayload,
                             Objects.toString(inputs.getOrDefault("goal", ""), ""),
-                Objects.toString(inputs.getOrDefault("constraints", ""), ""));
-        String supervisorResponse = result.result();
-        return supervisorResponse == null ? "" : supervisorResponse;
+                            Objects.toString(inputs.getOrDefault("constraints", ""), ""));
+            String supervisorResponse = result.result();
+            return supervisorResponse == null ? "" : supervisorResponse;
         }
 
-    private SkillActSupervisor buildSupervisor(
-        Toolbox toolbox, SkillIndex.SkillMetadata metadata, List<String> expectedOutputs) {
+        private SkillActSupervisor buildSupervisor(
+                Toolbox toolbox, SkillIndex.SkillMetadata metadata, List<String> expectedOutputs) {
             return AgenticServices
                     .supervisorBuilder(SkillActSupervisor.class)
                     .chatModel(chatModel)
@@ -392,7 +393,6 @@ public final class SkillRuntime {
                     .responseStrategy(SupervisorResponseStrategy.SUMMARY)
                     .supervisorContext(createSupervisorContext(metadata, expectedOutputs))
                     .subAgents(
-                new ReadSkillMdAgent(toolbox),
                 new ReadReferenceAgent(toolbox),
                 new ScriptDeployAgent(toolbox),
                 new RunScriptAgent(toolbox),
@@ -402,15 +402,22 @@ public final class SkillRuntime {
                     .build();
         }
 
+        private String serialiseExpectedOutputs(List<String> expectedOutputs) {
+            if (expectedOutputs == null || expectedOutputs.isEmpty()) {
+                return "artifactPath";
+            }
+            return String.join(System.lineSeparator(), expectedOutputs);
+        }
+
         private String createSupervisorContext(
                 SkillIndex.SkillMetadata metadata, List<String> expectedOutputs) {
             String expected = expectedOutputs.isEmpty()
                     ? "artifactPath (default)"
                     : String.join(", ", expectedOutputs);
+            String skillInstructions = loadSkillInstructions(metadata);
             return """
                     Progressive Disclosure Policy:
                     - Maintain L1 (name/description) in context by default.
-                    - Call readSkillMd first to load SKILL.md (L2) for skill %s.
                     - Use readRef to resolve any additional references (L3).
                     - Persist artefacts only through writeArtifact (paths relative to build/out).
                     - Capture derived procedures with writeArtifact and then reference them with readRef when you need that knowledge again.
@@ -427,26 +434,24 @@ public final class SkillRuntime {
                         * Do not emit JSON arrays or objects inside the arguments map.
                     - If you are unsure, choose the most appropriate next action yourself; you will not receive extra guidance from the user.
                     Always respond with key=value pairs when completing the task.
+                    
+                    SKILL.md content (must be read fully before acting):
+                    %s
+                    
                     Expected outputs: %s
-                    """.formatted(metadata.id(), expected);
+                    """.formatted(skillInstructions, expected);
         }
 
-    }
-
-    public static final class ReadSkillMdAgent {
-
-        private final Toolbox toolbox;
-
-        public ReadSkillMdAgent(Toolbox toolbox) {
-            this.toolbox = Objects.requireNonNull(toolbox, "toolbox");
+        private String loadSkillInstructions(SkillIndex.SkillMetadata metadata) {
+            Path skillMd = metadata.skillRoot().resolve("SKILL.md");
+            try {
+                return Files.readString(skillMd);
+            } catch (IOException e) {
+                new WorkflowLogger().warn("Failed to load SKILL.md for skill {}: {}", metadata.id(), e.getMessage());
+                return "(SKILL.md could not be loaded; stop and investigate before proceeding)";
+            }
         }
 
-        @Agent(
-                name = "readSkillMd",
-                description = "Reads the SKILL.md document for the active skill")
-        public SkillDocumentResult read(@V("skillId") String skillId) {
-            return toolbox.readSkillMd(skillId);
-        }
     }
 
     public static final class ReadReferenceAgent {
@@ -681,8 +686,9 @@ public final class SkillRuntime {
                 description = "Unified validator that performs contract (deterministic) and semantic (LLM) checks.")
         public ValidationReport validate(
                 @V("skillId") String skillId,
-                @V("expectedOutputs") List<String> expectedOutputs) {
-            
+                @V("expectedOutputs") String expectedOutputsArgument) {
+
+            List<String> expectedOutputs = normaliseExpectedOutputs(expectedOutputsArgument);
             WorkflowLogger logger = getLogger();
             
             // Phase 1: Contract Check (deterministic, non-AI)
@@ -711,6 +717,37 @@ public final class SkillRuntime {
             logger.info("Validation[semantic] Completed: pass={}", semanticResult.pass());
             
             return semanticResult;
+        }
+
+        private List<String> normaliseExpectedOutputs(String rawExpectedOutputs) {
+            if (rawExpectedOutputs == null || rawExpectedOutputs.isBlank()) {
+                return List.of("artifactPath");
+            }
+
+            List<String> outputs = new ArrayList<>();
+            String[] tokens = rawExpectedOutputs.split("[\\n,]");
+            for (String token : tokens) {
+                if (token == null) {
+                    continue;
+                }
+                String trimmed = token.trim();
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                int equalsIndex = trimmed.indexOf('=');
+                if (equalsIndex >= 0) {
+                    trimmed = trimmed.substring(0, equalsIndex).trim();
+                }
+                if (!trimmed.isEmpty()) {
+                    outputs.add(trimmed);
+                }
+            }
+
+            if (outputs.isEmpty()) {
+                outputs.add("artifactPath");
+            }
+
+            return List.copyOf(outputs);
         }
 
         private WorkflowLogger getLogger() {
@@ -1427,16 +1464,21 @@ public final class SkillRuntime {
         }
 
         private Path resolveScriptPath(Path skillRoot, Path outputDir, String requested) {
-            Path candidate = Path.of(requested);
+            Path candidate = Path.of(requested == null ? "" : requested);
             List<Path> searchOrder = new ArrayList<>();
             if (candidate.isAbsolute()) {
-                searchOrder.add(candidate);
+                searchOrder.add(candidate.toAbsolutePath().normalize());
             } else {
-                searchOrder.add(skillRoot.resolve(candidate));
-                searchOrder.add(outputDir.resolve(candidate));
+                Path normalised = candidate.normalize();
+                Path outputRelative = SkillRuntime.sanitiseOutputRelativePath(normalised, outputDir);
+                searchOrder.add(skillRoot.resolve(normalised));
+                searchOrder.add(outputDir.resolve(outputRelative));
+                if (!outputRelative.equals(normalised)) {
+                    searchOrder.add(outputDir.resolve(normalised));
+                }
                 Path projectRoot = SkillRuntime.this.skillIndex.skillsRoot().getParent();
                 if (projectRoot != null) {
-                    searchOrder.add(projectRoot.resolve(candidate));
+                    searchOrder.add(projectRoot.resolve(normalised));
                 }
             }
             for (Path option : searchOrder) {
@@ -1471,13 +1513,18 @@ public final class SkillRuntime {
         }
 
         private Path resolveDeploymentSource(Path skillRoot, Path outputDir, String sourceDir) {
-            Path candidate = Path.of(sourceDir);
+            Path candidate = Path.of(sourceDir == null ? "" : sourceDir);
             List<Path> searchOrder = new ArrayList<>();
             if (candidate.isAbsolute()) {
-                searchOrder.add(candidate);
+                searchOrder.add(candidate.toAbsolutePath().normalize());
             } else {
-                searchOrder.add(outputDir.resolve(candidate));
-                searchOrder.add(skillRoot.resolve(candidate));
+                Path normalised = candidate.normalize();
+                Path outputRelative = SkillRuntime.sanitiseOutputRelativePath(normalised, outputDir);
+                searchOrder.add(outputDir.resolve(outputRelative));
+                if (!outputRelative.equals(normalised)) {
+                    searchOrder.add(outputDir.resolve(normalised));
+                }
+                searchOrder.add(skillRoot.resolve(normalised));
             }
             for (Path option : searchOrder) {
                 Path normalised = option.toAbsolutePath().normalize();
@@ -1492,8 +1539,11 @@ public final class SkillRuntime {
         }
 
         private Path resolveDeploymentTarget(Path outputDir, String targetDir) {
-            Path candidate = Path.of(targetDir);
-            Path resolved = candidate.isAbsolute() ? candidate : outputDir.resolve(candidate);
+            Path candidate = Path.of(targetDir == null ? "" : targetDir);
+            if (!candidate.isAbsolute()) {
+                candidate = SkillRuntime.sanitiseOutputRelativePath(candidate.normalize(), outputDir);
+            }
+            Path resolved = candidate.isAbsolute() ? candidate.toAbsolutePath().normalize() : outputDir.resolve(candidate);
             Path normalised = resolved.toAbsolutePath().normalize();
             if (!normalised.startsWith(outputDir)) {
                 throw new IllegalArgumentException("Deployment target must remain under " + outputDir);
@@ -2137,6 +2187,55 @@ public final class SkillRuntime {
         private record ReferenceDocumentContent(String detail, String summaryText, boolean binary) {}
     }
 
+    private static Path sanitiseOutputRelativePath(Path candidate, Path outputDir) {
+        if (candidate == null || candidate.isAbsolute() || outputDir == null) {
+            return candidate;
+        }
+        Path normalised = candidate.normalize();
+        List<String> suffixParts = outputDirSuffixParts(outputDir);
+        if (suffixParts.isEmpty() || normalised.getNameCount() == 0) {
+            return normalised;
+        }
+        List<String> candidateParts = new ArrayList<>(normalised.getNameCount());
+        for (Path part : normalised) {
+            candidateParts.add(part.toString());
+        }
+        int index = 0;
+        boolean removed = false;
+        while (candidateParts.size() - index >= suffixParts.size()
+                && candidateParts.subList(index, index + suffixParts.size()).equals(suffixParts)) {
+            index += suffixParts.size();
+            removed = true;
+        }
+        if (!removed) {
+            return normalised;
+        }
+        if (candidateParts.size() == index) {
+            return Path.of("");
+        }
+        String first = candidateParts.get(index);
+        String[] rest = candidateParts.subList(index + 1, candidateParts.size()).toArray(String[]::new);
+        return Path.of(first, rest);
+    }
+
+    private static List<String> outputDirSuffixParts(Path outputDir) {
+        if (outputDir == null) {
+            return List.of();
+        }
+        Path normalised = outputDir.toAbsolutePath().normalize();
+        int nameCount = normalised.getNameCount();
+        if (nameCount == 0) {
+            return List.of();
+        }
+        int start = Math.max(0, nameCount - 2);
+        Path suffix = normalised.subpath(start, nameCount);
+        List<String> parts = new ArrayList<>();
+        for (Path part : suffix) {
+            parts.add(part.toString());
+        }
+        return parts;
+    }
+
     private record ProcessResult(
             List<String> command,
             int exitCode,
@@ -2236,7 +2335,12 @@ public final class SkillRuntime {
             } else {
                 fileName = DEFAULT_OUTPUT_FILE;
             }
-            Path resolved = outputDirectory.resolve(fileName).toAbsolutePath().normalize();
+            Path requestedPath = Path.of(fileName);
+            Path resolvedCandidate = requestedPath.isAbsolute()
+                    ? requestedPath.toAbsolutePath().normalize()
+                    : outputDirectory.resolve(
+                            SkillRuntime.sanitiseOutputRelativePath(requestedPath.normalize(), outputDirectory));
+            Path resolved = resolvedCandidate.toAbsolutePath().normalize();
             if (!resolved.startsWith(outputDirectory)) {
                 throw new IllegalArgumentException("Output path must remain under " + outputDirectory);
             }
