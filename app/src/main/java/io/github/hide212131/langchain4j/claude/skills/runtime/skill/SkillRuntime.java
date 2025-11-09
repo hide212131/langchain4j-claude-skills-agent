@@ -11,8 +11,7 @@ import dev.langchain4j.agentic.scope.ResultWithAgenticScope;
 import dev.langchain4j.agentic.supervisor.SupervisorContextStrategy;
 import dev.langchain4j.agentic.supervisor.SupervisorResponseStrategy;
 import dev.langchain4j.model.chat.ChatModel;
-import dev.langchain4j.service.AiServices;
-import dev.langchain4j.service.SystemMessage;
+import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
 import io.opentelemetry.api.common.Attributes;
@@ -484,12 +483,15 @@ public final class SkillRuntime {
 
     }
 
-    interface ReadReferenceAgent {
-        @SystemMessage("""
-                You are a reference document reader for the skill system.
-                Your role is to resolve and read reference documents for skills.
-                When given a skillId and reference path, use the available tools to read the requested reference.
-                """)
+    public interface ReadReferenceAgent {
+    @UserMessage("""
+        You are a reference document reader for the skill system.
+        Your role is to resolve and read reference documents for skills.
+        First, call the readRef tool with the provided skillId and reference path.
+        Then, return the resolved document content and relevant metadata.
+        skillId={{skillId}}
+        reference={{reference}}
+        """)
         @Agent(
                 name = "readRef",
                 description = "Resolves and reads an additional reference for the active skill")
