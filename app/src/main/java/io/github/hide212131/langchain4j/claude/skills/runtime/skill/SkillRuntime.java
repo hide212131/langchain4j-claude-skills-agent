@@ -13,6 +13,8 @@ import dev.langchain4j.agentic.supervisor.SupervisorResponseStrategy;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.service.V;
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
+import io.github.hide212131.langchain4j.claude.skills.runtime.skill.agent.ProgressTrackerAgent;
+import io.github.hide212131.langchain4j.claude.skills.runtime.skill.agent.ProgressTrackerAgentFactory;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
 import java.io.File;
@@ -386,6 +388,11 @@ public final class SkillRuntime {
 
         private SkillActSupervisor buildSupervisor(
                 Toolbox toolbox, SkillIndex.SkillMetadata metadata, List<String> expectedOutputs) {
+            
+            // Create ProgressTrackerAgent
+            ProgressTrackerAgent progressTracker = 
+                new ProgressTrackerAgentFactory(chatModel).create();
+            
             return AgenticServices
                     .supervisorBuilder(SkillActSupervisor.class)
                     .chatModel(chatModel)
@@ -397,7 +404,8 @@ public final class SkillRuntime {
                 new ScriptDeployAgent(toolbox),
                 new RunScriptAgent(toolbox),
                 new WriteArtifactAgent(toolbox),
-                new UnifiedOutputsValidatorAgent(toolbox, chatModel, false) // Semantic check disabled by default
+                new UnifiedOutputsValidatorAgent(toolbox, chatModel, false), // Semantic check disabled by default
+                new ProgressTrackerAgentWrapper(progressTracker)  // Add progress tracking agent
                 )
                     .build();
         }
@@ -433,6 +441,11 @@ public final class SkillRuntime {
                         * Provide deploy arguments as directory paths, e.g. "sourceDir": "scripts", "targetDir": "workdir".
                         * Do not emit JSON arrays or objects inside the arguments map.
                     - If you are unsure, choose the most appropriate next action yourself; you will not receive extra guidance from the user.
+                    
+                    **Progress Tracking:**
+                    - Current work progress: {{current_work_progress}}
+                    - After completing each action, invoke ProgressTracker to update the progress state.
+                    
                     Always respond with key=value pairs when completing the task.
                     
                     SKILL.md content (must be read fully before acting):
@@ -666,6 +679,28 @@ public final class SkillRuntime {
                 @V("expected") Object expected,
                 @V("observed") Object observed) {
             return toolbox.validateExpectedOutputs(expected, observed);
+        }
+    }
+
+    public static final class ProgressTrackerAgentWrapper {
+
+        private final ProgressTrackerAgent progressTrackerAgent;
+
+        public ProgressTrackerAgentWrapper(ProgressTrackerAgent progressTrackerAgent) {
+            this.progressTrackerAgent = Objects.requireNonNull(progressTrackerAgent, "progressTrackerAgent");
+        }
+
+        @Agent(
+                name = "ProgressTracker",
+                description = "Tracks and updates the current work progress based on completed actions. "
+                            + "Invoke this agent after completing each action (readRef, deployScripts, runScript, writeArtifact, validateOutputs) "
+                            + "with parameters: current_progress (from {{current_work_progress}}), latest_action (description of what was done), "
+                            + "and action_result (success/failure with details).")
+        public String updateProgress(
+                @V("current_progress") String currentProgress,
+                @V("latest_action") String latestAction,
+                @V("action_result") String actionResult) {
+            return progressTrackerAgent.updateProgress(currentProgress, latestAction, actionResult);
         }
     }
 
