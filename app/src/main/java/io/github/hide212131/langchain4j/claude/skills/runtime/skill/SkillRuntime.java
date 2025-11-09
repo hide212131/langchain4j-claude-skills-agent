@@ -397,7 +397,7 @@ public final class SkillRuntime {
                     .subAgents(
                 buildReadReferenceAgent(toolbox),
                 buildScriptDeployAgent(toolbox),
-                new RunScriptAgent(toolbox),
+                buildRunScriptAgent(toolbox),
                 buildWriteArtifactAgent(toolbox),
                 new UnifiedOutputsValidatorAgent(toolbox, chatModel, false) // Semantic check disabled by default
                 )
@@ -422,6 +422,13 @@ public final class SkillRuntime {
             return AgenticServices.agentBuilder(WriteArtifactAgent.class)
                     .chatModel(chatModel)
                     .tools(toolbox)
+                    .build();
+        }
+
+        private RunScriptAgent buildRunScriptAgent(Toolbox toolbox) {
+            return AgenticServices.agentBuilder(RunScriptAgent.class)
+                    .chatModel(chatModel)
+                    .tools(new RunScriptTools(toolbox))
                     .build();
         }
 
@@ -491,23 +498,38 @@ public final class SkillRuntime {
                 @V("reference") String reference);
     }
 
-    public static final class RunScriptAgent {
-
-        private final Toolbox toolbox;
-
-        public RunScriptAgent(Toolbox toolbox) {
-            this.toolbox = Objects.requireNonNull(toolbox, "toolbox");
-        }
-
+    interface RunScriptAgent {
+        @SystemMessage("""
+                You are a script execution agent for the skill system.
+                Your role is to execute scripts within the skill sandbox with proper arguments and dependencies.
+                When given script parameters, use the available tools to run the script safely.
+                """)
         @Agent(
                 name = "runScript",
                 description = "Executes a script within the skill sandbox")
-        public ScriptResult run(
+        ScriptResult run(
                 @V("skillId") String skillId,
                 @V("path") String path,
                 @V("args") Object args,
                 @V("dependencies") Object dependencies,
-                @V("timeoutSeconds") Integer timeoutSeconds) {
+                @V("timeoutSeconds") Integer timeoutSeconds);
+    }
+
+    // Helper class providing script execution tools with parameter coercion
+    static final class RunScriptTools {
+        private final Toolbox toolbox;
+
+        RunScriptTools(Toolbox toolbox) {
+            this.toolbox = Objects.requireNonNull(toolbox, "toolbox");
+        }
+
+        @Tool(name = "runScript", returnBehavior = ReturnBehavior.TO_LLM)
+        public ScriptResult runScript(
+                @P("skillId") String skillId,
+                @P("path") String path,
+                @P("args") Object args,
+                @P("dependencies") Object dependencies,
+                @P("timeoutSeconds") Integer timeoutSeconds) {
             return toolbox.runScript(
                     skillId,
                     path,
