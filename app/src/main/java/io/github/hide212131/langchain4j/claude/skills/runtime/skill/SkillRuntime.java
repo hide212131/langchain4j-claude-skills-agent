@@ -395,12 +395,19 @@ public final class SkillRuntime {
                     .responseStrategy(SupervisorResponseStrategy.SUMMARY)
                     .supervisorContext(createSupervisorContext(metadata, expectedOutputs))
                     .subAgents(
-                new ReadReferenceAgent(toolbox, chatModel),
+                buildReadReferenceAgent(toolbox),
                 new ScriptDeployAgent(toolbox),
                 new RunScriptAgent(toolbox),
                 new WriteArtifactAgent(toolbox),
                 new UnifiedOutputsValidatorAgent(toolbox, chatModel, false) // Semantic check disabled by default
                 )
+                    .build();
+        }
+
+        private ReadReferenceAgent buildReadReferenceAgent(Toolbox toolbox) {
+            return AiServices.builder(ReadReferenceAgent.class)
+                    .chatModel(chatModel)
+                    .tools(toolbox)
                     .build();
         }
 
@@ -456,53 +463,18 @@ public final class SkillRuntime {
 
     }
 
-    interface ReadReferenceAgentService {
+    interface ReadReferenceAgent {
         @SystemMessage("""
                 You are a reference document reader for the skill system.
                 Your role is to resolve and read reference documents for skills.
-                When given a skillId and reference path:
-                - Use the readReferenceFile tool to read the requested reference
-                - Return the complete reference documents information
+                When given a skillId and reference path, use the available tools to read the requested reference.
                 """)
-        ReferenceDocuments readReference(
-                @V("skillId") String skillId,
-                @V("reference") String reference);
-    }
-
-    public static final class ReadReferenceAgent {
-
-        private final ReadReferenceAgentService agentService;
-
-        public ReadReferenceAgent(Toolbox toolbox, ChatModel chatModel) {
-            this.agentService = AiServices.builder(ReadReferenceAgentService.class)
-                    .chatModel(chatModel)
-                    .tools(new ReadReferenceTools(toolbox))
-                    .build();
-        }
-
         @Agent(
                 name = "readRef",
                 description = "Resolves and reads an additional reference for the active skill")
-        public ReferenceDocuments read(
+        ReferenceDocuments read(
                 @V("skillId") String skillId,
-                @V("reference") String reference) {
-            return agentService.readReference(skillId, reference);
-        }
-
-        private static final class ReadReferenceTools {
-            private final Toolbox toolbox;
-
-            ReadReferenceTools(Toolbox toolbox) {
-                this.toolbox = Objects.requireNonNull(toolbox, "toolbox");
-            }
-
-            @Tool(name = "readReferenceFile", returnBehavior = ReturnBehavior.TO_LLM)
-            public ReferenceDocuments readReferenceFile(
-                    @P("skillId") String skillId,
-                    @P("reference") String reference) {
-                return toolbox.readReference(skillId, reference);
-            }
-        }
+                @V("reference") String reference);
     }
 
     public static final class RunScriptAgent {
