@@ -396,9 +396,9 @@ public final class SkillRuntime {
                     .supervisorContext(createSupervisorContext(metadata, expectedOutputs))
                     .subAgents(
                 buildReadReferenceAgent(toolbox),
-                new ScriptDeployAgent(toolbox),
+                buildScriptDeployAgent(toolbox),
                 new RunScriptAgent(toolbox),
-                new WriteArtifactAgent(toolbox),
+                buildWriteArtifactAgent(toolbox),
                 new UnifiedOutputsValidatorAgent(toolbox, chatModel, false) // Semantic check disabled by default
                 )
                     .build();
@@ -406,6 +406,20 @@ public final class SkillRuntime {
 
         private ReadReferenceAgent buildReadReferenceAgent(Toolbox toolbox) {
             return AgenticServices.agentBuilder(ReadReferenceAgent.class)
+                    .chatModel(chatModel)
+                    .tools(toolbox)
+                    .build();
+        }
+
+        private ScriptDeployAgent buildScriptDeployAgent(Toolbox toolbox) {
+            return AgenticServices.agentBuilder(ScriptDeployAgent.class)
+                    .chatModel(chatModel)
+                    .tools(toolbox)
+                    .build();
+        }
+
+        private WriteArtifactAgent buildWriteArtifactAgent(Toolbox toolbox) {
+            return AgenticServices.agentBuilder(WriteArtifactAgent.class)
                     .chatModel(chatModel)
                     .tools(toolbox)
                     .build();
@@ -616,44 +630,36 @@ public final class SkillRuntime {
         }
     }
 
-    public static final class ScriptDeployAgent {
-
-        private final Toolbox toolbox;
-
-        public ScriptDeployAgent(Toolbox toolbox) {
-            this.toolbox = Objects.requireNonNull(toolbox, "toolbox");
-        }
-
+    interface ScriptDeployAgent {
+        @SystemMessage("""
+                You are a script deployment agent for the skill system.
+                Your role is to copy supporting script files into a working directory.
+                When given source and target directories, use the available tools to deploy scripts safely.
+                """)
         @Agent(
                 name = "deployScripts",
                 description = "Copies supporting script files into a working directory under build/out")
-        public DeploymentResult deploy(
+        DeploymentResult deploy(
                 @V("skillId") String skillId,
                 @V("sourceDir") String sourceDir,
-                @V("targetDir") String targetDir) {
-            return toolbox.deployScripts(skillId, sourceDir, targetDir);
-        }
+                @V("targetDir") String targetDir);
     }
 
-    public static final class WriteArtifactAgent {
-
-        private final Toolbox toolbox;
-
-        public WriteArtifactAgent(Toolbox toolbox) {
-            this.toolbox = Objects.requireNonNull(toolbox, "toolbox");
-        }
-
+    interface WriteArtifactAgent {
+        @SystemMessage("""
+                You are an artifact writing agent for the skill system.
+                Your role is to persist generated artifacts under the build output directory.
+                You can save either plain text or Base64-encoded content.
+                When given content to save, use the available tools to write artifacts safely.
+                """)
         @Agent(
                 name = "writeArtifact",
                 description = "Persists generated artefacts under the build output directory. You can save either plain text or Base64-encoded content. Specify which using the base64Encoded parameter.")
-        public ArtifactHandle write(
+        ArtifactHandle write(
                 @V("skillId") String skillId,
                 @V(value = "relativePath") String relativePath,
                 @V(value = "content") String content,
-                @V(value = "base64Encoded") Boolean base64Encoded) {
-            boolean encoded = Boolean.TRUE.equals(base64Encoded);
-            return toolbox.writeArtifact(skillId, relativePath, content, encoded);
-        }
+                @V(value = "base64Encoded") Boolean base64Encoded);
     }
 
     public static final class ValidateExpectedOutputsAgent {
