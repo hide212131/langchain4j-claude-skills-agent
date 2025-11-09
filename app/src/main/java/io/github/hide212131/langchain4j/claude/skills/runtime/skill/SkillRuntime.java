@@ -153,9 +153,15 @@ public final class SkillRuntime {
             SkillIndex.SkillMetadata metadata, Map<String, Object> inputs, List<String> expectedOutputs) {
         String goal = Objects.toString(inputs.getOrDefault("goal", ""), "");
         String constraints = Objects.toString(inputs.getOrDefault("constraints", ""), "");
+        String currentWorkProgress = Objects.toString(inputs.getOrDefault("current_work_progress", ""), "");
         String expected = expectedOutputs.isEmpty()
                 ? "artifactPath (default)"
                 : String.join(", ", expectedOutputs);
+        
+        String progressSection = currentWorkProgress.isBlank() 
+                ? "" 
+                : "\nCurrent Work Progress:\n" + currentWorkProgress + "\n";
+        
         return """
                 # Skill Execution Request
 
@@ -163,7 +169,7 @@ public final class SkillRuntime {
                 Skill Name: %s
                 Goal: %s
                 Constraints: %s
-                Expected Outputs: %s of artifacts aligned with the goal
+                Expected Outputs: %s of artifacts aligned with the goal%s
 
                 Apply the supervisor instructions to decide which tools to call. When you finish, respond with key=value lines containing at least:
                   artifactPath=<absolute path to the generated artefact>
@@ -173,7 +179,8 @@ public final class SkillRuntime {
                 metadata.name(),
                 goal.isBlank() ? "(goal not provided)" : goal,
                 constraints.isBlank() ? "(none)" : constraints,
-                expected);
+                expected,
+                progressSection);
     }
 
     private Map<String, String> parseFinalResponse(String response) {
