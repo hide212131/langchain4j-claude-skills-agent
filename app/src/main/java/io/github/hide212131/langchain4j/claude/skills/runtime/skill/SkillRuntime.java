@@ -11,8 +11,6 @@ import dev.langchain4j.agentic.scope.ResultWithAgenticScope;
 import dev.langchain4j.agentic.supervisor.SupervisorContextStrategy;
 import dev.langchain4j.agentic.supervisor.SupervisorResponseStrategy;
 import dev.langchain4j.model.chat.ChatModel;
-import dev.langchain4j.service.AiServices;
-import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.V;
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
 import io.opentelemetry.api.common.Attributes;
@@ -395,36 +393,13 @@ public final class SkillRuntime {
                     .responseStrategy(SupervisorResponseStrategy.SUMMARY)
                     .supervisorContext(createSupervisorContext(metadata, expectedOutputs))
                     .subAgents(
-                buildReadReferenceAgent(toolbox),
+                new ReadReferenceAgent(toolbox),
                 new ScriptDeployAgent(toolbox),
                 new RunScriptAgent(toolbox),
                 new WriteArtifactAgent(toolbox),
                 new UnifiedOutputsValidatorAgent(toolbox, chatModel, false) // Semantic check disabled by default
                 )
                     .build();
-        }
-
-        private ReadReferenceAgent buildReadReferenceAgent(Toolbox toolbox) {
-            return AiServices
-                    .builder(ReadReferenceAgent.class)
-                    .chatModel(chatModel)
-                    .tools(new ReadReferenceTools(toolbox))
-                    .build();
-        }
-
-        private static final class ReadReferenceTools {
-            private final Toolbox toolbox;
-
-            ReadReferenceTools(Toolbox toolbox) {
-                this.toolbox = Objects.requireNonNull(toolbox, "toolbox");
-            }
-
-            @Tool(name = "readReference", returnBehavior = ReturnBehavior.TO_LLM)
-            public ReferenceDocuments readReference(
-                    @P("skillId") String skillId,
-                    @P("reference") String reference) {
-                return toolbox.readReference(skillId, reference);
-            }
         }
 
         private String serialiseExpectedOutputs(List<String> expectedOutputs) {
@@ -479,20 +454,22 @@ public final class SkillRuntime {
 
     }
 
-    interface ReadReferenceAgent {
-        @SystemMessage("""
-                You are a reference document reader for the skill system.
-                Your role is to resolve and read reference documents for skills.
-                - Accept skillId and reference path as inputs
-                - Delegate actual file reading to the provided tools
-                - Return the resolved reference documents
-                """)
+    public static final class ReadReferenceAgent {
+
+        private final Toolbox toolbox;
+
+        public ReadReferenceAgent(Toolbox toolbox) {
+            this.toolbox = Objects.requireNonNull(toolbox, "toolbox");
+        }
+
         @Agent(
                 name = "readRef",
                 description = "Resolves and reads an additional reference for the active skill")
-        ResultWithAgenticScope<ReferenceDocuments> read(
+        public ReferenceDocuments read(
                 @V("skillId") String skillId,
-                @V("reference") String reference);
+                @V("reference") String reference) {
+            return toolbox.readReference(skillId, reference);
+        }
     }
 
     public static final class RunScriptAgent {
