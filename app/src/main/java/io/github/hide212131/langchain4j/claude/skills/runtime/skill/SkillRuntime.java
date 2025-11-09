@@ -405,7 +405,7 @@ public final class SkillRuntime {
         }
 
         private ReadReferenceAgent buildReadReferenceAgent(Toolbox toolbox) {
-            return AiServices.builder(ReadReferenceAgent.class)
+            return AgenticServices.agentBuilder(ReadReferenceAgent.class)
                     .chatModel(chatModel)
                     .tools(toolbox)
                     .build();
