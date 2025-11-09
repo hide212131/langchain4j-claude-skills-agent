@@ -11,6 +11,8 @@ import dev.langchain4j.agentic.scope.ResultWithAgenticScope;
 import dev.langchain4j.agentic.supervisor.SupervisorContextStrategy;
 import dev.langchain4j.agentic.supervisor.SupervisorResponseStrategy;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.service.AiServices;
+import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.V;
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
 import io.opentelemetry.api.common.Attributes;
@@ -393,7 +395,7 @@ public final class SkillRuntime {
                     .responseStrategy(SupervisorResponseStrategy.SUMMARY)
                     .supervisorContext(createSupervisorContext(metadata, expectedOutputs))
                     .subAgents(
-                new ReadReferenceAgent(toolbox),
+                new ReadReferenceAgent(toolbox, chatModel),
                 new ScriptDeployAgent(toolbox),
                 new RunScriptAgent(toolbox),
                 new WriteArtifactAgent(toolbox),
@@ -454,12 +456,28 @@ public final class SkillRuntime {
 
     }
 
+    interface ReadReferenceAgentService {
+        @SystemMessage("""
+                You are a reference document reader for the skill system.
+                Your role is to resolve and read reference documents for skills.
+                When given a skillId and reference path:
+                - Use the readReferenceFile tool to read the requested reference
+                - Return the complete reference documents information
+                """)
+        ReferenceDocuments readReference(
+                @V("skillId") String skillId,
+                @V("reference") String reference);
+    }
+
     public static final class ReadReferenceAgent {
 
-        private final Toolbox toolbox;
+        private final ReadReferenceAgentService agentService;
 
-        public ReadReferenceAgent(Toolbox toolbox) {
-            this.toolbox = Objects.requireNonNull(toolbox, "toolbox");
+        public ReadReferenceAgent(Toolbox toolbox, ChatModel chatModel) {
+            this.agentService = AiServices.builder(ReadReferenceAgentService.class)
+                    .chatModel(chatModel)
+                    .tools(new ReadReferenceTools(toolbox))
+                    .build();
         }
 
         @Agent(
@@ -468,7 +486,22 @@ public final class SkillRuntime {
         public ReferenceDocuments read(
                 @V("skillId") String skillId,
                 @V("reference") String reference) {
-            return toolbox.readReference(skillId, reference);
+            return agentService.readReference(skillId, reference);
+        }
+
+        private static final class ReadReferenceTools {
+            private final Toolbox toolbox;
+
+            ReadReferenceTools(Toolbox toolbox) {
+                this.toolbox = Objects.requireNonNull(toolbox, "toolbox");
+            }
+
+            @Tool(name = "readReferenceFile", returnBehavior = ReturnBehavior.TO_LLM)
+            public ReferenceDocuments readReferenceFile(
+                    @P("skillId") String skillId,
+                    @P("reference") String reference) {
+                return toolbox.readReference(skillId, reference);
+            }
         }
     }
 
