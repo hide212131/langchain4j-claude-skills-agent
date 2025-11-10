@@ -318,7 +318,7 @@ public final class SkillRuntime {
         return List.copyOf(references);
     }
 
-    interface SkillActSupervisor {
+    public interface SkillActSupervisor {
     @Agent(
         name = "SkillActSupervisor",
         description = "Supervisor coordinating Pure Act execution for a single skill. Goals must be set specifically in line with the purpose of the skill.")
@@ -500,16 +500,21 @@ public final class SkillRuntime {
                 @V("reference") String reference);
     }
 
-    interface RunScriptAgent {
-        @SystemMessage("""
-                You are a script execution agent for the skill system.
-                Your role is to execute scripts within the skill sandbox with proper arguments and dependencies.
-                When given script parameters, use the available tools to run the script safely.
-                """)
-        @Agent(
-                name = "runScript",
-                description = "Executes a script within the skill sandbox")
-        ScriptResult run(
+    public interface RunScriptAgent {
+    @UserMessage("""
+        You are a script execution agent for the skill system.
+        Your role is to execute scripts within the skill sandbox with proper arguments and dependencies.
+        First, call the runScript tool with the provided parameters to run the script safely.
+        skillId={{skillId}}
+        path={{path}}
+        args={{args}}
+        dependencies={{dependencies}}
+        timeoutSeconds={{timeoutSeconds}}
+        """)
+    @Agent(
+        name = "runScript",
+        description = "Executes a script within the skill sandbox")
+    String run(
                 @V("skillId") String skillId,
                 @V("path") String path,
                 @V("args") Object args,
@@ -526,18 +531,19 @@ public final class SkillRuntime {
         }
 
         @Tool(name = "runScript", returnBehavior = ReturnBehavior.TO_LLM)
-        public ScriptResult runScript(
+        public String runScript(
                 @P("skillId") String skillId,
                 @P("path") String path,
                 @P("args") Object args,
                 @P("dependencies") Object dependencies,
                 @P("timeoutSeconds") Integer timeoutSeconds) {
-            return toolbox.runScript(
+            ScriptResult result = toolbox.runScript(
                     skillId,
                     path,
                     coerceToList(args),
                     coerceDependencies(dependencies),
                     timeoutSeconds);
+            return summariseResult(result);
         }
 
         private List<String> coerceToList(Object value) {
@@ -652,14 +658,54 @@ public final class SkillRuntime {
             }
             return null;
         }
+
+        private String summariseResult(ScriptResult result) {
+            boolean success = result.exitCode() == 0 && !result.timedOut();
+            StringBuilder builder = new StringBuilder();
+            builder.append("Script ")
+                    .append(result.path())
+                    .append(success ? " succeeded" : " completed")
+                    .append(" (exitCode=")
+                    .append(result.exitCode());
+            if (result.timedOut()) {
+                builder.append(", timedOut=true");
+            }
+            builder.append(", durationMs=")
+                    .append(result.durationMillis())
+                    .append(')');
+            appendPreview(builder, "stdout", result.stdoutText());
+            appendPreview(builder, "stderr", result.stderrText());
+            return builder.toString();
+        }
+
+        private void appendPreview(StringBuilder builder, String label, String text) {
+            String preview = summariseText(text);
+            if (!preview.isEmpty()) {
+                builder.append(' ').append(label).append('=').append(preview);
+            }
+        }
+
+        private String summariseText(String text) {
+            if (text == null || text.isBlank()) {
+                return "";
+            }
+            return text.lines()
+                    .map(String::trim)
+                    .filter(line -> !line.isEmpty())
+                    .limit(3)
+                    .collect(Collectors.joining(" "));
+        }
     }
 
-    interface ScriptDeployAgent {
-        @SystemMessage("""
-                You are a script deployment agent for the skill system.
-                Your role is to copy supporting script files into a working directory.
-                When given source and target directories, use the available tools to deploy scripts safely.
-                """)
+    public interface ScriptDeployAgent {
+    @UserMessage("""
+        You are a script deployment agent for the skill system.
+        Your role is to copy supporting script files into a working directory under build/out.
+        First, call the deployScripts tool with the provided parameters to deploy the scripts safely.
+        skillId={{skillId}}
+        sourceDir={{sourceDir}}
+        targetDir={{targetDir}}
+        """)
         @Agent(
                 name = "deployScripts",
                 description = "Copies supporting script files into a working directory under build/out")
@@ -669,13 +715,16 @@ public final class SkillRuntime {
                 @V("targetDir") String targetDir);
     }
 
-    interface WriteArtifactAgent {
-        @SystemMessage("""
-                You are an artifact writing agent for the skill system.
-                Your role is to persist generated artifacts under the build output directory.
-                You can save either plain text or Base64-encoded content.
-                When given content to save, use the available tools to write artifacts safely.
-                """)
+    public interface WriteArtifactAgent {
+    @UserMessage("""
+        You are an artifact writing agent for the skill system.
+        Your role is to persist generated artifacts under the build output directory.
+        First, call the writeArtifact tool with the supplied parameters to save the artifact safely.
+        skillId={{skillId}}
+        relativePath={{relativePath}}
+        content={{content}}
+        base64Encoded={{base64Encoded}}
+        """)
         @Agent(
                 name = "writeArtifact",
                 description = "Persists generated artefacts under the build output directory. You can save either plain text or Base64-encoded content. Specify which using the base64Encoded parameter.")
@@ -812,6 +861,7 @@ public final class SkillRuntime {
             try {
                 String artifactsIndex = generateArtifactsIndexInternal();
                 String expectedStr = String.join(", ", expectedOutputs);
+                WorkflowLogger logger = getLogger();
                 
                 // Call LLM for semantic validation
                 String llmPrompt = String.format("""
@@ -832,6 +882,7 @@ public final class SkillRuntime {
                 
                 String llmResponse = "Semantic validation passed"; // Placeholder
                 // In a real implementation, would call chatModel here
+                logger.debug("Validation[semantic] Prompt preview:\n{}", llmPrompt);
                 
                 return new ValidationReport(
                     true,
