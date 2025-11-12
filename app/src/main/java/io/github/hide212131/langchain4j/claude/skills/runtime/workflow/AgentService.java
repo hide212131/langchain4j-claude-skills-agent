@@ -211,13 +211,23 @@ public final class AgentService {
                 metricsSnapshot,
                 visitsSnapshot.size());
 
+        // Build blackboard snapshot from ActResult outputs for backward compatibility
+        Map<String, Object> blackboardSnapshot = new java.util.LinkedHashMap<>();
+        if (finalActResult != null && finalActResult.outputs() != null) {
+            finalActResult.outputs().forEach((skillId, output) -> {
+                blackboardSnapshot.put(
+                    io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.ActState.outputKey(skillId),
+                    output);
+            });
+        }
+
         return new ExecutionResult(
                 visitsSnapshot,
                 finalPlan,
                 finalPlanCompletion,
                 metricsSnapshot,
                 finalActResult,
-                blackboardStore.snapshot());
+                blackboardSnapshot);
     }
 
 
