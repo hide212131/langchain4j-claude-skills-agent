@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -246,6 +247,53 @@ class SkillRuntimeTest {
                 .anyMatch(path -> path.endsWith("procedures/generated.md"));
         Path generated = tempDir.resolve("procedures/generated.md");
         assertThat(Files.readString(generated)).contains("Generated notes");
+    }
+
+    @Test
+    void secondExecutionShouldEmbedPreviousOutputDetailsIntoPrompt() throws Exception {
+        Path tempDir = Files.createTempDirectory("skill-runtime-previous-output");
+        Path skillsRoot = Path.of("skills").toAbsolutePath().normalize();
+        SkillIndex index = new SkillIndex(skillsRoot, Map.of(
+                "brand-guidelines",
+                new SkillIndex.SkillMetadata(
+                        "brand-guidelines",
+                        "Brand Guidelines",
+                        "Summarise brand rules",
+                        List.of("brand"),
+                        List.of(),
+                        skillsRoot.resolve("brand-guidelines"))));
+        List<String> prompts = new ArrayList<>();
+        SkillRuntime.SkillAgentOrchestrator capturingOrchestrator = new SkillRuntime.SkillAgentOrchestrator() {
+            private int invocationCount;
+
+            @Override
+            public String run(
+                    SkillRuntime.Toolbox toolbox,
+                    SkillIndex.SkillMetadata metadata,
+                    Map<String, Object> inputs,
+                    List<String> expectedOutputs,
+                    String prompt) {
+                prompts.add(prompt);
+                if (invocationCount++ == 0) {
+                    SkillRuntime.ArtifactHandle handle =
+                            toolbox.writeArtifact(metadata.id(), "first-output.txt", "First artefact", false);
+                    return "artifactPath=" + handle.path() + System.lineSeparator() + "summary=First summary";
+                }
+                return "artifactPath=/tmp/second-output" + System.lineSeparator() + "summary=Second summary";
+            }
+        };
+        SkillRuntime runtime = new SkillRuntime(index, tempDir, logger, capturingOrchestrator);
+
+        SkillRuntime.ExecutionResult firstResult =
+                runtime.execute("brand-guidelines", Map.of("goal", "first goal"));
+        runtime.execute("brand-guidelines", Map.of("goal", "second goal"));
+
+        assertThat(prompts).hasSize(2);
+        assertThat(prompts.get(0)).doesNotContain("Previous Skill Output:");
+        assertThat(prompts.get(1))
+                .contains("Previous Skill Output:")
+                .contains("Summary: First summary")
+                .contains("Artifact Path: " + firstResult.outputs().get("artifactPath"));
     }
 
         private EnumSet<SkillRuntime.DisclosureLevel> disclosureLevels(SkillRuntime.ExecutionResult result) {

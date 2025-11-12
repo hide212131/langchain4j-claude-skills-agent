@@ -70,6 +70,7 @@ public final class SkillRuntime {
     private final Path outputDirectory;
     private final WorkflowLogger logger;
     private final SkillAgentOrchestrator orchestrator;
+    private ExecutionResult previousExecutionResult;
 
     public SkillRuntime(
             SkillIndex skillIndex, Path outputDirectory, WorkflowLogger logger, ChatModel chatModel) {
@@ -95,17 +96,18 @@ public final class SkillRuntime {
         SkillIndex.SkillMetadata metadata = skillIndex.find(skillId)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown skill: " + skillId));
         Map<String, Object> safeInputs = inputs == null ? Map.of() : Map.copyOf(inputs);
-    ensureOutputDirectoryExists(outputDirectory);
+        ensureOutputDirectoryExists(outputDirectory);
         List<String> expectedOutputs = resolveExpectedOutputs(safeInputs);
+        ExecutionResult previousResultSnapshot = this.previousExecutionResult;
 
-    SkillRuntimeContext context = new SkillRuntimeContext(metadata, expectedOutputs, outputDirectory, logger);
-    context.logL1();
-    SkillToolbox toolbox = new SkillToolbox(context);
+        SkillRuntimeContext context = new SkillRuntimeContext(metadata, expectedOutputs, outputDirectory, logger);
+        context.logL1();
+        SkillToolbox toolbox = new SkillToolbox(context);
 
-    String prompt = buildPrompt(metadata, safeInputs, expectedOutputs);
-    recordSkillPrompt(metadata.id(), prompt);
-    String rawResponse = orchestrator.run(toolbox, metadata, safeInputs, expectedOutputs, prompt);
-    recordSkillResponse(metadata.id(), rawResponse);
+        String prompt = buildPrompt(metadata, safeInputs, expectedOutputs, previousResultSnapshot);
+        recordSkillPrompt(metadata.id(), prompt);
+        String rawResponse = orchestrator.run(toolbox, metadata, safeInputs, expectedOutputs, prompt);
+        recordSkillResponse(metadata.id(), rawResponse);
 
         Map<String, String> parsed = parseFinalResponse(rawResponse);
         Map<String, Object> outputs = new LinkedHashMap<>();
@@ -139,31 +141,37 @@ public final class SkillRuntime {
             context.setValidation(validation);
         }
 
-    Path artifactPath = context.artifactPath();
+        Path artifactPath = context.artifactPath();
         logger.info("Act[done] {} — {}", metadata.id(), outputs.get("summary"));
-        return new ExecutionResult(
+        ExecutionResult result = new ExecutionResult(
                 skillId,
                 Map.copyOf(outputs),
                 artifactPath,
                 validation,
                 context.disclosureLog(),
-        context.toolInvocations(),
-        context.invokedSkills());
+                context.toolInvocations(),
+                context.invokedSkills());
+        this.previousExecutionResult = result;
+        return result;
     }
 
     private String buildPrompt(
-            SkillIndex.SkillMetadata metadata, Map<String, Object> inputs, List<String> expectedOutputs) {
+            SkillIndex.SkillMetadata metadata,
+            Map<String, Object> inputs,
+            List<String> expectedOutputs,
+            ExecutionResult previousResult) {
         String goal = Objects.toString(inputs.getOrDefault("goal", ""), "");
         String constraints = Objects.toString(inputs.getOrDefault("constraints", ""), "");
         String currentWorkProgress = Objects.toString(inputs.getOrDefault("current_work_progress", ""), "");
         String expected = expectedOutputs.isEmpty()
                 ? "artifactPath (default)"
                 : String.join(", ", expectedOutputs);
-        
-        String progressSection = currentWorkProgress.isBlank() 
-                ? "" 
+
+        String progressSection = currentWorkProgress.isBlank()
+                ? ""
                 : "\nCurrent Work Progress:\n" + currentWorkProgress + "\n";
-        
+        String previousOutputsSection = formatPreviousOutputs(previousResult);
+
         return """
                 # Skill Execution Request
 
@@ -171,7 +179,7 @@ public final class SkillRuntime {
                 Skill Name: %s
                 Goal: %s
                 Constraints: %s
-                Expected Outputs: %s of artifacts aligned with the goal%s
+                Expected Outputs: %s of artifacts aligned with the goal%s%s
 
                 Apply the supervisor instructions to decide which tools to call. When you finish, respond with key=value lines containing at least:
                   artifactPath=<absolute path to the generated artefact>
@@ -182,7 +190,38 @@ public final class SkillRuntime {
                 goal.isBlank() ? "(goal not provided)" : goal,
                 constraints.isBlank() ? "(none)" : constraints,
                 expected,
-                progressSection);
+                progressSection,
+                previousOutputsSection);
+    }
+
+    private String formatPreviousOutputs(ExecutionResult previousResult) {
+        if (previousResult == null) {
+            return "";
+        }
+        Map<String, Object> previousOutputs = previousResult.outputs();
+        Object summaryObject = previousOutputs.get("summary");
+        String summary = summaryObject == null ? "" : summaryObject.toString().trim();
+
+        Object artifactObject = previousOutputs.get("artifactPath");
+        String artifactPath = artifactObject == null ? null : artifactObject.toString();
+        if (artifactPath == null && previousResult.artifactPath() != null) {
+            artifactPath = previousResult.artifactPath().toString();
+        }
+
+        if ((summary == null || summary.isBlank()) && artifactPath == null) {
+            return "";
+        }
+
+        String summaryLine = (summary == null || summary.isBlank()) ? "(summary not available)" : summary;
+        String artifactLine = artifactPath == null ? "(artifact path not available)" : artifactPath;
+
+        return """
+
+                Previous Skill Output:
+                The prior skill produced the following summary and artifact path.
+                Summary: %s
+                Artifact Path: %s
+                """.formatted(summaryLine, artifactLine);
     }
 
     private Map<String, String> parseFinalResponse(String response) {
@@ -263,6 +302,7 @@ public final class SkillRuntime {
 
     public void resetOutputDirectory() {
         clearOutputDirectory(outputDirectory);
+        previousExecutionResult = null;
     }
 
     private void ensureOutputDirectoryExists(Path directory) {
@@ -458,6 +498,7 @@ public final class SkillRuntime {
                     Progressive Disclosure Policy:
                     - Maintain L1 (name/description) in context by default.
                     - Use readRef to resolve any additional references (L3).
+                    - When previous skill artefacts are provided, always readRef them before acting.
                     - Persist artefacts only through writeArtifact (paths relative to build/out).
                     - Capture derived procedures with writeArtifact and then reference them with readRef when you need that knowledge again.
                     - Use deployScripts to copy auxiliary files before executing a script. Provide sourceDir relative to the skill root (e.g. "scripts") and targetDir under build/out (e.g. "workdir").
@@ -465,7 +506,6 @@ public final class SkillRuntime {
                     - Create new scripts with writeArtifact before running them via runScript.
                     - When calling writeArtifact, explicitly set base64Encoded to false unless you are saving Base64 content.
                     - After producing artifacts, ALWAYS call validateOutputs to verify contract compliance.
-                    - The validateOutputs agent performs deterministic contract checks (file existence, sandbox boundaries).
                     - When you issue an agent invocation (JSON), every argument value MUST be a simple string.
                         * Join multiple values with commas, e.g. "args": "--flag1,--flag2".
                         * Provide dependencies as "dependencies": "pip:python-pptx".
