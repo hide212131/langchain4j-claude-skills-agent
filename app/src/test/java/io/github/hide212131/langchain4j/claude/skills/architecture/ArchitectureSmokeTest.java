@@ -81,7 +81,6 @@ class ArchitectureSmokeTest {
                 "io.github.hide212131.langchain4j.claude.skills.runtime.workflow.support.WorkflowFactory",
                 "io.github.hide212131.langchain4j.claude.skills.runtime.provider.ProviderAdapter",
                 "io.github.hide212131.langchain4j.claude.skills.runtime.skill.SkillIndex",
-                "io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.BlackboardStore",
                 "io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.AgenticScopeBridge",
                 "io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.PlanState",
                 "io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.PlanInputsState",

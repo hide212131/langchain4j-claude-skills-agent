@@ -47,7 +47,7 @@ runtime/
 │  └─ fs/
 ├─ evaluation/
 └─ shared/
-├─ Blackboard
+├─ AgenticScope DTOs (Plan/Act/Reflect state)
 └─ SkillIndex
 
 ```
@@ -57,8 +57,7 @@ runtime/
 ├─ ProviderAdapter (OpenAI 既定 / Claude 代替)
 ├─ SkillRuntime（別紙: spec_skillruntime.md）
 ├─ ContextPacking (抜粋/要約/差分/キャッシュ)
-├─ SkillIndex (SKILL.md 索引)
-└─ Blackboard (中間成果)
+└─ SkillIndex (SKILL.md 索引)
 
 ```
 - **固定骨格**：Plan → Act→ Done  
@@ -70,7 +69,7 @@ runtime/
   - `runtime.workflow.plan`：`PlannerAgent`（Skill 候補列の生成、期待出力の定義、評価観点の提示）  
   - `runtime.workflow.act`：`InvokerAgent`（SkillRuntime 呼び出し、Budgets の配布）  
 - `provider`：LLM アダプタ（OpenAI/Claude）。温度/seed/上限の統一設定を適用する。  
-- `shared`：Blackboard/SkillIndex/ContextCache 等の横断 DTO・リポジトリ。  
+- `shared`：AgenticScope DTO（PlanState/ActState など）と SkillIndex/ContextCache 等の横断リポジトリ。  
 - `infra.config`：`RuntimeConfig`, `BudgetConfig`, `SkillRuntimeConfig` 等。CLI 起動時に読み込み、WorkflowFactory/ProviderAdapter へ注入。
 
 ---
@@ -87,9 +86,10 @@ runtime/
 - `skillId`（相対パス）、`name/description`（必須）、`version`（任意）、`inputs/outputs`（任意）、`keywords`（任意）、`stages` 要約（任意）、主要 `resources`（scripts 含む、任意）
 - **System 提示用の要約（L1）**：`name / description` のみに圧縮
 
-### 3.3 Blackboard（中間成果）
-- `artifactHandle`：`build/` 直下に生成されたファイルのハンドル（`path`, `hash`, `meta`）  
-- `evidenceLog`：各手の根拠（`reason_short`, `inputs_digest`, `cost`, `diff_summary`）  
+### 3.3 Act Output Index（AgenticScope 管理の中間成果）
+- `act.output.<skillId>`：スキル実行結果をそのまま AgenticScope に記録。`ActState` が最新の実行と同期し、以前の “Blackboard” 役を兼ねる。  
+- `artifactHandle`：`build/` 直下に生成されたファイルのハンドル（`path`, `hash`, `meta`）。Scope には `SharedBlackboardIndexState` として参照順が保持される。  
+- `evidenceLog`：各手の根拠（`reason_short`, `inputs_digest`, `cost`, `diff_summary`）を結果マップに含め、後続ステージがスコープ経由で取得。  
 - `metrics`：tokens/time/tool_calls/disclosure など
 
 ### 3.4 AgenticScope（実行時スナップショット）
@@ -102,8 +102,8 @@ runtime/
   - `act.windowState`：残り予算（call/token/time）。  
   - `act.currentStep`：実行中ステップの `skillId` と `stageIntent`。  
   - `act.inputBundle`：スキルに渡した入力（SkillInputBinder が整形）。  
-  - `act.output.<skillId>`：スキル実行結果（原文＋要約＋Blackboard ハンドル）。  
-  - `shared.blackboardIndex`：Blackboard 登録済みキー一覧（`artifactHandle` と同期）。  
+  - `act.output.<skillId>`：スキル実行結果（原文＋要約＋ artifact ハンドル）。  
+  - `shared.blackboardIndex`：AgenticScope 上で管理する成果物キー一覧（旧 Blackboard のインデックスに相当）。  
 - **補助ステート**
   - `shared.contextSnapshot`：Progressive Disclosure の投入ログ。  
   - `shared.guardState`：Guard 判定の結果（違反種別、残リトライ数）。  
@@ -142,7 +142,7 @@ runtime/
 - メモ：Plan が複数候補を提示し、Selector が逐次決定する
 
 ### 6.2 入出力束ね（SkillInputBinder / ArtifactWriter）
-- `SkillInputBinder`：`plan.inputs` と Blackboard を突き合わせ、スキルごとの入力を整形  
+- `SkillInputBinder`：`plan.inputs` と AgenticScope 上の `act.output.*` エントリを突き合わせ、スキルごとの入力を整形  
 - `ArtifactWriter`：`build/<skillId>/...` への安全な書き出し。重複は `contentHash` で回避
 
 ### 6.3 スクリプト実行（scripts/）

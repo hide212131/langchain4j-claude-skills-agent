@@ -32,7 +32,7 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `./sk run .
 - [x] `WorkflowFactory` が LangChain4j `AgenticServices` を経由せずにカスタム Workflow を返そうとした場合に失敗するテスト  
   - [x] AgenticScope の必須キー（`plan.goal`, `act.output.<skillId>` など）が未設定のまま `AgenticScopeBridge` を呼び出すと例外となることを期待する失敗テスト  
 - Green  
-  - [x] 各パッケージにスケルトン（`package-info.java` または空クラス）を配置し、`WorkflowFactory`, `ProviderAdapter`, `SkillIndex`, `BlackboardStore`, `ContextPackingService`, `SkillInvocationGuard`, `HumanReviewAgentFactory`, `WorkflowLogger`, `RuntimeConfig` の雛形を実装  
+  - [x] 各パッケージにスケルトン（`package-info.java` または空クラス）を配置し、`WorkflowFactory`, `ProviderAdapter`, `SkillIndex`, `ContextPackingService`, `SkillInvocationGuard`, `HumanReviewAgentFactory`, `WorkflowLogger`, `RuntimeConfig` の雛形を実装  
   - [x] `AgenticScopeBridge` と `PlanState` / `ActState` / `ReflectFinalSummaryState` ほか AgenticScope DTO 群を作成し、未設定キー検知ロジックを実装  
 - Refactor  
 - [x] 静的な依存ルールで層間依存（`app` → `runtime` → `infra`）を固定し、テストを緑に保つ  
@@ -86,14 +86,14 @@ P0 では「API キーをセットすれば LangChain4j Workflow が `./sk run .
 ### P0-4. invokeSkill Tool + SkillRuntime（最小成果物 / Pure Act）
 - Red  
   - [x] Act ノードが LangChain4j Tool（`invokeSkill(skillId, inputs)`）を経由し、`SkillRuntime` を実行する失敗テスト  
-  - [x] Runtime が 1 Stage で `build/out/deck.pptx`（仮テンプレでも可）を生成し、Blackboard に登録する失敗テスト  
+  - [x] Runtime が 1 Stage で `build/out/deck.pptx`（仮テンプレでも可）を生成し、AgenticScope (`act.output.*`) に登録する失敗テスト  
   - [ ] **SKILL.md のみのスキル**（L3なし）でも完了する失敗テスト  
 - Green  
   - [x] `InvokeSkillTool` を登録し、`DefaultInvoker` + `SkillRuntime` を実働化  
-  - [ ] **Pure 方式**：順序配線せず、**単一エージェント＋ツール群**で Act を実装（`readSkillMd/readRef/runScript/validate/writeArtifact/blackboard.*` 等。仕様は `spec_skillruntime.md` に準拠）  
+  - [ ] **Pure 方式**：順序配線せず、**単一エージェント＋ツール群**で Act を実装（`readSkillMd/readRef/runScript/validate/writeArtifact/scopeState.*` 等。仕様は `spec_skillruntime.md` に準拠）  
   - [ ] スタブ出力（固定テキスト）を排除し、Skill 定義に基づく実成果物生成を実装  
 - Refactor  
-  - [x] Blackboard API と Runtime 入出力を整理  
+  - [x] AgenticScope state API と Runtime 入出力を整理  
 - DoD  
   - [x] `./sk run --goal "ブランド準拠でスライド"` が LLM→brand skill→pptx skill の順で呼ばれ、`build/out/deck.pptx` を生成  
   - [ ] **SKILL.mdのみ**でも expectedOutputs 検証を通過して終了（再現用の最小テストケースを作成）  

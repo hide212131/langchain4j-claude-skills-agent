@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.tuple;
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
 import io.github.hide212131.langchain4j.claude.skills.infra.observability.WorkflowTracer;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.ActState;
-import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.BlackboardStore;
 
 import io.github.hide212131.langchain4j.claude.skills.runtime.guard.SkillInvocationGuard;
 import io.github.hide212131.langchain4j.claude.skills.runtime.provider.LangChain4jLlmClient;
@@ -50,12 +49,11 @@ class AgentServiceTest {
                         java.util.List.of(),
                         skillsRoot.resolve("document-skills/pptx"))));
         WorkflowLogger logger = new WorkflowLogger();
-        BlackboardStore blackboardStore = new BlackboardStore();
         DryRunSkillRuntimeOrchestrator orchestrator = new DryRunSkillRuntimeOrchestrator();
         SkillRuntime runtime = new SkillRuntime(index, tempDir, logger, orchestrator);
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
         DefaultInvoker invoker =
-                new DefaultInvoker(tool, new SkillInvocationGuard(), blackboardStore, logger);
+                new DefaultInvoker(tool, new SkillInvocationGuard(), logger);
         LangChain4jLlmClient llmClient = LangChain4jLlmClient.fake();
         AgenticPlanner planner = new AgenticPlanner(index, llmClient, logger);
         WorkflowTracer tracer = new WorkflowTracer(
@@ -66,7 +64,6 @@ class AgentServiceTest {
                 index,
                 logger,
                 invoker,
-                blackboardStore,
                 planner,
                 tracer);
         AgentService.ExecutionResult result =
