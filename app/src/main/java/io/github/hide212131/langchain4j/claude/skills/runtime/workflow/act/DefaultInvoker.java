@@ -88,7 +88,13 @@ public final class DefaultInvoker {
 
     /**
      * Executes a single skill step, managing guards, state updates, and skill invocation.
-     * This method encapsulates the logic that would be in a skill agent.
+     * This method encapsulates the logic that would be in a skill agent, providing a clean
+     * separation of concerns and enabling future refactoring to use dynamic agent sequences.
+     * 
+     * @param scope The AgenticScope for state management and propagation
+     * @param step The PlanStep containing skill metadata and execution parameters
+     * @param totalSteps The total number of skills to be executed (for budget calculation)
+     * @param invokedSkills The list of already-invoked skill IDs (for progress tracking)
      */
     private void executeSkillStep(
             AgenticScope scope,
@@ -96,9 +102,11 @@ public final class DefaultInvoker {
             int totalSteps,
             List<String> invokedSkills) {
         
+        // Guard: Ensure skill invocation is allowed
         guard.ensureAllowed(step.skillId());
         guard.checkBudgets(new BudgetSnapshot(totalSteps - invokedSkills.size(), Integer.MAX_VALUE));
 
+        // State management: Write current step information to AgenticScope
         ActCurrentStepState.STATE.write(scope, new ActCurrentStepState(step.skillId(), step.name()));
         Map<String, Object> invocationInputs = Map.of(
                 "goal", step.stepGoal(),
@@ -113,8 +121,11 @@ public final class DefaultInvoker {
                 step.keywords(),
                 step.skillRoot()));
 
+        // Execute: Invoke the skill through SkillRuntime
         SkillRuntime.ExecutionResult executionResult = invokeSkillTool.invoke(step.skillId(), invocationInputs);
         Object outputValue = executionResult.outputs();
+        
+        // Output management: Store results in both BlackboardStore and AgenticScope
         blackboardStore.put(ActState.outputKey(step.skillId()), outputValue);
         ActState.STATE.write(scope, new ActState(step.skillId(), outputValue));
         

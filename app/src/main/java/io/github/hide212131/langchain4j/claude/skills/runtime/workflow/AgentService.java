@@ -360,6 +360,7 @@ public final class AgentService {
                 if (plan == null) {
                     throw new IllegalStateException("Plan stage must complete before Act");
                 }
+                // Use the refactored DefaultInvoker which now has cleaner skill execution logic
                 ActResult result = invoker.invoke(scope, plan);
                 WorkflowStateKeys.ACT_RESULT.write(scope, result);
                 WorkflowStateKeys.ACT_STAGE_OUTPUT.write(scope, result);
