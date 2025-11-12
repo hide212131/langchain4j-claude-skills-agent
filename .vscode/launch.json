@@ -11,6 +11,17 @@
       "cwd": "/Users/hide/Github/langchain4j-claude-skills-agent",
       "envFile": "${workspaceFolder}/.env",
       "console": "integratedTerminal"
+    },
+    {
+      "name": "SkillsCliApp (debug integrate)",
+      "type": "java",
+      "request": "launch",
+      "mainClass": "io.github.hide212131.langchain4j.claude.skills.app.cli.SkillsCliApp",
+      "projectName": "app",
+      "args": "run --goal \"Anthropicのブランドのスタイルで、JJUG CCCのスライドとなるpptxファイルの作成\"",
+      "cwd": "/Users/hide/Github/langchain4j-claude-skills-agent",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
     }
   ]
 }

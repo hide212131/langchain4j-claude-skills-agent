@@ -38,6 +38,10 @@ public final class InvokeSkillTool {
         return specification;
     }
 
+    public void resetOutputDirectory() {
+        skillRuntime.resetOutputDirectory();
+    }
+
     @Tool(name = TOOL_NAME, returnBehavior = ReturnBehavior.TO_LLM)
     public SkillRuntime.ExecutionResult invoke(
             @P("skillId") String skillId, @P(value = "inputs", required = false) Map<String, Object> inputs) {

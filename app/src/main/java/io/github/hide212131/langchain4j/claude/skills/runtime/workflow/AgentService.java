@@ -33,7 +33,6 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.Plan
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect.DefaultEvaluator;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect.ReflectEvaluator;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.support.WorkflowFactory;
-import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.WorkflowStateKeys;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +56,8 @@ public final class AgentService {
     private final ReflectEvaluator evaluator;
     private final WorkflowTracer tracer;
     private final ExecutionTelemetryReporter telemetryReporter;
+    private static final AgentStateKey<PlanState> PLAN_STATE_KEY =
+        AgentStateKey.of("plan.goal", PlanState.class);
 
     public static AgentService withDefaults(
             WorkflowFactory workflowFactory,
@@ -82,17 +83,18 @@ public final class AgentService {
                     determineProvider(runtimeChatModel),
                     llmClient.defaultModelName());
         }
-        SkillRuntime runtime = dryRun
-                ? new SkillRuntime(
-                        skillIndex,
-                        Path.of("build", "out"),
-                        logger,
-                        new DryRunSkillRuntimeOrchestrator())
-                : new SkillRuntime(
-                        skillIndex,
-                        Path.of("build", "out"),
-                        logger,
-                        runtimeChatModel);
+    Path outputDirectory = resolveOutputDirectory(skillIndex);
+    SkillRuntime runtime = dryRun
+        ? new SkillRuntime(
+            skillIndex,
+            outputDirectory,
+            logger,
+            new DryRunSkillRuntimeOrchestrator())
+        : new SkillRuntime(
+            skillIndex,
+            outputDirectory,
+            logger,
+            runtimeChatModel);
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
         SkillInvocationGuard guard = new SkillInvocationGuard();
         DefaultInvoker invoker = new DefaultInvoker(tool, guard, blackboardStore, logger);
@@ -107,6 +109,13 @@ public final class AgentService {
                 evaluator,
                 new AgenticPlanner(skillIndex, llmClient, logger),
                 tracer);
+    }
+
+    private static Path resolveOutputDirectory(SkillIndex skillIndex) {
+        Objects.requireNonNull(skillIndex, "skillIndex");
+        Path skillsRoot = skillIndex.skillsRoot();
+        Path candidate = skillsRoot.resolveSibling("build").resolve("out");
+        return candidate.toAbsolutePath().normalize();
     }
 
     public AgentService(
@@ -512,7 +521,7 @@ public final class AgentService {
         if (goal == null || goal.isBlank()) {
             throw new IllegalArgumentException("goal must be provided");
         }
-        PlanState.STATE.write(scope, new PlanState(goal));
+        PLAN_STATE_KEY.write(scope, new PlanState(goal));
     }
 
     public record AgentRunRequest(String goal, boolean dryRun, List<String> forcedSkillIds) {

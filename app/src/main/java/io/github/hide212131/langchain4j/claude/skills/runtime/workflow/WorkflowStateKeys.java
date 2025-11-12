@@ -26,4 +26,8 @@ public final class WorkflowStateKeys {
         AgentStateKey.of("workflow.act.output", DefaultInvoker.ActResult.class);
     public static final AgentStateKey<ReflectEvaluator.EvaluationResult> REFLECT_STAGE_OUTPUT =
         AgentStateKey.of("workflow.reflect.output", ReflectEvaluator.EvaluationResult.class);
+    
+    // Progress tracking key
+    public static final AgentStateKey<String> CURRENT_WORK_PROGRESS =
+        AgentStateKey.of("current_work_progress", String.class);
 }

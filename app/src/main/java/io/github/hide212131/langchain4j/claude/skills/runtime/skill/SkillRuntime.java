@@ -13,6 +13,7 @@ import dev.langchain4j.agentic.supervisor.SupervisorResponseStrategy;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.service.V;
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
+import io.github.hide212131.langchain4j.claude.skills.runtime.skill.agent.ProgressTrackerAgent;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
 import java.io.File;
@@ -92,7 +93,7 @@ public final class SkillRuntime {
         SkillIndex.SkillMetadata metadata = skillIndex.find(skillId)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown skill: " + skillId));
         Map<String, Object> safeInputs = inputs == null ? Map.of() : Map.copyOf(inputs);
-    prepareOutputDirectory(outputDirectory);
+    ensureOutputDirectoryExists(outputDirectory);
         List<String> expectedOutputs = resolveExpectedOutputs(safeInputs);
 
     SkillRuntimeContext context = new SkillRuntimeContext(metadata, expectedOutputs, outputDirectory, logger);
@@ -152,9 +153,15 @@ public final class SkillRuntime {
             SkillIndex.SkillMetadata metadata, Map<String, Object> inputs, List<String> expectedOutputs) {
         String goal = Objects.toString(inputs.getOrDefault("goal", ""), "");
         String constraints = Objects.toString(inputs.getOrDefault("constraints", ""), "");
+        String currentWorkProgress = Objects.toString(inputs.getOrDefault("current_work_progress", ""), "");
         String expected = expectedOutputs.isEmpty()
                 ? "artifactPath (default)"
                 : String.join(", ", expectedOutputs);
+        
+        String progressSection = currentWorkProgress.isBlank() 
+                ? "" 
+                : "\nCurrent Work Progress:\n" + currentWorkProgress + "\n";
+        
         return """
                 # Skill Execution Request
 
@@ -162,7 +169,7 @@ public final class SkillRuntime {
                 Skill Name: %s
                 Goal: %s
                 Constraints: %s
-                Expected Outputs: %s of artifacts aligned with the goal
+                Expected Outputs: %s of artifacts aligned with the goal%s
 
                 Apply the supervisor instructions to decide which tools to call. When you finish, respond with key=value lines containing at least:
                   artifactPath=<absolute path to the generated artefact>
@@ -172,7 +179,8 @@ public final class SkillRuntime {
                 metadata.name(),
                 goal.isBlank() ? "(goal not provided)" : goal,
                 constraints.isBlank() ? "(none)" : constraints,
-                expected);
+                expected,
+                progressSection);
     }
 
     private Map<String, String> parseFinalResponse(String response) {
@@ -251,7 +259,19 @@ public final class SkillRuntime {
         return skillId.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
-    private void prepareOutputDirectory(Path directory) {
+    public void resetOutputDirectory() {
+        clearOutputDirectory(outputDirectory);
+    }
+
+    private void ensureOutputDirectoryExists(Path directory) {
+        try {
+            Files.createDirectories(directory);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to create output directory " + directory, e);
+        }
+    }
+
+    private void clearOutputDirectory(Path directory) {
         try {
             Files.createDirectories(directory);
             Files.walkFileTree(directory, new SimpleFileVisitor<>() {
@@ -274,7 +294,7 @@ public final class SkillRuntime {
                 }
             });
         } catch (IOException e) {
-            throw new IllegalStateException("Failed to prepare output directory " + directory, e);
+            throw new IllegalStateException("Failed to clear output directory " + directory, e);
         }
     }
 
@@ -397,7 +417,10 @@ public final class SkillRuntime {
                 new ScriptDeployAgent(toolbox),
                 new RunScriptAgent(toolbox),
                 new WriteArtifactAgent(toolbox),
-                new UnifiedOutputsValidatorAgent(toolbox, chatModel, false) // Semantic check disabled by default
+                new UnifiedOutputsValidatorAgent(toolbox, chatModel, false), // Semantic check disabled by default
+                AgenticServices.agentBuilder(ProgressTrackerAgent.class)
+                        .chatModel(chatModel)
+                        .build()
                 )
                     .build();
         }
@@ -431,6 +454,7 @@ public final class SkillRuntime {
                         * Join multiple values with commas, e.g. "args": "--flag1,--flag2".
                         * Provide dependencies as "dependencies": "pip:python-pptx".
                         * Provide deploy arguments as directory paths, e.g. "sourceDir": "scripts", "targetDir": "workdir".
+                        * EXCEPTION: boolean parameters (like base64Encoded) must be JSON booleans (true/false), not strings.
                         * Do not emit JSON arrays or objects inside the arguments map.
                     - If you are unsure, choose the most appropriate next action yourself; you will not receive extra guidance from the user.
                     Always respond with key=value pairs when completing the task.
@@ -779,6 +803,7 @@ public final class SkillRuntime {
                 String expectedStr = String.join(", ", expectedOutputs);
                 
                 // Call LLM for semantic validation
+                @SuppressWarnings("unused")
                 String llmPrompt = String.format("""
                     You are a strict QA reviewer for software deliverables.
                     
