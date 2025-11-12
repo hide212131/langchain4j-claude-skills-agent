@@ -31,7 +31,7 @@
 Acquire → Decide → Apply → Record → Progress/Exit
 
 ````
-- **Acquire**：予算残・Blackboard・開示レベル（L1/L2/L3）を同期。
+- **Acquire**：予算残・AgenticScope 上の最新成果（`act.output.*`）・開示レベル（L1/L2/L3）を同期。
 - **Decide**：次に取るべき最小アクションを LLM が選択（参照読取／テンプレ展開／スクリプト実行／検証／書き出し 等）。
 - **Apply**：選ばれたツールを実行。
 - **Record**：成果物と根拠（Evidence）を記録。
@@ -50,10 +50,10 @@ Acquire → Decide → Apply → Record → Progress/Exit
 
 ---
 
-## 6. Blackboard（Artifacts & Evidence）
+## 6. Artifacts & Evidence（AgenticScope + build/out）
 - **Artifacts**：`build/` 配下（相対）へ生成、命名例 `act.<artifact>@vN`（`act.pptx.slide_outline@1` など）。
 - **Evidence（毎手）**：`reason_short(≤5行)` / `inputs_digest` / `cost(tokens,time)` / `diff_summary` / `file_ids`。
-- **Metrics**：`tokens/time/tool_calls/disclosure` を収集。
+- **Metrics**：`tokens/time/tool_calls/disclosure` を収集し、AgenticScope の `act.output.*` 並びに `SharedBlackboardIndexState` に書き戻す。
 
 ---
 
@@ -70,7 +70,7 @@ Pure Act Runtime は **Supervisor Agent + Sub Agent** 構成とし、Supervisor 
 3. **RunScriptAgent**：スクリプト自動化（依存解決・サンドボックス順守）。
 4. **WriteArtifactAgent**：生成成果物の `build/out` への永続化。
 
-各 Sub Agent は必要最小のツールのみ保持し、Supervisor は Sub Agent に依頼するかどうかだけを決める。Sub Agent 同士は直接やり取りせず、成果は Supervisor の Blackboard へ記録する。
+各 Sub Agent は必要最小のツールのみ保持し、Supervisor は Sub Agent に依頼するかどうかだけを決める。Sub Agent 同士は直接やり取りせず、成果は Supervisor が AgenticScope へ記録する。
 
 ### 7.3 利用可能ツール
 Sub Agent が利用するツールは以下に限定し、**構造化 I/O**（成功/失敗を型で表現）とする。
@@ -82,7 +82,7 @@ Sub Agent が利用するツールは以下に限定し、**構造化 I/O**（�
 - `validate(schemaRef|rules, object|filePath) -> ValidationResult`
 - `summarize(text|filePath) -> Summary`
 - `diff(aPath, bPath) -> DiffSummary`
-- `blackboard.put(key, value)` / `blackboard.get(key)`
+- `scopeState.write(outputKey, value)` / `scopeState.read(key)`：AgenticScope 経由で共有状態にアクセス
 - （任意）`templateExpand(templatePath: string, json: object) -> GeneratedText|File`
 
 Supervisor 自身はファイル・スクリプトへ直接アクセスせず、Sub Agent との対話で必要な情報と成果物を取得する。
@@ -149,22 +149,22 @@ Supervisor 自身はファイル・スクリプトへ直接アクセスせず、
   ```java
   var readSkillAgent = AiServices.builder(ReadSkillMdAgent.class)
       .chatModel(model)
-      .tools(new FsReadTool(...), blackboardTool)
+      .tools(new FsReadTool(...), scopeStateTool)
       .build();
 
   var readRefAgent = AiServices.builder(ReadRefAgent.class)
       .chatModel(model)
-      .tools(new FsReadTool(...), blackboardTool)
+      .tools(new FsReadTool(...), scopeStateTool)
       .build();
 
   var runScriptAgent = AiServices.builder(RunScriptAgent.class)
       .chatModel(model)
-      .tools(new ScriptTool(...), blackboardTool)
+      .tools(new ScriptTool(...), scopeStateTool)
       .build();
 
   var writeArtifactAgent = AiServices.builder(WriteArtifactAgent.class)
       .chatModel(model)
-      .tools(new FsWriteTool(...), blackboardTool)
+      .tools(new FsWriteTool(...), scopeStateTool)
       .build();
 
   var supervisor = AiServices.builder(SkillActSupervisor.class)

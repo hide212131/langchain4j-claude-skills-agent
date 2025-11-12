@@ -2,7 +2,6 @@ package io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect;
 
 import dev.langchain4j.agentic.scope.AgenticScope;
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
-import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.BlackboardStore;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.act.DefaultInvoker;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.PlanModels;
 import java.util.List;
@@ -12,7 +11,7 @@ import java.util.List;
  */
 public final class DefaultEvaluator implements ReflectEvaluator {
 
-    public DefaultEvaluator(BlackboardStore blackboard, WorkflowLogger logger) {
+    public DefaultEvaluator(WorkflowLogger logger) {
         // Stub constructor
     }
 

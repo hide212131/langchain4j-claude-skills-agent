@@ -1,8 +1,12 @@
 package io.github.hide212131.langchain4j.claude.skills.runtime.blackboard;
 
+import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.AgentStateKey;
 import java.util.Objects;
 
 public record ActState(String skillId, Object output) {
+
+    public static final AgentStateKey<ActState> STATE =
+        AgentStateKey.of("act.current.state", ActState.class);
 
     public ActState {
         if (skillId == null || skillId.isBlank()) {

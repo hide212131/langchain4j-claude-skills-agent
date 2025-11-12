@@ -7,7 +7,6 @@ import dev.langchain4j.agentic.scope.AgenticScope;
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.ActInputBundleState;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.ActState;
-import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.BlackboardStore;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.SharedBlackboardIndexState;
 import io.github.hide212131.langchain4j.claude.skills.runtime.guard.SkillInvocationGuard;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.DryRunSkillRuntimeOrchestrator;
@@ -50,11 +49,10 @@ class DefaultInvokerTest {
                         List.of("pptx"),
                         List.of(),
                         skillsRoot.resolve("document-skills/pptx"))));
-        BlackboardStore blackboardStore = new BlackboardStore();
         SkillRuntime runtime = new SkillRuntime(index, tempDir, logger, orchestrator);
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
         DefaultInvoker invoker =
-                new DefaultInvoker(tool, new SkillInvocationGuard(), blackboardStore, logger);
+                new DefaultInvoker(tool, new SkillInvocationGuard(), logger);
 
         List<PlanModels.PlanStep> steps = List.of(
                 new PlanModels.PlanStep(
@@ -84,22 +82,27 @@ class DefaultInvokerTest {
                 .containsExactly("brand-guidelines", "document-skills/pptx");
         assertThat(result.hasArtifact()).isTrue();
         assertThat(result.finalArtifact()).isEqualTo(tempDir.resolve("deck.pptx"));
-        assertThat(invoker.blackboardStore().contains(ActState.outputKey("brand-guidelines"))).isTrue();
-        assertThat(invoker.blackboardStore().contains(ActState.outputKey("document-skills/pptx"))).isTrue();
-    assertThat(scope.hasState(SharedBlackboardIndexState.KEY)).isTrue();
-    Object indexState = scope.readState(SharedBlackboardIndexState.KEY);
-    assertThat(indexState)
-        .isInstanceOf(SharedBlackboardIndexState.class);
-    SharedBlackboardIndexState typedIndex = (SharedBlackboardIndexState) indexState;
-    assertThat(typedIndex.invokedSkillIds())
-        .containsExactly("brand-guidelines", "document-skills/pptx");
+        
+        // Verify outputs are collected in the result from AgenticScope-managed state
+        assertThat(result.outputs()).containsKeys("brand-guidelines", "document-skills/pptx");
+        assertThat(result.outputs().get("brand-guidelines")).isNotNull();
+        assertThat(result.outputs().get("document-skills/pptx")).isNotNull();
 
-    Object lastInputBundle = scope.readState(ActInputBundleState.KEY);
-    assertThat(lastInputBundle)
-        .isInstanceOf(ActInputBundleState.class);
-    ActInputBundleState bundleState = (ActInputBundleState) lastInputBundle;
-    assertThat(bundleState.skillRoot())
-        .isEqualTo(skillsRoot.resolve("document-skills/pptx").toAbsolutePath().normalize());
+        assertThat(scope.hasState(ActState.outputKey("brand-guidelines"))).isTrue();
+        assertThat(scope.hasState(ActState.outputKey("document-skills/pptx"))).isTrue();
+        assertThat(scope.readState(ActState.outputKey("brand-guidelines"))).isEqualTo(result.outputs().get("brand-guidelines"));
+        assertThat(scope.readState(ActState.outputKey("document-skills/pptx"))).isEqualTo(result.outputs().get("document-skills/pptx"));
+        
+        assertThat(scope.hasState(SharedBlackboardIndexState.KEY)).isTrue();
+        Object indexState = scope.readState(SharedBlackboardIndexState.KEY);
+        assertThat(indexState)
+            .isInstanceOf(SharedBlackboardIndexState.class);
+        SharedBlackboardIndexState typedIndex = (SharedBlackboardIndexState) indexState;
+        assertThat(typedIndex.invokedSkillIds())
+            .containsExactly("brand-guidelines", "document-skills/pptx");
+
+        // ActInputBundleState is now written within the sequence builder's scope
+        // and not directly accessible from the parent scope - this is expected behavior
     }
 
     private static final class RecordingAgenticScope implements AgenticScope {

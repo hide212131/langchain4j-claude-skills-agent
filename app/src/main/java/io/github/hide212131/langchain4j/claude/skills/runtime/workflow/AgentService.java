@@ -14,7 +14,6 @@ import io.github.hide212131.langchain4j.claude.skills.infra.observability.Workfl
 import io.github.hide212131.langchain4j.claude.skills.runtime.observability.AgentWorkflowObserver;
 import io.github.hide212131.langchain4j.claude.skills.runtime.observability.ExecutionTelemetryReporter;
 import io.github.hide212131.langchain4j.claude.skills.runtime.observability.InstrumentedChatModel;
-import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.BlackboardStore;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.PlanCandidateStepsState;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.PlanConstraintsState;
 import io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.PlanEvaluationCriteriaState;
@@ -50,7 +49,6 @@ public final class AgentService {
     private final WorkflowLogger logger;
     private final AgenticPlanner planner;
     private final DefaultInvoker invoker;
-    private final BlackboardStore blackboardStore;
     private final WorkflowTracer tracer;
     private final ExecutionTelemetryReporter telemetryReporter;
     private static final AgentStateKey<PlanState> PLAN_STATE_KEY =
@@ -69,7 +67,6 @@ public final class AgentService {
             SkillIndex skillIndex,
             boolean dryRun) {
         WorkflowLogger logger = new WorkflowLogger();
-        BlackboardStore blackboardStore = new BlackboardStore();
         ObservabilityConfig observability = ObservabilityConfig.fromEnvironment();
         WorkflowTracer tracer = new WorkflowTracer(observability.tracer(), observability.isEnabled());
         ChatModel runtimeChatModel = llmClient.chatModel();
@@ -94,14 +91,13 @@ public final class AgentService {
             runtimeChatModel);
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
         SkillInvocationGuard guard = new SkillInvocationGuard();
-        DefaultInvoker invoker = new DefaultInvoker(tool, guard, blackboardStore, logger);
+        DefaultInvoker invoker = new DefaultInvoker(tool, guard, logger);
         return new AgentService(
                 workflowFactory,
                 llmClient,
                 skillIndex,
                 logger,
                 invoker,
-                blackboardStore,
                 new AgenticPlanner(skillIndex, llmClient, logger),
                 tracer);
     }
@@ -119,7 +115,6 @@ public final class AgentService {
             SkillIndex skillIndex,
             WorkflowLogger logger,
             DefaultInvoker invoker,
-            BlackboardStore blackboardStore,
             AgenticPlanner planner,
             WorkflowTracer tracer) {
         this.workflowFactory = Objects.requireNonNull(workflowFactory, "workflowFactory");
@@ -127,7 +122,6 @@ public final class AgentService {
         this.logger = Objects.requireNonNull(logger, "logger");
         Objects.requireNonNull(skillIndex, "skillIndex");
         this.invoker = Objects.requireNonNull(invoker, "invoker");
-        this.blackboardStore = Objects.requireNonNull(blackboardStore, "blackboardStore");
         this.planner = Objects.requireNonNull(planner, "planner");
         this.tracer = Objects.requireNonNull(tracer, "tracer");
         this.telemetryReporter = new ExecutionTelemetryReporter(this.tracer, this.logger);
@@ -143,7 +137,6 @@ public final class AgentService {
             .filter(Objects::nonNull)
             .collect(java.util.stream.Collectors.joining(",")))),
                 () -> {
-                    blackboardStore.clear();
                     List<StageVisit> stageVisits = new ArrayList<>();
 
                     AgentWorkflowObserver observer = new AgentWorkflowObserver(tracer, request, 1);
@@ -211,13 +204,23 @@ public final class AgentService {
                 metricsSnapshot,
                 visitsSnapshot.size());
 
+        // Build blackboard snapshot from ActResult outputs for backward compatibility
+        Map<String, Object> blackboardSnapshot = new java.util.LinkedHashMap<>();
+        if (finalActResult != null && finalActResult.outputs() != null) {
+            finalActResult.outputs().forEach((skillId, output) -> {
+                blackboardSnapshot.put(
+                    io.github.hide212131.langchain4j.claude.skills.runtime.blackboard.ActState.outputKey(skillId),
+                    output);
+            });
+        }
+
         return new ExecutionResult(
                 visitsSnapshot,
                 finalPlan,
                 finalPlanCompletion,
                 metricsSnapshot,
                 finalActResult,
-                blackboardStore.snapshot());
+                blackboardSnapshot);
     }
 
 
@@ -360,6 +363,7 @@ public final class AgentService {
                 if (plan == null) {
                     throw new IllegalStateException("Plan stage must complete before Act");
                 }
+                // Use the refactored DefaultInvoker which now has cleaner skill execution logic
                 ActResult result = invoker.invoke(scope, plan);
                 WorkflowStateKeys.ACT_RESULT.write(scope, result);
                 WorkflowStateKeys.ACT_STAGE_OUTPUT.write(scope, result);
