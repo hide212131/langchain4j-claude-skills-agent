@@ -13,10 +13,9 @@ The observability integration provides comprehensive tracing for:
    - Execution time
    - Errors and exceptions
 
-2. **Workflow Stages** - Manual tracing for Plan → Act → Reflect workflow:
-   - **Plan Stage**: Goal, execution mode, selected skill IDs, skill count, attempt number
+2. **Workflow Stages** - Manual tracing for Plan → Act workflow:
+   - **Plan Stage**: Goal, execution mode, selected skill IDs, skill count
    - **Act Stage**: Executed skills, generated artifacts, invoked skills
-   - **Reflect Stage**: Evaluation summary, retry advice, attempt number
 
 3. **Skill Runtime** - Internal processing traces:
    - Skill execution details (ID, name, description)
@@ -102,19 +101,16 @@ Once LangFuse is running, access the web UI at `http://localhost:3000` to view t
 
 ```
 agent.execution (root span)
-├── workflow.plan (attempt 1)
+├── workflow.plan
 │   ├── plan.completed (event)
 │   └── [LLM call spans - auto-instrumented]
-├── workflow.act (attempt 1)
+├── workflow.act
 │   ├── skill.execute (for each skill)
 │   │   ├── tool.readSkillMd
 │   │   ├── tool.readRef
 │   │   ├── tool.runScript
 │   │   └── tool.writeArtifact
 │   └── act.completed (event)
-├── workflow.reflect (attempt 1)
-│   ├── reflect.completed (event)
-│   └── [LLM call spans - auto-instrumented]
 └── execution.completed (event)
     ├── execution.artifacts (event)
     └── [metrics summary]
@@ -127,30 +123,21 @@ agent.execution (root span)
 - `goal`: The user's goal/objective
 - `dryRun`: Whether this is a dry-run execution
 - `forcedSkillIds`: Comma-separated list of forced skill IDs
-- `attempt`: Attempt number (for retries)
 - `mode`: Execution mode (dry-run or live)
 
 ### Plan Stage
 
 - `selectedSkills`: Comma-separated list of selected skill IDs
 - `skillCount`: Number of skills in the plan
-- `attempt`: Attempt number
 
 ### Act Stage
 
 - `invokedSkills`: Comma-separated list of executed skills
 - `hasArtifact`: Whether artifacts were generated
-- `attempt`: Attempt number
-
-### Reflect Stage
-
-- `needsRetry`: Whether retry is needed
-- `summary`: Evaluation summary
-- `attempt`: Attempt number
 
 ### AgentScope Snapshots
 
-- `agentic.scope.input` / `agentic.scope.output`: Emitted on every Plan → Act → Reflect span with a JSON dump (max ~16 KB) of the LangChain4j `AgenticScope` immediately before and after the stage executes. Attributes include `stage`, `phase`, and `attempt` so LangFuse timelines show the full before/after contract state.
+- `agentic.scope.input` / `agentic.scope.output`: Emitted on every Plan → Act span with a JSON dump (max ~16 KB) of the LangChain4j `AgenticScope` immediately before and after the stage executes. Attributes include `stage` and `phase` so LangFuse timelines show the full before/after contract state.
 - `agentic.scope.error`: Emitted when a stage fails and captures the last known scope snapshot to help debug missing keys or malformed data.
 - `skill.agentic.scope`: Published by the Pure Act `SkillRuntime` supervisor to expose the complete supervisor scope for standalone skill executions.
 - `llm.chat` spans also include `agentic.scope.input` / `agentic.scope.output` / `agentic.scope.error` attributes so you can correlate every prompt/response with the exact AgenticScope payload that was in effect at call time.

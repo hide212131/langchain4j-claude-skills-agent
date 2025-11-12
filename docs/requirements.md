@@ -7,7 +7,7 @@
 ## 背景と方針
 - Skills は **定義（`SKILL.md`＋任意の追加リソース）** が本体。実行エンジンは本来 Claude だが、本プロジェクトでは **OpenAI（GPT）経路**で動く **独自ランタイム** を提供する（Claude 直実行は将来互換の“代替経路”として保持）。
 - **人間はスキルを選ばない**。LLM が `skills/` から **自動で選択・連携** する（Skills は「必要なときにだけ読み込む」設計が公式でも推奨）。
-- **Hybrid**：外側は **Workflow（Plan/Reflect）**、内側の各 Skill 実行（Act）は **Pure**。  
+- **Hybrid**：外側は **Workflow（Plan）**、内側の各 Skill 実行（Act）は **Pure**。  
   - **Workflow**：要求を複数 Skill に分解・順序化し、評価（Reflect）で再試行を管理。  
   - **Pure（Act）**：**単一エージェント＋ツール群**で順序を配線せず、LLM が毎ターンのツール選択/停止判断を行う（詳細は `spec_skillruntime.md`）。
 
@@ -53,14 +53,14 @@
 - 構造化ログ：tokens/time/tool_calls/disclosure、L1/L2/L3 投入ログ、Attempt ログ（`reason_short / inputs_digest / output_meta / diff / file_ids`）
 
 ## 受け入れ基準（抜粋）
-- **skillId が任意パス**でも Plan→Act→Reflect が E2E 完走する  
+- **skillId が任意パス**でも Plan→Act が E2E 完走する  
 - **固定ディレクトリ名に依存しない参照解決**が機能する（相対/明示/glob）  
 - **SKILL.md のみの Skill** でも完了（L3 未使用）  
 - L1/L2/L3 の投入方針に従っている（L2=SKILL.md 全文、L3=結果のみ）  
 - 2 回目実行でトークン/ツール呼出が減少（キャッシュ/差分投入が有効）
 
 ## 依存・セットアップ（抜粋）
-- LangChain4j **Agentic** チュートリアル（Plan→Act→Reflect の公式実装パターン）  
+- LangChain4j **Agentic** チュートリアル（Plan→Act の公式実装パターン）  
   https://docs.langchain4j.dev/tutorials/agents
 - LangChain4j **エージェント構築例**（Workflow/Agent API の具体例）  
   https://github.com/langchain4j/langchain4j-examples/tree/main/agentic-tutorial

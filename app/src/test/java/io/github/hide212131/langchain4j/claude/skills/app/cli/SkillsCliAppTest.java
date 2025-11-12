@@ -27,13 +27,12 @@ class SkillsCliAppTest {
     String output = out.toString();
 
     assertThat(output)
-        .contains("Attempt 1: plan -> act -> reflect")
+        .contains("Attempt 1: plan -> act")
         .contains("Plan skills: brand-guidelines -> document-skills/pptx -> with-reference")
         .contains("Assistant draft: dry-run-plan")
-    .contains("Tokens in/out/total: 0/0/0 (calls=2")
+        .contains("Tokens in/out/total: 0/0/0 (calls=2")
         .contains("Invoked skills: brand-guidelines, document-skills/pptx, with-reference")
-                .contains("Act outputs:")
-                .contains("with-reference: ")
-        .contains("Reflect summary: Complete");
+        .contains("Act outputs:")
+        .contains("with-reference: ");
     }
 }

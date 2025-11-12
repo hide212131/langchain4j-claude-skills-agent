@@ -87,7 +87,7 @@
   デバッグ環境向けの環境変数はプロジェクトルートの `.env` に `KEY=VALUE` 形式で記述し（例：`OPENAI_API_KEY=...`）、`launch.json` の `envFile` から読み込ませます。目標やスキル並びを変えたい場合は、`launch.json` を複製して `args` を調整すると便利です。
 
 ## 8. 今後のタスク連携
-- P0-1 完了後は LangChain4j Workflow ノード（Plan / Act / Reflect）の充実と安全性向上を段階的に進めます。  
+- P0-1 完了後は LangChain4j Workflow ノード（Plan / Act）の充実と安全性向上を段階的に進めます。  
 - 追加の設定項目（モデル名、スロットリング、プロキシなど）が増えた場合は本書に追記してください。
 
 ## 9. パッケージ雛形の作成手順
@@ -97,7 +97,6 @@
   mkdir -p app/cli \
            runtime/workflow/plan \
            runtime/workflow/act \
-           runtime/workflow/reflect \
            runtime/workflow/support \
            runtime/provider \
            runtime/skill \
