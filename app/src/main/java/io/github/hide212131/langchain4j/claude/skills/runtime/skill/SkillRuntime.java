@@ -93,7 +93,7 @@ public final class SkillRuntime {
         SkillIndex.SkillMetadata metadata = skillIndex.find(skillId)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown skill: " + skillId));
         Map<String, Object> safeInputs = inputs == null ? Map.of() : Map.copyOf(inputs);
-    prepareOutputDirectory(outputDirectory);
+    ensureOutputDirectoryExists(outputDirectory);
         List<String> expectedOutputs = resolveExpectedOutputs(safeInputs);
 
     SkillRuntimeContext context = new SkillRuntimeContext(metadata, expectedOutputs, outputDirectory, logger);
@@ -259,7 +259,19 @@ public final class SkillRuntime {
         return skillId.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
-    private void prepareOutputDirectory(Path directory) {
+    public void resetOutputDirectory() {
+        clearOutputDirectory(outputDirectory);
+    }
+
+    private void ensureOutputDirectoryExists(Path directory) {
+        try {
+            Files.createDirectories(directory);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to create output directory " + directory, e);
+        }
+    }
+
+    private void clearOutputDirectory(Path directory) {
         try {
             Files.createDirectories(directory);
             Files.walkFileTree(directory, new SimpleFileVisitor<>() {
@@ -282,7 +294,7 @@ public final class SkillRuntime {
                 }
             });
         } catch (IOException e) {
-            throw new IllegalStateException("Failed to prepare output directory " + directory, e);
+            throw new IllegalStateException("Failed to clear output directory " + directory, e);
         }
     }
 
@@ -791,6 +803,7 @@ public final class SkillRuntime {
                 String expectedStr = String.join(", ", expectedOutputs);
                 
                 // Call LLM for semantic validation
+                @SuppressWarnings("unused")
                 String llmPrompt = String.format("""
                     You are a strict QA reviewer for software deliverables.
                     

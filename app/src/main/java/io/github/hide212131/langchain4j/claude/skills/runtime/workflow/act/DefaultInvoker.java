@@ -44,7 +44,9 @@ public final class DefaultInvoker {
     public ActResult invoke(AgenticScope scope, PlanModels.PlanResult plan) {
         Objects.requireNonNull(scope, "scope");
         Objects.requireNonNull(plan, "plan");
-        List<PlanModels.PlanStep> steps = plan.steps();
+    invokeSkillTool.resetOutputDirectory();
+
+    List<PlanModels.PlanStep> steps = plan.steps();
         List<String> invokedSkills = new ArrayList<>(steps.size());
         Map<String, Object> outputs = new LinkedHashMap<>();
         Path lastArtifact = null;
