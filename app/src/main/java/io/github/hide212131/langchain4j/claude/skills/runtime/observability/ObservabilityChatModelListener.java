@@ -1,5 +1,6 @@
 package io.github.hide212131.langchain4j.claude.skills.runtime.observability;
 
+import dev.langchain4j.agentic.scope.AgenticScope;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
@@ -66,6 +67,7 @@ public final class ObservabilityChatModelListener implements ChatModelListener {
             span.setAttribute("gen_ai.request.prompt", promptPreview);
             span.addEvent("llm.prompt", Attributes.of(PROMPT_EVENT_KEY, promptPreview));
         }
+        emitAgenticScopeSnapshot(span, "input");
 
         Scope scope = span.makeCurrent();
         requestContext.attributes().put(ATTR_SPAN, span);
@@ -95,6 +97,7 @@ public final class ObservabilityChatModelListener implements ChatModelListener {
             if (chatResponse != null) {
                 recordResponse(span, chatResponse);
             }
+            emitAgenticScopeSnapshot(span, "output");
             span.setStatus(StatusCode.OK);
         } catch (RuntimeException ex) {
             span.setStatus(StatusCode.ERROR, ex.getMessage());
@@ -122,6 +125,7 @@ public final class ObservabilityChatModelListener implements ChatModelListener {
         if (start != null) {
             span.setAttribute("gen_ai.response.latency_ms", Duration.between(start, Instant.now()).toMillis());
         }
+        emitAgenticScopeSnapshot(span, "error");
         span.recordException(errorContext.error());
         span.setStatus(StatusCode.ERROR, safeMessage(errorContext.error()));
         span.end();
@@ -156,6 +160,30 @@ public final class ObservabilityChatModelListener implements ChatModelListener {
                 span.setAttribute("gen_ai.response.id", chatResponse.metadata().id());
             }
         }
+    }
+
+    private void emitAgenticScopeSnapshot(Span span, String phase) {
+        if (span == null) {
+            return;
+        }
+        AgenticScope scope = currentAgenticScope();
+        if (scope == null) {
+            return;
+        }
+        AgenticScopeSnapshots.snapshot(scope).ifPresent(snapshot -> {
+            String eventName = "agentic.scope." + phase;
+            span.addEvent(
+                    eventName,
+                    Attributes.builder()
+                            .put("phase", phase)
+                            .put("state", snapshot)
+                            .build());
+            span.setAttribute(eventName, snapshot);
+        });
+    }
+
+    private AgenticScope currentAgenticScope() {
+        return AgenticScopeContext.current();
     }
 
     private String resolveModelName(ModelProvider provider) {

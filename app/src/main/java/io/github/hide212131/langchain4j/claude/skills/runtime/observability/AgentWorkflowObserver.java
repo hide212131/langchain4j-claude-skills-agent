@@ -10,6 +10,7 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.WorkflowS
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.act.DefaultInvoker;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.PlanModels;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect.ReflectEvaluator;
+import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.context.Scope;
@@ -47,9 +48,11 @@ public final class AgentWorkflowObserver {
         Span span = tracer.startSpan("workflow." + stage, Map.of(
                 "attempt", attemptNumber,
                 "stage", stage));
-        Scope scope = span.makeCurrent();
+        Scope otelScope = span.makeCurrent();
         applyStageInputAttributes(stage, span, request.agenticScope());
-        stageStack.push(new StageContext(stage, span, scope));
+        emitScopeSnapshot("input", stage, span, request.agenticScope());
+        AgenticScope previousScope = AgenticScopeContext.set(request.agenticScope());
+        stageStack.push(new StageContext(stage, span, otelScope, request.agenticScope(), previousScope));
     }
 
     public void afterAgentInvocation(AgentResponse response) {
@@ -59,12 +62,14 @@ public final class AgentWorkflowObserver {
         }
         try {
             applyStageOutputAttributes(context.stage(), context.span(), response.agenticScope());
+            emitScopeSnapshot("output", context.stage(), context.span(), response.agenticScope());
             context.span().setStatus(StatusCode.OK);
         } catch (RuntimeException ex) {
             context.span().setStatus(StatusCode.ERROR, ex.getMessage());
             context.span().recordException(ex);
             throw ex;
         } finally {
+            AgenticScopeContext.restore(context.previousScope());
             context.scope().close();
             context.span().end();
         }
@@ -75,6 +80,8 @@ public final class AgentWorkflowObserver {
         if (context == null) {
             return;
         }
+        emitScopeSnapshot("error", context.stage(), context.span(), context.agenticScope());
+        AgenticScopeContext.restore(context.previousScope());
         context.scope().close();
         context.span().recordException(error);
         context.span().setStatus(StatusCode.ERROR, safeMessage(error));
@@ -230,5 +237,24 @@ public final class AgentWorkflowObserver {
         return value != null && !value.isBlank();
     }
 
-    private record StageContext(String stage, Span span, Scope scope) {}
+    private void emitScopeSnapshot(String phase, String stage, Span span, AgenticScope scope) {
+        if (span == null || scope == null || !span.isRecording()) {
+            return;
+        }
+        AgenticScopeSnapshots.snapshot(scope).ifPresent(snapshot -> {
+            String eventName = "agentic.scope." + phase;
+            span.addEvent(
+                    eventName,
+                    Attributes.builder()
+                            .put("stage", stage)
+                            .put("phase", phase)
+                            .put("attempt", attemptNumber)
+                            .put("state", snapshot)
+                            .build());
+            span.setAttribute(eventName, snapshot);
+        });
+    }
+
+    private record StageContext(
+            String stage, Span span, Scope scope, AgenticScope agenticScope, AgenticScope previousScope) {}
 }

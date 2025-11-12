@@ -148,6 +148,15 @@ agent.execution (root span)
 - `summary`: Evaluation summary
 - `attempt`: Attempt number
 
+### AgentScope Snapshots
+
+- `agentic.scope.input` / `agentic.scope.output`: Emitted on every Plan → Act → Reflect span with a JSON dump (max ~16 KB) of the LangChain4j `AgenticScope` immediately before and after the stage executes. Attributes include `stage`, `phase`, and `attempt` so LangFuse timelines show the full before/after contract state.
+- `agentic.scope.error`: Emitted when a stage fails and captures the last known scope snapshot to help debug missing keys or malformed data.
+- `skill.agentic.scope`: Published by the Pure Act `SkillRuntime` supervisor to expose the complete supervisor scope for standalone skill executions.
+- `llm.chat` spans also include `agentic.scope.input` / `agentic.scope.output` / `agentic.scope.error` attributes so you can correlate every prompt/response with the exact AgenticScope payload that was in effect at call time.
+
+Each snapshot truncates very long strings/collections so OTLP payloads stay bounded while still surfacing every key stored in `AgenticScope`.
+
 ### Execution Summary
 
 - `stageVisits`: Total number of stage visits

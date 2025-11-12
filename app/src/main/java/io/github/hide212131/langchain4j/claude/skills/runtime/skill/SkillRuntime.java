@@ -7,12 +7,14 @@ import dev.langchain4j.agent.tool.ReturnBehavior;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.agentic.Agent;
 import dev.langchain4j.agentic.AgenticServices;
+import dev.langchain4j.agentic.scope.AgenticScope;
 import dev.langchain4j.agentic.scope.ResultWithAgenticScope;
 import dev.langchain4j.agentic.supervisor.SupervisorContextStrategy;
 import dev.langchain4j.agentic.supervisor.SupervisorResponseStrategy;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.service.V;
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
+import io.github.hide212131.langchain4j.claude.skills.runtime.observability.AgenticScopeSnapshots;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.agent.ProgressTrackerAgent;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
@@ -400,6 +402,7 @@ public final class SkillRuntime {
                             expectedOutputsPayload,
                             Objects.toString(inputs.getOrDefault("goal", ""), ""),
                             Objects.toString(inputs.getOrDefault("constraints", ""), ""));
+            recordAgenticScope(metadata.id(), result.agenticScope());
             String supervisorResponse = result.result();
             return supervisorResponse == null ? "" : supervisorResponse;
         }
@@ -423,6 +426,19 @@ public final class SkillRuntime {
                         .build()
                 )
                     .build();
+        }
+
+        private void recordAgenticScope(String skillId, AgenticScope scope) {
+            Span span = Span.current();
+            if (!span.isRecording()) {
+                return;
+            }
+            AgenticScopeSnapshots.snapshot(scope).ifPresent(snapshot -> span.addEvent(
+                    "skill.agentic.scope",
+                    Attributes.builder()
+                            .put("skillId", skillId)
+                            .put("state", snapshot)
+                            .build()));
         }
 
         private String serialiseExpectedOutputs(List<String> expectedOutputs) {
