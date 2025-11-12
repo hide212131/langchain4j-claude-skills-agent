@@ -6,7 +6,7 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.provider.LangChain
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.AgentService;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.act.DefaultInvoker;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.PlanModels;
-import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect.ReflectEvaluator;
+
 import io.opentelemetry.api.trace.Span;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,24 +34,20 @@ public final class ExecutionTelemetryReporter {
             PlanModels.PlanResult finalPlan,
             LangChain4jLlmClient.CompletionResult finalPlanCompletion,
             DefaultInvoker.ActResult finalActResult,
-            ReflectEvaluator.EvaluationResult finalEvaluation,
-        LangChain4jLlmClient.ProviderMetrics metricsSnapshot,
-        int stageVisitCount) {
+            LangChain4jLlmClient.ProviderMetrics metricsSnapshot,
+            int stageVisitCount) {
 
-        boolean needsRetry = finalEvaluation != null && finalEvaluation.needsRetry();
         String planSkills = joinComma(finalPlan == null ? List.of() : finalPlan.orderedSkillIds());
         String invokedSkills = finalActResult == null ? "" : joinComma(finalActResult.invokedSkills());
         String artifactPath = finalActResult != null && finalActResult.hasArtifact()
                 ? finalActResult.finalArtifact().toString()
                 : "";
-        String reflectSummary = finalEvaluation != null ? limit(finalEvaluation.finalSummary()) : "";
 
-        ResultDescriptor descriptor = describeResult(finalPlanCompletion, finalActResult, finalEvaluation, finalPlan);
+        ResultDescriptor descriptor = describeResult(finalPlanCompletion, finalActResult, finalPlan);
 
         Map<String, String> eventAttributes = new LinkedHashMap<>();
         eventAttributes.put("workflow.goal", request.goal());
         eventAttributes.put("workflow.result_type", descriptor.type());
-        eventAttributes.put("workflow.needs_retry", Boolean.toString(needsRetry));
         eventAttributes.put("workflow.stage_visits", Integer.toString(stageVisitCount));
         if (!planSkills.isEmpty()) {
             eventAttributes.put("plan.skills", planSkills);
@@ -65,21 +61,16 @@ public final class ExecutionTelemetryReporter {
         if (!artifactPath.isEmpty()) {
             eventAttributes.put("act.artifact_path", artifactPath);
         }
-        if (!reflectSummary.isEmpty()) {
-            eventAttributes.put("reflect.summary", reflectSummary);
-            eventAttributes.put("reflect.success", Boolean.toString(finalEvaluation.success()));
-        }
         appendMetricAttributes(eventAttributes, metricsSnapshot);
         tracer.addEvent("execution.summary", eventAttributes);
 
-        logSummary(request.goal(), descriptor, needsRetry, planSkills, invokedSkills, artifactPath, metricsSnapshot, stageVisitCount);
-        annotateRootSpan(request.goal(), descriptor, needsRetry, planSkills, invokedSkills, artifactPath, metricsSnapshot, stageVisitCount);
+        logSummary(request.goal(), descriptor, planSkills, invokedSkills, artifactPath, metricsSnapshot, stageVisitCount);
+        annotateRootSpan(request.goal(), descriptor, planSkills, invokedSkills, artifactPath, metricsSnapshot, stageVisitCount);
     }
 
     private void logSummary(
             String goal,
             ResultDescriptor descriptor,
-            boolean needsRetry,
             String planSkills,
             String invokedSkills,
             String artifactPath,
@@ -92,10 +83,9 @@ public final class ExecutionTelemetryReporter {
         int outputTokens = metricsSnapshot != null ? metricsSnapshot.totalOutputTokens() : 0;
 
         logger.info(
-                "Execution summary goal='{}' resultType={} needsRetry={} planSkills={} invokedSkills={} artifact={} stageVisits={} llmCalls={} tokens(in/out)={}/{} durationMs={}",
+                "Execution summary goal='{}' resultType={} planSkills={} invokedSkills={} artifact={} stageVisits={} llmCalls={} tokens(in/out)={}/{} durationMs={}",
                 goal,
                 descriptor.type(),
-                needsRetry,
                 planSkills,
                 invokedSkills,
                 artifactPath,
@@ -109,7 +99,6 @@ public final class ExecutionTelemetryReporter {
     private void annotateRootSpan(
             String goal,
             ResultDescriptor descriptor,
-            boolean needsRetry,
             String planSkills,
             String invokedSkills,
             String artifactPath,
@@ -122,7 +111,6 @@ public final class ExecutionTelemetryReporter {
         }
         span.setAttribute("workflow.execution.goal", goal);
         span.setAttribute("workflow.execution.result_type", descriptor.type());
-        span.setAttribute("workflow.execution.needs_retry", needsRetry);
         span.setAttribute("workflow.execution.stage_visits", stageVisitCount);
         if (!descriptor.output().isEmpty()) {
             span.setAttribute("workflow.execution.output", descriptor.output());
@@ -148,12 +136,8 @@ public final class ExecutionTelemetryReporter {
     private static ResultDescriptor describeResult(
             LangChain4jLlmClient.CompletionResult planCompletion,
             DefaultInvoker.ActResult actResult,
-            ReflectEvaluator.EvaluationResult evaluation,
             PlanModels.PlanResult plan) {
 
-        if (evaluation != null && hasText(evaluation.finalSummary())) {
-            return new ResultDescriptor("reflect-summary", limit(evaluation.finalSummary()));
-        }
         if (actResult != null) {
             if (actResult.hasArtifact()) {
                 return new ResultDescriptor("artifact", actResult.finalArtifact().toString());

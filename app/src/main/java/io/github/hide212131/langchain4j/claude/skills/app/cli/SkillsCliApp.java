@@ -192,19 +192,7 @@ public final class SkillsCliApp implements Runnable {
                             .println("Artifact: " + result.actResult().finalArtifact());
                 }
             }
-            if (result.evaluation() != null) {
-                commandSpec
-                        .commandLine()
-                        .getOut()
-                        .println("Reflect summary: " + result.evaluation().finalSummary());
-                if (result.evaluation().retryAdvice() != null
-                        && !"none".equalsIgnoreCase(result.evaluation().retryAdvice())) {
-                    commandSpec
-                            .commandLine()
-                            .getOut()
-                            .println("Retry advice: " + result.evaluation().retryAdvice());
-                }
-            }
+
             commandSpec.commandLine().getOut().flush();
             return 0;
         }

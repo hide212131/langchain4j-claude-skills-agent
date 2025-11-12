@@ -9,7 +9,7 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.AgentServ
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.WorkflowStateKeys;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.act.DefaultInvoker;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.PlanModels;
-import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect.ReflectEvaluator;
+
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
@@ -96,7 +96,6 @@ public final class AgentWorkflowObserver {
         switch (stage) {
             case "plan" -> annotatePlanInput(span);
             case "act" -> annotateActInput(span, scope);
-            case "reflect" -> annotateReflectInput(span, scope);
             default -> { /* no-op */ }
         }
     }
@@ -105,7 +104,6 @@ public final class AgentWorkflowObserver {
         switch (stage) {
             case "plan" -> handlePlanSpan(span, scope);
             case "act" -> handleActSpan(span, scope);
-            case "reflect" -> handleReflectSpan(span, scope);
             default -> { /* no-op */ }
         }
     }
@@ -152,18 +150,7 @@ public final class AgentWorkflowObserver {
         }
     }
 
-    private void handleReflectSpan(Span span, AgenticScope scope) {
-        ReflectEvaluator.EvaluationResult evaluation = readEvaluation(scope);
-        if (evaluation == null) {
-            return;
-        }
-        String summary = evaluation.finalSummary();
-        span.setAttribute("workflow.reflect.needs_retry", evaluation.needsRetry());
-        span.setAttribute("workflow.reflect.success", evaluation.success());
-        if (hasText(summary)) {
-            span.setAttribute("workflow.reflect.summary", summary);
-        }
-    }
+
 
     private void annotatePlanInput(Span span) {
         span.setAttribute("workflow.plan.goal", runRequest.goal());
@@ -183,19 +170,7 @@ public final class AgentWorkflowObserver {
         span.setAttribute("workflow.act.plan_skill_count", plan.orderedSkillIds().size());
     }
 
-    private void annotateReflectInput(Span span, AgenticScope scope) {
-        DefaultInvoker.ActResult actResult = readAct(scope);
-        if (actResult == null) {
-            return;
-        }
-        if (!actResult.invokedSkills().isEmpty()) {
-            span.setAttribute("workflow.reflect.invoked_skills", String.join(",", actResult.invokedSkills()));
-            span.setAttribute("workflow.reflect.skill_call_count", actResult.invokedSkills().size());
-        }
-        if (actResult.hasArtifact()) {
-            span.setAttribute("workflow.reflect.input_artifact", actResult.finalArtifact().toString());
-        }
-    }
+
 
     private PlanModels.PlanResult readPlan(AgenticScope scope) {
         if (scope != null && WorkflowStateKeys.PLAN_RESULT.exists(scope)) {
@@ -218,12 +193,7 @@ public final class AgentWorkflowObserver {
         return null;
     }
 
-    private ReflectEvaluator.EvaluationResult readEvaluation(AgenticScope scope) {
-        if (scope != null && WorkflowStateKeys.REFLECT_RESULT.exists(scope)) {
-            return WorkflowStateKeys.REFLECT_RESULT.readOrNull(scope);
-        }
-        return null;
-    }
+
 
     private String safeMessage(Throwable error) {
         String message = error.getMessage();

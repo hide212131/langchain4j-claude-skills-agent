@@ -30,8 +30,7 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.act.Defau
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.act.InvokeSkillTool;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.AgenticPlanner;
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.plan.PlanModels;
-import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect.DefaultEvaluator;
-import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.reflect.ReflectEvaluator;
+
 import io.github.hide212131.langchain4j.claude.skills.runtime.workflow.support.WorkflowFactory;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -39,8 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
+
 
 /**
  * High-level entry point that executes the Plan → Act → Reflect workflow.
@@ -53,7 +51,6 @@ public final class AgentService {
     private final AgenticPlanner planner;
     private final DefaultInvoker invoker;
     private final BlackboardStore blackboardStore;
-    private final ReflectEvaluator evaluator;
     private final WorkflowTracer tracer;
     private final ExecutionTelemetryReporter telemetryReporter;
     private static final AgentStateKey<PlanState> PLAN_STATE_KEY =
@@ -98,7 +95,6 @@ public final class AgentService {
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
         SkillInvocationGuard guard = new SkillInvocationGuard();
         DefaultInvoker invoker = new DefaultInvoker(tool, guard, blackboardStore, logger);
-        ReflectEvaluator evaluator = new DefaultEvaluator(blackboardStore, logger);
         return new AgentService(
                 workflowFactory,
                 llmClient,
@@ -106,7 +102,6 @@ public final class AgentService {
                 logger,
                 invoker,
                 blackboardStore,
-                evaluator,
                 new AgenticPlanner(skillIndex, llmClient, logger),
                 tracer);
     }
@@ -125,7 +120,6 @@ public final class AgentService {
             WorkflowLogger logger,
             DefaultInvoker invoker,
             BlackboardStore blackboardStore,
-            ReflectEvaluator evaluator,
             AgenticPlanner planner,
             WorkflowTracer tracer) {
         this.workflowFactory = Objects.requireNonNull(workflowFactory, "workflowFactory");
@@ -134,7 +128,6 @@ public final class AgentService {
         Objects.requireNonNull(skillIndex, "skillIndex");
         this.invoker = Objects.requireNonNull(invoker, "invoker");
         this.blackboardStore = Objects.requireNonNull(blackboardStore, "blackboardStore");
-        this.evaluator = Objects.requireNonNull(evaluator, "evaluator");
         this.planner = Objects.requireNonNull(planner, "planner");
         this.tracer = Objects.requireNonNull(tracer, "tracer");
         this.telemetryReporter = new ExecutionTelemetryReporter(this.tracer, this.logger);
@@ -152,39 +145,40 @@ public final class AgentService {
                 () -> {
                     blackboardStore.clear();
                     List<StageVisit> stageVisits = new ArrayList<>();
-                    int maxAttempts = 2;
 
-                    AtomicReference<AttemptSnapshot> lastSnapshot = new AtomicReference<>();
-                    AttemptAgent attemptAgent = new AttemptAgent(
+                    AgentWorkflowObserver observer = new AgentWorkflowObserver(tracer, request, 1);
+
+                    DynamicPlanOperator dynamicPlanAgent = new DynamicPlanOperator(
+                            planner,
+                            llmClient,
+                            logger,
                             request,
-                            maxAttempts,
-                            stageVisits,
-                            lastSnapshot);
+                            1,
+                            1,
+                            observer);
+                    ForcedPlanOperator forcedPlanAgent = new ForcedPlanOperator(
+                            planner,
+                            logger,
+                            request,
+                            1,
+                            1,
+                            observer);
+                    ActOperator actAgent = new ActOperator(invoker, observer);
 
-                    UntypedAgent workflow = AgenticServices.loopBuilder()
-                            .name("skills-plan-act-reflect")
-                            .subAgents(attemptAgent)
-                            .maxIterations(maxAttempts)
-                            .exitCondition((scope, iteration) -> shouldExit(lastSnapshot.get()))
-                            .output(scope -> lastSnapshot.get())
+                    UntypedAgent planBranch = AgenticServices.conditionalBuilder()
+                            .name("plan-branch")
+                            .subAgents(agenticScope -> !request.forcedSkillIds().isEmpty(), forcedPlanAgent)
+                            .subAgents(agenticScope -> request.forcedSkillIds().isEmpty(), dynamicPlanAgent)
                             .build();
 
-                    UntypedAgent executionWorkflow = AgenticServices.sequenceBuilder()
-                            .name("skills-plan-act-reflect-root")
-                            .subAgents(workflow)
-                            .output(scope -> assembleExecutionResult(request, stageVisits, lastSnapshot))
-                            .build();
+                    UntypedAgent executionWorkflow = workflowFactory.createWorkflow(builder -> {
+                        builder.name("skills-plan-act");
+                        builder.output(attemptScope -> assembleExecutionResult(request, stageVisits, attemptScope, observer));
+                        builder.subAgents(planBranch, actAgent);
+                    });
 
                     return (ExecutionResult) executionWorkflow.invoke(Map.of("goal", request.goal()));
                 });
-    }
-
-    private AttemptSnapshot assembleAttemptSnapshot(AgenticScope scope, AgentWorkflowObserver observer) {
-        PlanModels.PlanResult plan = readStateOrNull(scope, WorkflowStateKeys.PLAN_RESULT);
-        LangChain4jLlmClient.CompletionResult planDraft = readStateOrNull(scope, WorkflowStateKeys.PLAN_DRAFT);
-        ActResult actResult = readStateOrNull(scope, WorkflowStateKeys.ACT_RESULT);
-        ReflectEvaluator.EvaluationResult evaluation = readStateOrNull(scope, WorkflowStateKeys.REFLECT_RESULT);
-        return new AttemptSnapshot(plan, planDraft, actResult, evaluation, observer.visits());
     }
 
     private static <T> T readStateOrNull(AgenticScope scope, AgentStateKey<T> key) {
@@ -194,41 +188,28 @@ public final class AgentService {
         return key.readOrNull(scope);
     }
 
-    private static boolean shouldExit(AttemptSnapshot snapshot) {
-        if (snapshot == null) {
-            return false;
-        }
-        ReflectEvaluator.EvaluationResult evaluation = snapshot.evaluation();
-        return evaluation == null || !evaluation.needsRetry();
-    }
-
     private ExecutionResult assembleExecutionResult(
             AgentRunRequest request,
             List<StageVisit> stageVisits,
-            AtomicReference<AttemptSnapshot> lastSnapshot) {
+            AgenticScope scope,
+            AgentWorkflowObserver observer) {
 
-        AttemptSnapshot snapshot = lastSnapshot.get();
-        PlanModels.PlanResult finalPlan = snapshot != null ? snapshot.plan() : null;
-        LangChain4jLlmClient.CompletionResult finalPlanCompletion =
-                snapshot != null ? snapshot.planCompletion() : null;
-        ActResult finalActResult = snapshot != null ? snapshot.actResult() : null;
-        ReflectEvaluator.EvaluationResult finalEvaluation = snapshot != null ? snapshot.evaluation() : null;
+        PlanModels.PlanResult finalPlan = readStateOrNull(scope, WorkflowStateKeys.PLAN_RESULT);
+        LangChain4jLlmClient.CompletionResult finalPlanCompletion = readStateOrNull(scope, WorkflowStateKeys.PLAN_DRAFT);
+        ActResult finalActResult = readStateOrNull(scope, WorkflowStateKeys.ACT_RESULT);
 
         LangChain4jLlmClient.ProviderMetrics metricsSnapshot = llmClient.metrics();
-        if (finalEvaluation != null && finalEvaluation.needsRetry()) {
-            logger.warn("Reflect could not satisfy requirements within retry budget.");
-        }
 
-    List<StageVisit> visitsSnapshot = List.copyOf(stageVisits);
+        stageVisits.addAll(observer.visits());
+        List<StageVisit> visitsSnapshot = List.copyOf(stageVisits);
 
         telemetryReporter.report(
                 request,
                 finalPlan,
                 finalPlanCompletion,
                 finalActResult,
-                finalEvaluation,
-        metricsSnapshot,
-        visitsSnapshot.size());
+                metricsSnapshot,
+                visitsSnapshot.size());
 
         return new ExecutionResult(
                 visitsSnapshot,
@@ -236,82 +217,10 @@ public final class AgentService {
                 finalPlanCompletion,
                 metricsSnapshot,
                 finalActResult,
-                finalEvaluation,
                 blackboardStore.snapshot());
     }
 
-    public final class AttemptAgent {
-        private final AgentRunRequest request;
-        private final int maxAttempts;
-        private final List<StageVisit> stageVisits;
-        private final AtomicReference<AttemptSnapshot> lastSnapshot;
-        private final AtomicInteger attemptCounter = new AtomicInteger();
 
-        AttemptAgent(
-                AgentRunRequest request,
-                int maxAttempts,
-                List<StageVisit> stageVisits,
-                AtomicReference<AttemptSnapshot> lastSnapshot) {
-            this.request = request;
-            this.maxAttempts = maxAttempts;
-            this.stageVisits = stageVisits;
-            this.lastSnapshot = lastSnapshot;
-        }
-
-        @Agent(name = "attempt")
-        public AttemptSnapshot invoke(AgenticScope scope) {
-            int attemptNumber = attemptCounter.incrementAndGet();
-            AgentWorkflowObserver observer = new AgentWorkflowObserver(tracer, request, attemptNumber);
-
-            DynamicPlanOperator dynamicPlanAgent = new DynamicPlanOperator(
-                    planner,
-                    llmClient,
-                    logger,
-                    request,
-                    attemptNumber,
-                    maxAttempts,
-                    observer);
-            ForcedPlanOperator forcedPlanAgent = new ForcedPlanOperator(
-                    planner,
-                    logger,
-                    request,
-                    attemptNumber,
-                    maxAttempts,
-                    observer);
-            ActOperator actAgent = new ActOperator(invoker, observer);
-            ReflectOperator reflectAgent = new ReflectOperator(
-                    evaluator,
-                    attemptNumber,
-                    maxAttempts,
-                    observer);
-
-            UntypedAgent planBranch = AgenticServices.conditionalBuilder()
-                    .name("plan-branch")
-                    .subAgents(agenticScope -> !request.forcedSkillIds().isEmpty(), forcedPlanAgent)
-                    .subAgents(agenticScope -> request.forcedSkillIds().isEmpty(), dynamicPlanAgent)
-                    .build();
-
-            UntypedAgent attemptWorkflow = workflowFactory.createWorkflow(builder -> {
-                builder.name("skills-plan-act-reflect-attempt");
-                builder.output(attemptScope -> assembleAttemptSnapshot(attemptScope, observer));
-                builder.subAgents(planBranch, actAgent, reflectAgent);
-            });
-
-            AttemptSnapshot snapshot = (AttemptSnapshot) attemptWorkflow.invoke(Map.of("goal", request.goal()));
-            lastSnapshot.set(snapshot);
-            stageVisits.addAll(snapshot.stageVisits());
-
-            ReflectEvaluator.EvaluationResult evaluation = snapshot.evaluation();
-            if (evaluation != null && evaluation.needsRetry() && attemptNumber < maxAttempts) {
-                logger.info(
-                        "Reflect requested retry after attempt {} — clearing blackboard and retrying.",
-                        attemptNumber);
-                blackboardStore.clear();
-            }
-
-            return snapshot;
-        }
-    }
 
     public static final class DynamicPlanOperator {
         private final AgenticPlanner planner;
@@ -462,60 +371,14 @@ public final class AgentService {
         }
     }
 
-    public static final class ReflectOperator {
-        private final ReflectEvaluator evaluator;
-        private final int attemptNumber;
-        private final int maxAttempts;
-        private final AgentWorkflowObserver observer;
 
-        ReflectOperator(
-                ReflectEvaluator evaluator,
-                int attemptNumber,
-                int maxAttempts,
-                AgentWorkflowObserver observer) {
-            this.evaluator = evaluator;
-            this.attemptNumber = attemptNumber;
-            this.maxAttempts = maxAttempts;
-            this.observer = observer;
-        }
-
-        @Agent(name = "reflect")
-        public void run(AgenticScope scope) {
-            observer.beforeAgentInvocation(new AgentRequest(scope, "reflect", Map.of("attempt", attemptNumber)));
-            try {
-                PlanModels.PlanResult plan = readStateOrNull(scope, WorkflowStateKeys.PLAN_RESULT);
-                if (plan == null) {
-                    throw new IllegalStateException("Plan stage must complete before Reflect");
-                }
-                ActResult actResult = readStateOrNull(scope, WorkflowStateKeys.ACT_RESULT);
-                ReflectEvaluator.EvaluationResult evaluation =
-                        evaluator.evaluate(scope, plan, actResult, attemptNumber, maxAttempts);
-                WorkflowStateKeys.REFLECT_RESULT.write(scope, evaluation);
-                WorkflowStateKeys.REFLECT_STAGE_OUTPUT.write(scope, evaluation);
-                observer.afterAgentInvocation(new AgentResponse(scope, "reflect", Map.of("attempt", attemptNumber), evaluation));
-            } catch (RuntimeException ex) {
-                observer.onStageError(ex);
-                throw ex;
-            }
-        }
-    }
 
     public record PlanStageOutput(
             PlanModels.PlanResult plan,
             LangChain4jLlmClient.CompletionResult completion,
             String assistantDraft) {}
 
-    private record AttemptSnapshot(
-            PlanModels.PlanResult plan,
-            LangChain4jLlmClient.CompletionResult planCompletion,
-            ActResult actResult,
-            ReflectEvaluator.EvaluationResult evaluation,
-            List<StageVisit> stageVisits) {
 
-        private AttemptSnapshot {
-            stageVisits = stageVisits == null ? List.of() : List.copyOf(stageVisits);
-        }
-    }
 
     private static void writePlanGoal(AgenticScope scope, String goal) {
         if (goal == null || goal.isBlank()) {
@@ -539,7 +402,6 @@ public final class AgentService {
             LangChain4jLlmClient.CompletionResult planResult,
             LangChain4jLlmClient.ProviderMetrics metrics,
             ActResult actResult,
-            ReflectEvaluator.EvaluationResult evaluation,
             Map<String, Object> blackboardSnapshot) {
     }
 
