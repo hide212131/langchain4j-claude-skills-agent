@@ -605,6 +605,7 @@ public final class SkillRuntime {
                     .contextGenerationStrategy(SupervisorContextStrategy.CHAT_MEMORY_AND_SUMMARIZATION)
                     .responseStrategy(SupervisorResponseStrategy.SUMMARY)
                     .supervisorContext(createSupervisorContext(metadata, expectedOutputs))
+                    .maxAgentsInvocations(20)
                     .subAgents(
                 new ReadReferenceAgent(toolbox),
                 new ScriptDeployAgent(toolbox),
@@ -716,7 +717,7 @@ public final class SkillRuntime {
 
         @Agent(
                 name = "runScript",
-                description = "Executes a script within the skill sandbox")
+                description = "Executes a skill-generated .py/.sh/.js file under the skill output directory using the appropriate interpreter and optional args/dependencies")
         public ScriptResult run(
                 @V("skillId") String skillId,
                 @V("path") String path,
@@ -1045,7 +1046,11 @@ public final class SkillRuntime {
                 throw new IllegalArgumentException("path must be provided when calling runScript");
             }
 
-            Path scriptPath = resolveScriptPath(metadata.skillRoot(), context.outputDirectory(), path);
+            Path scriptPath = resolveScriptPath(
+                    metadata.skillRoot(),
+                    context.skillOutputDirectory(),
+                    context.outputDirectory(),
+                    path);
             String extension = resolveExtension(scriptPath);
             if (!ALLOWED_SCRIPT_EXTENSIONS.contains(extension)) {
                 throw new IllegalArgumentException(
@@ -1149,7 +1154,7 @@ public final class SkillRuntime {
             if (!Files.isDirectory(sourcePath)) {
                 throw new IllegalArgumentException("Deployment source must be a directory: " + sourcePath);
             }
-            Path targetPath = resolveDeploymentTarget(context.outputDirectory(), targetDir);
+            Path targetPath = resolveDeploymentTarget(context, targetDir);
             DeploymentResult deployment = copyDirectoryTree(sourcePath, targetPath);
             logger.info(
                     "Act[deploy] {} — {} -> {} (filesCopied={}, directoriesCreated={})",
@@ -1658,7 +1663,7 @@ public final class SkillRuntime {
             return pattern.replace("/", separator);
         }
 
-        private Path resolveScriptPath(Path skillRoot, Path outputDir, String requested) {
+        private Path resolveScriptPath(Path skillRoot, Path skillOutputDir, Path outputDir, String requested) {
             Path candidate = Path.of(requested == null ? "" : requested);
             List<Path> searchOrder = new ArrayList<>();
             if (candidate.isAbsolute()) {
@@ -1667,6 +1672,9 @@ public final class SkillRuntime {
                 Path normalised = candidate.normalize();
                 Path outputRelative = SkillRuntime.sanitiseOutputRelativePath(normalised, outputDir);
                 searchOrder.add(skillRoot.resolve(normalised));
+                if (skillOutputDir != null) {
+                    searchOrder.add(skillOutputDir.resolve(normalised));
+                }
                 searchOrder.add(outputDir.resolve(outputRelative));
                 if (!outputRelative.equals(normalised)) {
                     searchOrder.add(outputDir.resolve(normalised));
@@ -1733,17 +1741,22 @@ public final class SkillRuntime {
                     "Deployment source '" + sourceDir + "' could not be resolved for skill '" + context.metadata().id() + "'");
         }
 
-        private Path resolveDeploymentTarget(Path outputDir, String targetDir) {
-            Path candidate = Path.of(targetDir == null ? "" : targetDir);
-            if (!candidate.isAbsolute()) {
-                candidate = SkillRuntime.sanitiseOutputRelativePath(candidate.normalize(), outputDir);
+        private Path resolveDeploymentTarget(SkillRuntimeContext context, String targetDir) {
+            Path requested = Path.of(targetDir == null ? "" : targetDir);
+            Path skillOutputDir = context.skillOutputDirectory();
+            Path resolved;
+            if (requested.isAbsolute()) {
+                resolved = requested.toAbsolutePath().normalize();
+            } else {
+                Path sanitised = SkillRuntime.sanitiseOutputRelativePath(
+                        requested.normalize(), context.outputDirectory());
+                Path skillRelative = context.relativizeToSkill(sanitised);
+                resolved = skillOutputDir.resolve(skillRelative).toAbsolutePath().normalize();
             }
-            Path resolved = candidate.isAbsolute() ? candidate.toAbsolutePath().normalize() : outputDir.resolve(candidate);
-            Path normalised = resolved.toAbsolutePath().normalize();
-            if (!normalised.startsWith(outputDir)) {
-                throw new IllegalArgumentException("Deployment target must remain under " + outputDir);
+            if (!resolved.startsWith(skillOutputDir)) {
+                throw new IllegalArgumentException("Deployment target must remain under " + skillOutputDir);
             }
-            return normalised;
+            return resolved;
         }
 
         private DeploymentResult copyDirectoryTree(Path source, Path target) {
@@ -2423,6 +2436,10 @@ public final class SkillRuntime {
 
         Path skillOutputDirectory() {
             return skillOutputDirectory;
+        }
+
+        Path relativizeToSkill(Path candidate) {
+            return stripSkillIdPrefix(candidate);
         }
 
         void logL1() {
