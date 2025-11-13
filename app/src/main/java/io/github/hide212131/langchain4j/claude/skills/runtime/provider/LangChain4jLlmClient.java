@@ -18,6 +18,8 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static dev.langchain4j.model.chat.Capability.RESPONSE_FORMAT_JSON_SCHEMA;
+
 /**
  * LangChain4j wrapper that exposes a small surface tailored for the agent runtime.
  */
@@ -30,6 +32,7 @@ public final class LangChain4jLlmClient {
     private final AtomicLong cumulativeDurationMs = new AtomicLong();
     private final AtomicInteger cumulativeInputTokens = new AtomicInteger();
     private final AtomicInteger cumulativeOutputTokens = new AtomicInteger();
+    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(120);
 
     private LangChain4jLlmClient(ChatModel chatModel, Clock clock, String defaultModelName) {
         this.chatModel = Objects.requireNonNull(chatModel, "chatModel");
@@ -47,7 +50,7 @@ public final class LangChain4jLlmClient {
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException("OPENAI_API_KEY must be set");
         }
-        OpenAiConfig config = new OpenAiConfig(apiKey, "gpt-5-mini");
+        OpenAiConfig config = new OpenAiConfig(apiKey, "gpt-5-mini", resolveTimeout(environment));
         ChatModel chatModel = factory.create(config);
         return new LangChain4jLlmClient(chatModel, clock, config.modelName);
     }
@@ -122,10 +125,12 @@ public final class LangChain4jLlmClient {
     static final class OpenAiConfig {
         final String apiKey;
         final String modelName;
+        final Duration timeout;
 
-        OpenAiConfig(String apiKey, String modelName) {
+        OpenAiConfig(String apiKey, String modelName, Duration timeout) {
             this.apiKey = Objects.requireNonNull(apiKey, "apiKey");
             this.modelName = Objects.requireNonNull(modelName, "modelName");
+            this.timeout = Objects.requireNonNull(timeout, "timeout");
         }
     }
 
@@ -139,6 +144,9 @@ public final class LangChain4jLlmClient {
             return OpenAiChatModel.builder()
                     .apiKey(config.apiKey)
                     .modelName(config.modelName)
+                    .timeout(config.timeout)
+                    .supportedCapabilities(RESPONSE_FORMAT_JSON_SCHEMA)
+                    .strictJsonSchema(true)
                     .build();
         }
     }
@@ -155,6 +163,24 @@ public final class LangChain4jLlmClient {
                     .tokenUsage(new TokenUsage(0, 0, 0))
                     .build();
         }
+    }
+
+    private static Duration resolveTimeout(EnvironmentVariables environment) {
+        String raw = environment.get("OPENAI_TIMEOUT_SECONDS");
+        if (raw == null || raw.isBlank()) {
+            return DEFAULT_TIMEOUT;
+        }
+        long seconds;
+        try {
+            seconds = Long.parseLong(raw.trim());
+        } catch (NumberFormatException ex) {
+            throw new IllegalStateException(
+                    "OPENAI_TIMEOUT_SECONDS must be a positive integer (seconds)", ex);
+        }
+        if (seconds <= 0) {
+            throw new IllegalStateException("OPENAI_TIMEOUT_SECONDS must be greater than zero");
+        }
+        return Duration.ofSeconds(seconds);
     }
 
     private void recordMetrics(TokenUsage usage, long durationMs) {

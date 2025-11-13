@@ -234,7 +234,7 @@ hash:
 この仕様に基づき、以下の実装が完了しています：
 
 ### 完了項目
-- ✅ `UnifiedOutputsValidatorAgent` クラスの作成
+- ✅ `SemanticOutputsValidatorAgent` クラスの作成
 - ✅ Contract Check（Non-AI）の実装
   - ファイル存在チェック
   - サンドボックス境界検証

@@ -47,6 +47,7 @@ public interface ProgressTrackerAgent {
         - Maintain chronological order
         - Clearly indicate success/failure for each action
         - Never hide errors or issues
+        - Do not prompt the user for "next steps"; simply proceed to the next milestone.
         """)
     @UserMessage("""
         **Current Progress:**
@@ -59,6 +60,7 @@ public interface ProgressTrackerAgent {
         {{action_result}}
         
         Based on the above information, generate an updated progress summary.
+        Do not prompt the user for "next steps"; simply proceed to the next milestone.
         """)
     @Agent(
         name = "ProgressTracker",

@@ -245,7 +245,9 @@ class SkillRuntimeTest {
                 .containsKey("referencedFiles")
                 .extractingByKey("referencedFiles", InstanceOfAssertFactories.list(String.class))
                 .anyMatch(path -> path.endsWith("procedures/generated.md"));
-        Path generated = tempDir.resolve("procedures/generated.md");
+        Path generated = tempDir
+                .resolve("document-skills/pptx")
+                .resolve("procedures/generated.md");
         assertThat(Files.readString(generated)).contains("Generated notes");
     }
 
