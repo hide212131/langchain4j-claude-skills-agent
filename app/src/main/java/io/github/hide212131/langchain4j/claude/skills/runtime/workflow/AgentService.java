@@ -83,12 +83,14 @@ public final class AgentService {
             skillIndex,
             outputDirectory,
             logger,
-            new DryRunSkillRuntimeOrchestrator())
+            new DryRunSkillRuntimeOrchestrator(),
+            tracer)
         : new SkillRuntime(
             skillIndex,
             outputDirectory,
             logger,
-            runtimeChatModel);
+            runtimeChatModel,
+            tracer);
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
         SkillInvocationGuard guard = new SkillInvocationGuard();
         DefaultInvoker invoker = new DefaultInvoker(tool, guard, logger);

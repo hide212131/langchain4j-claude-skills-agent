@@ -38,7 +38,7 @@ public final class ObservabilityChatModelListener implements ChatModelListener {
     private static final String ATTR_SPAN = ObservabilityChatModelListener.class.getName() + ".span";
     private static final String ATTR_SCOPE = ObservabilityChatModelListener.class.getName() + ".scope";
     private static final String ATTR_START = ObservabilityChatModelListener.class.getName() + ".start";
-    private static final int MAX_TEXT_PREVIEW = 4096;
+    private static final int ERROR_MESSAGE_PREVIEW_LIMIT = 4096;
 
     private final Tracer tracer;
     private final String system;
@@ -229,11 +229,7 @@ public final class ObservabilityChatModelListener implements ChatModelListener {
         if (text == null) {
             return "";
         }
-        String cleaned = text.strip();
-        if (cleaned.length() <= MAX_TEXT_PREVIEW) {
-            return cleaned;
-        }
-        return cleaned.substring(0, MAX_TEXT_PREVIEW);
+        return text.strip();
     }
 
     private String safeMessage(Throwable error) {
@@ -241,6 +237,8 @@ public final class ObservabilityChatModelListener implements ChatModelListener {
         if (message == null) {
             return error.getClass().getSimpleName();
         }
-        return message.length() <= MAX_TEXT_PREVIEW ? message : message.substring(0, MAX_TEXT_PREVIEW);
+        return message.length() <= ERROR_MESSAGE_PREVIEW_LIMIT
+                ? message
+                : message.substring(0, ERROR_MESSAGE_PREVIEW_LIMIT);
     }
 }

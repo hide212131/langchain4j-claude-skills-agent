@@ -16,10 +16,13 @@ import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
 import io.github.hide212131.langchain4j.claude.skills.infra.logging.WorkflowLogger;
+import io.github.hide212131.langchain4j.claude.skills.infra.observability.WorkflowTracer;
 import io.github.hide212131.langchain4j.claude.skills.runtime.observability.AgenticScopeSnapshots;
 import io.github.hide212131.langchain4j.claude.skills.runtime.skill.agent.ProgressTrackerAgent;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -73,11 +76,21 @@ public final class SkillRuntime {
     private final Path outputDirectory;
     private final WorkflowLogger logger;
     private final SkillAgentOrchestrator orchestrator;
+    private final WorkflowTracer workflowTracer;
     private ExecutionResult previousExecutionResult;
 
     public SkillRuntime(
             SkillIndex skillIndex, Path outputDirectory, WorkflowLogger logger, ChatModel chatModel) {
-        this(skillIndex, outputDirectory, logger, new AgenticOrchestrator(chatModel));
+        this(skillIndex, outputDirectory, logger, new AgenticOrchestrator(chatModel), null);
+    }
+
+    public SkillRuntime(
+            SkillIndex skillIndex,
+            Path outputDirectory,
+            WorkflowLogger logger,
+            ChatModel chatModel,
+            WorkflowTracer workflowTracer) {
+        this(skillIndex, outputDirectory, logger, new AgenticOrchestrator(chatModel), workflowTracer);
     }
 
     public SkillRuntime(
@@ -85,11 +98,21 @@ public final class SkillRuntime {
             Path outputDirectory,
             WorkflowLogger logger,
             SkillAgentOrchestrator orchestrator) {
+        this(skillIndex, outputDirectory, logger, orchestrator, null);
+    }
+
+    public SkillRuntime(
+            SkillIndex skillIndex,
+            Path outputDirectory,
+            WorkflowLogger logger,
+            SkillAgentOrchestrator orchestrator,
+            WorkflowTracer workflowTracer) {
         this.skillIndex = Objects.requireNonNull(skillIndex, "skillIndex");
         this.outputDirectory =
                 Objects.requireNonNull(outputDirectory, "outputDirectory").toAbsolutePath().normalize();
         this.logger = Objects.requireNonNull(logger, "logger");
         this.orchestrator = Objects.requireNonNull(orchestrator, "orchestrator");
+        this.workflowTracer = workflowTracer;
     }
 
     public ExecutionResult execute(String skillId, Map<String, Object> inputs) {
@@ -103,59 +126,81 @@ public final class SkillRuntime {
         List<String> expectedOutputs = resolveExpectedOutputs(safeInputs);
         ExecutionResult previousResultSnapshot = this.previousExecutionResult;
 
-        SkillRuntimeContext context = new SkillRuntimeContext(metadata, expectedOutputs, outputDirectory, logger);
-        context.logL1();
-        SkillToolbox toolbox = new SkillToolbox(context);
+        Span skillSpan = startSkillExecutionSpan(metadata, safeInputs, expectedOutputs);
+        Scope skillScope = skillSpan != null ? skillSpan.makeCurrent() : null;
 
-        String prompt = buildPrompt(metadata, safeInputs, expectedOutputs, previousResultSnapshot);
-        recordSkillPrompt(metadata.id(), prompt);
-        String rawResponse = orchestrator.run(toolbox, metadata, safeInputs, expectedOutputs, prompt);
-        recordSkillResponse(metadata.id(), rawResponse);
+        try {
+            SkillRuntimeContext context = new SkillRuntimeContext(metadata, expectedOutputs, outputDirectory, logger);
+            context.logL1();
+            SkillToolbox toolbox = new SkillToolbox(context);
 
-        Map<String, String> parsed = parseFinalResponse(rawResponse);
-        Map<String, Object> outputs = new LinkedHashMap<>();
-        outputs.put("skillRoot", metadata.skillRoot().toString());
-        outputs.put(
-                "summary",
-                parsed.getOrDefault(
-                        "summary",
-                        metadata.description().isBlank() ? metadata.name() : metadata.description()));
-        if (parsed.containsKey("notes")) {
-            outputs.put("notes", parsed.get("notes"));
-        }
-        if (context.artifactPath() != null) {
-            outputs.put("artifactPath", context.artifactPath().toString());
-        } else if (parsed.containsKey("artifactPath")) {
-            outputs.put("artifactPath", parsed.get("artifactPath"));
-        }
-        if (!context.referencedFiles().isEmpty()) {
+            String prompt = buildPrompt(metadata, safeInputs, expectedOutputs, previousResultSnapshot);
+            recordSkillPrompt(metadata.id(), prompt);
+            String rawResponse = orchestrator.run(toolbox, metadata, safeInputs, expectedOutputs, prompt);
+            recordSkillResponse(metadata.id(), rawResponse);
+
+            Map<String, String> parsed = parseFinalResponse(rawResponse);
+            Map<String, Object> outputs = new LinkedHashMap<>();
+            outputs.put("skillRoot", metadata.skillRoot().toString());
             outputs.put(
-                    "referencedFiles",
-                    context.referencedFiles().stream().map(Path::toString).toList());
-        }
-        if (!expectedOutputs.isEmpty()) {
-            outputs.put("expectedOutputs", expectedOutputs);
-        }
+                    "summary",
+                    parsed.getOrDefault(
+                            "summary",
+                            metadata.description().isBlank() ? metadata.name() : metadata.description()));
+            if (parsed.containsKey("notes")) {
+                outputs.put("notes", parsed.get("notes"));
+            }
+            if (context.artifactPath() != null) {
+                outputs.put("artifactPath", context.artifactPath().toString());
+            } else if (parsed.containsKey("artifactPath")) {
+                outputs.put("artifactPath", parsed.get("artifactPath"));
+            }
+            if (!context.referencedFiles().isEmpty()) {
+                outputs.put(
+                        "referencedFiles",
+                        context.referencedFiles().stream().map(Path::toString).toList());
+            }
+            if (!expectedOutputs.isEmpty()) {
+                outputs.put("expectedOutputs", expectedOutputs);
+            }
 
-        Validation validation = context.validation() != null
-                ? context.validation()
-                : validateOutputs(expectedOutputs, outputs, context.artifactPath());
-        if (context.validation() == null) {
-            context.setValidation(validation);
-        }
+            Validation validation = context.validation() != null
+                    ? context.validation()
+                    : validateOutputs(expectedOutputs, outputs, context.artifactPath());
+            if (context.validation() == null) {
+                context.setValidation(validation);
+            }
 
-        Path artifactPath = context.artifactPath();
-        logger.info("Act[done] {} — {}", metadata.id(), outputs.get("summary"));
-        ExecutionResult result = new ExecutionResult(
-                skillId,
-                Map.copyOf(outputs),
-                artifactPath,
-                validation,
-                context.disclosureLog(),
-                context.toolInvocations(),
-                context.invokedSkills());
-        this.previousExecutionResult = result;
-        return result;
+            Path artifactPath = context.artifactPath();
+            logger.info("Act[done] {} — {}", metadata.id(), outputs.get("summary"));
+            ExecutionResult result = new ExecutionResult(
+                    skillId,
+                    Map.copyOf(outputs),
+                    artifactPath,
+                    validation,
+                    context.disclosureLog(),
+                    context.toolInvocations(),
+                    context.invokedSkills());
+            if (skillSpan != null) {
+                recordSkillResultAttributes(skillSpan, result);
+                skillSpan.setStatus(StatusCode.OK);
+            }
+            this.previousExecutionResult = result;
+            return result;
+        } catch (RuntimeException | Error ex) {
+            if (skillSpan != null) {
+                skillSpan.setStatus(StatusCode.ERROR, ex.getMessage());
+                skillSpan.recordException(ex);
+            }
+            throw ex;
+        } finally {
+            if (skillScope != null) {
+                skillScope.close();
+            }
+            if (skillSpan != null) {
+                skillSpan.end();
+            }
+        }
     }
 
     private String buildPrompt(
@@ -294,6 +339,72 @@ public final class SkillRuntime {
                         .put("skillId", skillId)
                         .put("response", response)
                         .build());
+    }
+
+    private Span startSkillExecutionSpan(
+            SkillIndex.SkillMetadata metadata, Map<String, Object> inputs, List<String> expectedOutputs) {
+        if (workflowTracer == null || !workflowTracer.isEnabled()) {
+            return null;
+        }
+
+        Map<String, Object> attributes = new LinkedHashMap<>();
+        attributes.put("skill.runtime.id", metadata.id());
+        attributes.put("skill.runtime.name", metadata.name());
+        attributes.put("skill.runtime.skill_root", metadata.skillRoot().toString());
+        putIfNotBlank(attributes, "skill.runtime.goal", inputs.get("goal"));
+        putIfNotBlank(attributes, "skill.runtime.constraints", inputs.get("constraints"));
+        putIfNotBlank(attributes, "skill.runtime.current_work_progress", inputs.get("current_work_progress"));
+        if (!expectedOutputs.isEmpty()) {
+            attributes.put("skill.runtime.expected_outputs", String.join(",", expectedOutputs));
+        }
+
+        Span span = workflowTracer.startSpan("workflow.act.skill", attributes);
+        return span.getSpanContext().isValid() ? span : null;
+    }
+
+    private void recordSkillResultAttributes(Span span, ExecutionResult result) {
+        if (span == null || !span.isRecording() || result == null) {
+            return;
+        }
+        Map<String, Object> outputs = result.outputs();
+        putIfNotBlank(span, "skill.runtime.summary", outputs.get("summary"));
+        putIfNotBlank(span, "skill.runtime.notes", outputs.get("notes"));
+        Object artifact = outputs.get("artifactPath");
+        if (artifact != null) {
+            span.setAttribute("skill.runtime.artifact_path", artifact.toString());
+        } else if (result.artifactPath() != null) {
+            span.setAttribute("skill.runtime.artifact_path", result.artifactPath().toString());
+        }
+        if (!result.invokedSkills().isEmpty()) {
+            span.setAttribute("skill.runtime.invoked_skills", String.join(",", result.invokedSkills()));
+        }
+        span.setAttribute("skill.runtime.tool_invocation_count", result.toolInvocations().size());
+        span.setAttribute("skill.runtime.validation.ok", result.validation().expectedOutputsSatisfied());
+        if (!result.validation().expectedOutputsSatisfied() && !result.validation().missingOutputs().isEmpty()) {
+            span.setAttribute(
+                    "skill.runtime.validation.missing",
+                    String.join(",", result.validation().missingOutputs()));
+        }
+    }
+
+    private void putIfNotBlank(Map<String, Object> attributes, String key, Object value) {
+        if (value == null) {
+            return;
+        }
+        String text = value.toString().strip();
+        if (!text.isEmpty()) {
+            attributes.put(key, text);
+        }
+    }
+
+    private void putIfNotBlank(Span span, String key, Object value) {
+        if (value == null || !span.isRecording()) {
+            return;
+        }
+        String text = value.toString().strip();
+        if (!text.isEmpty()) {
+            span.setAttribute(key, text);
+        }
     }
 
     private String sanitiseForAttribute(String skillId) {
