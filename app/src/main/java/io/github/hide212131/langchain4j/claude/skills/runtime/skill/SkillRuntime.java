@@ -81,7 +81,7 @@ public final class SkillRuntime {
 
     public SkillRuntime(
             SkillIndex skillIndex, Path outputDirectory, WorkflowLogger logger, ChatModel chatModel) {
-        this(skillIndex, outputDirectory, logger, new AgenticOrchestrator(chatModel), null);
+        this(skillIndex, outputDirectory, logger, chatModel, null, null);
     }
 
     public SkillRuntime(
@@ -90,7 +90,31 @@ public final class SkillRuntime {
             WorkflowLogger logger,
             ChatModel chatModel,
             WorkflowTracer workflowTracer) {
-        this(skillIndex, outputDirectory, logger, new AgenticOrchestrator(chatModel), workflowTracer);
+        this(skillIndex, outputDirectory, logger, chatModel, null, workflowTracer);
+    }
+
+    public SkillRuntime(
+            SkillIndex skillIndex,
+            Path outputDirectory,
+            WorkflowLogger logger,
+            ChatModel chatModel,
+            ChatModel highPerformanceChatModel) {
+        this(skillIndex, outputDirectory, logger, chatModel, highPerformanceChatModel, null);
+    }
+
+    public SkillRuntime(
+            SkillIndex skillIndex,
+            Path outputDirectory,
+            WorkflowLogger logger,
+            ChatModel chatModel,
+            ChatModel highPerformanceChatModel,
+            WorkflowTracer workflowTracer) {
+        this(
+                skillIndex,
+                outputDirectory,
+                logger,
+                new AgenticOrchestrator(chatModel, highPerformanceChatModel),
+                workflowTracer);
     }
 
     public SkillRuntime(
@@ -541,9 +565,16 @@ public final class SkillRuntime {
     private static final class AgenticOrchestrator implements SkillAgentOrchestrator {
 
         private final ChatModel chatModel;
+        private final ChatModel highPerformanceChatModel;
 
         AgenticOrchestrator(ChatModel chatModel) {
+            this(chatModel, chatModel);
+        }
+
+        AgenticOrchestrator(ChatModel chatModel, ChatModel highPerformanceChatModel) {
             this.chatModel = Objects.requireNonNull(chatModel, "chatModel");
+            this.highPerformanceChatModel =
+                    highPerformanceChatModel != null ? highPerformanceChatModel : this.chatModel;
         }
 
         @Override
@@ -570,7 +601,7 @@ public final class SkillRuntime {
                 Toolbox toolbox, SkillIndex.SkillMetadata metadata, List<String> expectedOutputs) {
             return AgenticServices
                     .supervisorBuilder(SkillActSupervisor.class)
-                    .chatModel(chatModel)
+                    .chatModel(highPerformanceChatModel)
                     .contextGenerationStrategy(SupervisorContextStrategy.CHAT_MEMORY_AND_SUMMARIZATION)
                     .responseStrategy(SupervisorResponseStrategy.SUMMARY)
                     .supervisorContext(createSupervisorContext(metadata, expectedOutputs))
@@ -581,7 +612,7 @@ public final class SkillRuntime {
                 new WriteArtifactAgent(toolbox),
                 AgenticServices
                         .agentBuilder(SemanticOutputsValidatorAgent.class)
-                        .chatModel(chatModel)
+                        .chatModel(highPerformanceChatModel)
                         .tools(toolbox)
                         .build()
                 )

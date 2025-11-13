@@ -7,6 +7,12 @@
 - `OPENAI_API_KEY`  
   - 既定のプロバイダ（OpenAI GPT 系）で使用します。  
   - 本番用・個人用キーともに **リポジトリへコミットしない** こと。
+- `OPENAI_MODEL_NAME`（任意。既定値 `gpt-5-mini`）  
+  - プランニングやほとんどのツール呼び出しに使われる標準モデルです。  
+  - 未設定の場合は `gpt-5-mini` が選択されます。
+- `OPENAI_HIGH_PERFORMANCE_MODEL_NAME`（任意。既定では `OPENAI_MODEL_NAME` と同一）  
+  - Pure Act ループの中核である `SkillActSupervisor` と最終品質検証用の `SemanticOutputsValidatorAgent` にのみ適用されます。  
+  - より高精度なモデル（例：`gpt-5.1`）を指定して、他のエージェントとはコスト/レイテンシを分離できます。
 - `OPENAI_TIMEOUT_SECONDS`（任意。既定値 120）  
   - OpenAI へのチャット補完リクエストが応答を待つ秒数。長いスライド生成などで 1 分以上かかる場合に延長してください。  
   - 0 以下や数値以外を設定すると起動時にエラーになります。
@@ -32,7 +38,7 @@
 - 手動で依存を追加したい場合は各環境を直接アクティベートして `pip install` / `npm install` を実行できますが、再現性のため `requirements.txt` / `package.json` にも併記してください。
 
 ## 4. モデルとガードレール
-- 既定モデル：`gpt-5`（`LangChain4jLlmClient.forOpenAi` のデフォルト）。必要に応じて CLI や設定ファイルで上書きできるよう後続タスクで調整します。  
+- 既定モデル：`gpt-5-mini`（`OPENAI_MODEL_NAME` 未設定時に使用）。`SkillActSupervisor` と `SemanticOutputsValidatorAgent` は `OPENAI_HIGH_PERFORMANCE_MODEL_NAME` を優先し、未設定なら標準モデルを共有します。  
 - トークン/時間/ツール呼び出しの上限値は環境変数または設定ファイルに外出し予定。暫定値はコード側に埋め込み中。
 
 ## 5. CLI オプション（`./sk run`）

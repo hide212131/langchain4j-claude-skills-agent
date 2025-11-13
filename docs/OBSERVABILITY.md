@@ -54,6 +54,10 @@ export LANGFUSE_SERVICE_NAME=my-custom-service-name
 
 # Required: OpenAI API key for LLM calls
 export OPENAI_API_KEY=your-api-key
+
+# Optional: Override model names
+export OPENAI_MODEL_NAME=gpt-5-mini
+export OPENAI_HIGH_PERFORMANCE_MODEL_NAME=gpt-5.1
 ```
 
 ### LangFuse Setup

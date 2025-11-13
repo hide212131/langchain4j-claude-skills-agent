@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -87,6 +88,26 @@ class LangChain4jLlmClientTest {
                 .hasMessageContaining("OPENAI_TIMEOUT_SECONDS");
     }
 
+    @Test
+    void forOpenAiShouldCreateHighPerformanceChatModelWhenSpecified() {
+        RecordingChatModel defaultModel = new RecordingChatModel();
+        RecordingChatModel highPerformanceModel = new RecordingChatModel();
+        SequencedFactory factory = new SequencedFactory(List.of(defaultModel, highPerformanceModel));
+
+        LangChain4jLlmClient client = LangChain4jLlmClient.forOpenAi(key -> switch (key) {
+            case "OPENAI_API_KEY" -> "test-key";
+            case "OPENAI_HIGH_PERFORMANCE_MODEL_NAME" -> "gpt-5.1";
+            default -> null;
+        }, factory, Clock.systemUTC());
+
+        assertThat(factory.configs)
+                .extracting(config -> config.modelName)
+                .containsExactly("gpt-5-mini", "gpt-5.1");
+        assertThat(client.chatModel()).isSameAs(defaultModel);
+        assertThat(client.highPerformanceChatModel()).isSameAs(highPerformanceModel);
+        assertThat(client.highPerformanceModelName()).isEqualTo("gpt-5.1");
+    }
+
     private static final class RecordingChatModel implements ChatModel {
         String lastPrompt;
 
@@ -106,6 +127,7 @@ class LangChain4jLlmClientTest {
     private static final class CapturingFactory implements LangChain4jLlmClient.ChatModelFactory {
         final ChatModel delegate;
         LangChain4jLlmClient.OpenAiConfig lastConfig;
+        final List<LangChain4jLlmClient.OpenAiConfig> configs = new ArrayList<>();
 
         CapturingFactory(ChatModel delegate) {
             this.delegate = delegate;
@@ -114,7 +136,27 @@ class LangChain4jLlmClientTest {
         @Override
         public ChatModel create(LangChain4jLlmClient.OpenAiConfig config) {
             this.lastConfig = config;
+            this.configs.add(config);
             return delegate;
+        }
+    }
+
+    private static final class SequencedFactory implements LangChain4jLlmClient.ChatModelFactory {
+        private final List<ChatModel> delegates;
+        private int index;
+        final List<LangChain4jLlmClient.OpenAiConfig> configs = new ArrayList<>();
+
+        SequencedFactory(List<ChatModel> delegates) {
+            this.delegates = delegates;
+        }
+
+        @Override
+        public ChatModel create(LangChain4jLlmClient.OpenAiConfig config) {
+            configs.add(config);
+            if (index >= delegates.size()) {
+                throw new IllegalStateException("No delegate available for config " + config.modelName);
+            }
+            return delegates.get(index++);
         }
     }
 }

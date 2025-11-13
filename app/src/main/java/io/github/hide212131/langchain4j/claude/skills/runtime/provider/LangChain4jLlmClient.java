@@ -28,16 +28,27 @@ public final class LangChain4jLlmClient {
     private final ChatModel chatModel;
     private final Clock clock;
     private final String defaultModelName;
+    private final ChatModel highPerformanceChatModel;
+    private final String highPerformanceModelName;
     private final AtomicInteger callCount = new AtomicInteger();
     private final AtomicLong cumulativeDurationMs = new AtomicLong();
     private final AtomicInteger cumulativeInputTokens = new AtomicInteger();
     private final AtomicInteger cumulativeOutputTokens = new AtomicInteger();
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(120);
 
-    private LangChain4jLlmClient(ChatModel chatModel, Clock clock, String defaultModelName) {
+    private LangChain4jLlmClient(
+            ChatModel chatModel,
+            ChatModel highPerformanceChatModel,
+            Clock clock,
+            String defaultModelName,
+            String highPerformanceModelName) {
         this.chatModel = Objects.requireNonNull(chatModel, "chatModel");
+        this.highPerformanceChatModel =
+                highPerformanceChatModel != null ? highPerformanceChatModel : chatModel;
         this.clock = Objects.requireNonNull(clock, "clock");
         this.defaultModelName = defaultModelName;
+        this.highPerformanceModelName =
+                highPerformanceModelName != null ? highPerformanceModelName : defaultModelName;
     }
 
     public static LangChain4jLlmClient forOpenAi(EnvironmentVariables environment) {
@@ -50,17 +61,34 @@ public final class LangChain4jLlmClient {
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException("OPENAI_API_KEY must be set");
         }
-        OpenAiConfig config = new OpenAiConfig(apiKey, "gpt-5-mini", resolveTimeout(environment));
-        ChatModel chatModel = factory.create(config);
-        return new LangChain4jLlmClient(chatModel, clock, config.modelName);
+        String modelName = trimToNull(environment.get("OPENAI_MODEL_NAME"));
+        if (modelName == null) {
+            modelName = "gpt-5-mini";
+        }
+        String highPerformanceModelName =
+                trimToNull(environment.get("OPENAI_HIGH_PERFORMANCE_MODEL_NAME"));
+        Duration timeout = resolveTimeout(environment);
+        OpenAiConfig defaultConfig = new OpenAiConfig(apiKey, modelName, timeout);
+        ChatModel chatModel = factory.create(defaultConfig);
+        ChatModel highPerformanceChatModel = null;
+        if (highPerformanceModelName != null && !highPerformanceModelName.equals(modelName)) {
+            highPerformanceChatModel =
+                    factory.create(new OpenAiConfig(apiKey, highPerformanceModelName, timeout));
+        }
+        return new LangChain4jLlmClient(
+                chatModel,
+                highPerformanceChatModel,
+                clock,
+                defaultConfig.modelName,
+                highPerformanceModelName);
     }
 
     public static LangChain4jLlmClient usingChatModel(ChatModel chatModel) {
-        return new LangChain4jLlmClient(chatModel, Clock.systemUTC(), null);
+        return new LangChain4jLlmClient(chatModel, null, Clock.systemUTC(), null, null);
     }
 
     public static LangChain4jLlmClient fake() {
-        return new LangChain4jLlmClient(new FakeChatModel(), Clock.systemUTC(), null);
+        return new LangChain4jLlmClient(new FakeChatModel(), null, Clock.systemUTC(), null, null);
     }
 
     public CompletionResult complete(String prompt) {
@@ -95,6 +123,14 @@ public final class LangChain4jLlmClient {
 
     public String defaultModelName() {
         return defaultModelName;
+    }
+
+    public ChatModel highPerformanceChatModel() {
+        return highPerformanceChatModel;
+    }
+
+    public String highPerformanceModelName() {
+        return highPerformanceModelName;
     }
 
     public ProviderMetrics metrics() {
@@ -181,6 +217,14 @@ public final class LangChain4jLlmClient {
             throw new IllegalStateException("OPENAI_TIMEOUT_SECONDS must be greater than zero");
         }
         return Duration.ofSeconds(seconds);
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private void recordMetrics(TokenUsage usage, long durationMs) {

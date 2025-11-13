@@ -70,12 +70,25 @@ public final class AgentService {
         ObservabilityConfig observability = ObservabilityConfig.fromEnvironment();
         WorkflowTracer tracer = new WorkflowTracer(observability.tracer(), observability.isEnabled());
         ChatModel runtimeChatModel = llmClient.chatModel();
+        ChatModel highPerformanceChatModel = llmClient.highPerformanceChatModel();
         if (!dryRun && observability.isEnabled()) {
-            runtimeChatModel = new InstrumentedChatModel(
+            ChatModel instrumentedDefault = new InstrumentedChatModel(
                     runtimeChatModel,
                     observability.tracer(),
                     determineProvider(runtimeChatModel),
                     llmClient.defaultModelName());
+            ChatModel instrumentedHighPerformance;
+            if (highPerformanceChatModel == runtimeChatModel) {
+                instrumentedHighPerformance = instrumentedDefault;
+            } else {
+                instrumentedHighPerformance = new InstrumentedChatModel(
+                        highPerformanceChatModel,
+                        observability.tracer(),
+                        determineProvider(highPerformanceChatModel),
+                        llmClient.highPerformanceModelName());
+            }
+            runtimeChatModel = instrumentedDefault;
+            highPerformanceChatModel = instrumentedHighPerformance;
         }
     Path outputDirectory = resolveOutputDirectory(skillIndex);
     SkillRuntime runtime = dryRun
@@ -90,6 +103,7 @@ public final class AgentService {
             outputDirectory,
             logger,
             runtimeChatModel,
+            highPerformanceChatModel,
             tracer);
         InvokeSkillTool tool = new InvokeSkillTool(runtime);
         SkillInvocationGuard guard = new SkillInvocationGuard();
