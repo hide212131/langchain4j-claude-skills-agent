@@ -657,6 +657,7 @@ public final class SkillRuntime {
                     - Create new scripts with writeArtifact before running them via runScript.
                     - When calling writeArtifact, explicitly set base64Encoded to false unless you are saving Base64 content.
                     - As soon as you believe the latest writeArtifact output is the final deliverable, call validateOutputs and pass both the task goal and the exact path returned by writeArtifact.
+                    - You must not declare the task complete (agentName="done") until validateOutputs has been invoked at least once during the current run.
                     - If validateOutputs responds with false, inspect the feedback, revise the artefact, and repeat writeArtifact + validateOutputs until you achieve true or can no longer make progress.
                     - When you issue an agent invocation (JSON), every argument value MUST be a simple string.
                         * Join multiple values with commas, e.g. "args": "--flag1,--flag2".
