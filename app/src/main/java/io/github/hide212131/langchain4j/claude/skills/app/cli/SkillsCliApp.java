@@ -149,16 +149,16 @@ public final class SkillsCliApp implements Runnable {
                         .println(
                                 "Attempt " + attempt + ": " + String.join(" -> ", stages)));
             }
+            if (result.plan() != null && !result.plan().steps().isEmpty()) {
+                String skillSequence = result.plan().steps().stream()
+                        .map(step -> step.skillId())
+                        .collect(Collectors.joining(" -> "));
+                commandSpec
+                        .commandLine()
+                        .getOut()
+                        .println("Plan skills: " + skillSequence);
+            }
             if (result.planResult() != null) {
-                if (result.plan() != null && !result.plan().steps().isEmpty()) {
-                    String skillSequence = result.plan().steps().stream()
-                            .map(step -> step.skillId())
-                            .collect(Collectors.joining(" -> "));
-                    commandSpec
-                            .commandLine()
-                            .getOut()
-                            .println("Plan skills: " + skillSequence);
-                }
                 String assistantDraft = result.planResult().content();
                 if (assistantDraft != null && !assistantDraft.isBlank()) {
                     commandSpec
