@@ -21,13 +21,13 @@ class AgenticScopeSnapshotsTest {
     @Test
     void snapshotSerialisesNestedCollections() {
         TestScope scope = new TestScope();
-        scope.writeState("plan.goal", "Create deck");
+        scope.writeState("goal", "Create deck");
         scope.writeState("act.outputs", List.of(Map.of("artifactPath", "/tmp/out.pptx")));
 
         String snapshot = AgenticScopeSnapshots.snapshot(scope).orElseThrow();
 
         assertThat(snapshot)
-                .contains("\"plan.goal\":\"Create deck\"")
+                .contains("\"goal\":\"Create deck\"")
                 .contains("\"artifactPath\":\"/tmp/out.pptx\"");
     }
 
