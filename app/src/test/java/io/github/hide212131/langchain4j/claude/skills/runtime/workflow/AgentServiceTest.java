@@ -77,8 +77,9 @@ class AgentServiceTest {
         assertThat(result.plan().systemPromptSummary()).contains("brand-guidelines");
         assertThat(result.plan().steps().get(0).skillRoot())
                 .isEqualTo(skillsRoot.resolve("brand-guidelines").toAbsolutePath().normalize());
-        assertThat(result.planResult().content()).isEqualTo("dry-run-plan");
-        assertThat(result.metrics().callCount()).isEqualTo(2);
+        // Note: planResult() is now null as we removed the direct llmClient.complete() call
+        assertThat(result.planResult()).isNull();
+        assertThat(result.metrics().callCount()).isEqualTo(1);
         assertThat(result.actResult()).isNotNull();
         assertThat(result.actResult().invokedSkills())
                 .containsExactly("brand-guidelines", "document-skills/pptx");
