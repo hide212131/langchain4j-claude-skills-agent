@@ -152,7 +152,6 @@ public final class AgentService {
 
                     DynamicPlanOperator dynamicPlanAgent = new DynamicPlanOperator(
                             planner,
-                            llmClient,
                             logger,
                             request,
                             1,
@@ -236,7 +235,6 @@ public final class AgentService {
 
     public static final class DynamicPlanOperator {
         private final AgenticPlanner planner;
-        private final LangChain4jLlmClient llmClient;
         private final WorkflowLogger logger;
         private final AgentRunRequest request;
         private final int attemptNumber;
@@ -244,14 +242,12 @@ public final class AgentService {
 
         DynamicPlanOperator(
                 AgenticPlanner planner,
-                LangChain4jLlmClient llmClient,
                 WorkflowLogger logger,
                 AgentRunRequest request,
                 int attemptNumber,
                 int maxAttempts,
                 AgentWorkflowObserver observer) {
             this.planner = planner;
-            this.llmClient = llmClient;
             this.logger = logger;
             this.request = request;
             this.attemptNumber = attemptNumber;
@@ -266,17 +262,16 @@ public final class AgentService {
                     throw new IllegalStateException("DynamicPlanOperator should not handle forced skill ids.");
                 }
                 PlanModels.PlanResult plan = planner.plan(request.goal());
-                LangChain4jLlmClient.CompletionResult completion = llmClient.complete(request.goal());
-                String assistantDraft = completion != null && completion.content() != null
-                    ? completion.content()
-                    : "";
+                // Note: Removed direct llmClient.complete() call (low-level API usage)
+                // The planning is now handled through AgenticPlanner.plan() which uses the LLM
+                String assistantDraft = "";
                 logger.info(
                         "Plan attempt {} candidate steps: {}",
                         attemptNumber,
                         plan.orderedSkillIds());
                 WorkflowStateKeys.PLAN_RESULT.write(scope, plan);
-                WorkflowStateKeys.PLAN_DRAFT.write(scope, completion);
-                PlanStageOutput output = new PlanStageOutput(plan, completion, assistantDraft);
+                WorkflowStateKeys.PLAN_DRAFT.write(scope, null);
+                PlanStageOutput output = new PlanStageOutput(plan, null, assistantDraft);
                 WorkflowStateKeys.PLAN_STAGE_OUTPUT.write(scope, output);
                 observer.afterAgentInvocation(new AgentResponse(scope, "plan", Map.of("attempt", attemptNumber), output));
             } catch (RuntimeException ex) {
