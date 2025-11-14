@@ -52,6 +52,26 @@ quote_args() {
   printf '%s' "$out"
 }
 
-ARGS="$(quote_args "$@")"
+# Convert --goal-file to absolute path if provided
+convert_goal_file_to_absolute() {
+  local args=("$@")
+  local i=0
+  while [ $i -lt ${#args[@]} ]; do
+    if [ "${args[$i]}" = "--goal-file" ] && [ $((i + 1)) -lt ${#args[@]} ]; then
+      local file_path="${args[$((i + 1))]}"
+      # Convert relative path to absolute
+      if [[ ! "$file_path" = /* ]]; then
+        args[$((i + 1))]="$(cd "$(dirname "$file_path")" && pwd)/$(basename "$file_path")"
+      fi
+      i=$((i + 2))
+    else
+      i=$((i + 1))
+    fi
+  done
+  printf '%s\n' "${args[@]}"
+}
+
+CONVERTED_ARGS=($(convert_goal_file_to_absolute "$@"))
+ARGS="$(quote_args "${CONVERTED_ARGS[@]}")"
 
 exec "$GRADLEW" :app:run --args="$ARGS"
