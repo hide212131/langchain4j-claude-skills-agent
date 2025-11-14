@@ -9,26 +9,6 @@ import java.util.Objects;
  */
 public final class AgenticScopeBridge {
 
-    public PlanState readPlanGoal(AgenticScope scope) {
-        return PlanState.STATE.readRequired(scope);
-    }
-
-    public PlanInputsState readPlanInputs(AgenticScope scope) {
-        return PlanInputsState.STATE.readRequired(scope);
-    }
-
-    public PlanCandidateStepsState readPlanCandidateSteps(AgenticScope scope) {
-        return PlanCandidateStepsState.STATE.readRequired(scope);
-    }
-
-    public PlanConstraintsState readPlanConstraints(AgenticScope scope) {
-        return PlanConstraintsState.STATE.readRequired(scope);
-    }
-
-    public PlanEvaluationCriteriaState readPlanEvaluationCriteria(AgenticScope scope) {
-        return PlanEvaluationCriteriaState.STATE.readRequired(scope);
-    }
-
     public ActState readActState(AgenticScope scope, String skillId) {
         AgenticScope nonNullScope = Objects.requireNonNull(scope, "scope");
         String key = ActState.outputKey(skillId);

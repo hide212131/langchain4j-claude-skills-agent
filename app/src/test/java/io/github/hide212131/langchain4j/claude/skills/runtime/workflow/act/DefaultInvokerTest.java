@@ -81,7 +81,7 @@ class DefaultInvokerTest {
         assertThat(result.invokedSkills())
                 .containsExactly("brand-guidelines", "document-skills/pptx");
         assertThat(result.hasArtifact()).isTrue();
-        assertThat(result.finalArtifact()).isEqualTo(tempDir.resolve("deck.pptx"));
+        assertThat(result.finalArtifact()).isEqualTo(tempDir.resolve("document-skills/pptx/deck.pptx"));
         
         // Verify outputs are collected in the result from AgenticScope-managed state
         assertThat(result.outputs()).containsKeys("brand-guidelines", "document-skills/pptx");

@@ -86,7 +86,7 @@ class AgentServiceTest {
                 .containsKeys(
                         ActState.outputKey("brand-guidelines"), ActState.outputKey("document-skills/pptx"));
         assertThat(result.actResult().hasArtifact()).isTrue();
-        assertThat(result.actResult().finalArtifact()).isEqualTo(tempDir.resolve("deck.pptx"));
+        assertThat(result.actResult().finalArtifact()).isEqualTo(tempDir.resolve("document-skills/pptx/deck.pptx"));
         assertThat(Files.exists(result.actResult().finalArtifact())).isTrue();
     }
 
