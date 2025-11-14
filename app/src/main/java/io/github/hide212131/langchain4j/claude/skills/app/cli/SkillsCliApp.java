@@ -49,8 +49,11 @@ public final class SkillsCliApp implements Runnable {
     @Command(name = "run", description = "Execute the workflow for a given goal")
     static final class RunCommand implements Callable<Integer> {
 
-        @Option(names = "--goal", required = true, description = "High-level objective to accomplish")
+        @Option(names = "--goal", description = "High-level objective to accomplish")
         String goal;
+
+        @Option(names = "--goal-file", description = "Path to file containing the goal objective")
+        Path goalFile;
 
         @Option(names = "--dry-run", description = "Use fake LLM to run without external API calls")
         boolean dryRun;
@@ -78,6 +81,16 @@ public final class SkillsCliApp implements Runnable {
 
         @Override
         public Integer call() {
+            // Resolve goal from either --goal or --goal-file
+            String resolvedGoal = resolveGoal();
+            if (resolvedGoal == null || resolvedGoal.isBlank()) {
+                commandSpec
+                        .commandLine()
+                        .getErr()
+                        .println("Error: either --goal or --goal-file must be provided and non-empty");
+                return 1;
+            }
+
             Path primarySkillsDir = toAbsolute(skillsDir);
             Path resolvedSkillsDir = primarySkillsDir;
             if (!Files.exists(primarySkillsDir) && !skillsDir.isAbsolute()) {
@@ -122,7 +135,7 @@ public final class SkillsCliApp implements Runnable {
         }
         }
         AgentService.ExecutionResult result = agentService.run(
-            new AgentService.AgentRunRequest(goal, dryRun, forcedSkillIds));
+            new AgentService.AgentRunRequest(resolvedGoal, dryRun, forcedSkillIds));
             if (!result.visitedStages().isEmpty()) {
                 LinkedHashMap<Integer, ArrayList<String>> stagesPerAttempt = new LinkedHashMap<>();
                 for (StageVisit visit : result.visitedStages()) {
@@ -195,6 +208,41 @@ public final class SkillsCliApp implements Runnable {
 
             commandSpec.commandLine().getOut().flush();
             return 0;
+        }
+
+        private String resolveGoal() {
+            // If --goal-file is provided, read from file
+            if (goalFile != null) {
+                try {
+                    Path resolvedPath = goalFile.isAbsolute()
+                            ? goalFile.normalize()
+                            : Path.of("").toAbsolutePath().normalize().resolve(goalFile).normalize();
+                    if (!Files.exists(resolvedPath)) {
+                        commandSpec
+                                .commandLine()
+                                .getErr()
+                                .println("Error: goal file not found at " + resolvedPath);
+                        return null;
+                    }
+                    String content = Files.readString(resolvedPath);
+                    if (content.isBlank()) {
+                        commandSpec
+                                .commandLine()
+                                .getErr()
+                                .println("Error: goal file is empty at " + resolvedPath);
+                        return null;
+                    }
+                    return content.trim();
+                } catch (Exception e) {
+                    commandSpec
+                            .commandLine()
+                            .getErr()
+                            .println("Error: failed to read goal file: " + e.getMessage());
+                    return null;
+                }
+            }
+            // Otherwise use --goal directly
+            return goal;
         }
 
         private String summariseOutput(Object value) {
