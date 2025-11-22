@@ -74,7 +74,7 @@ Implementation Notes
 
 ### Error Handling
 
-- Use descriptive exceptions or error responses with actionable, English messages.
+- Use descriptive exceptions or error responses with actionable, Japanese messages.
 - Map exceptions to clear outcomes (HTTP status/return codes/log levels) and document them.
 - `[Exit codes or error surfaces relevant to this change]`
 

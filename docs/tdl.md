@@ -219,7 +219,7 @@ These requirements apply to ALL documentation templates (Analysis, Requirements,
 
 ### Writing Standards
 
-- **Language**: All documentation must be written in English (per `CLAUDE.md` policy)
+- **Language**: All documentation must be written in Japanese (per `CLAUDE.md` policy)
 - **Date Format**: Use `YYYY-MM-DD` format consistently
 - **IDs & Naming**: Use explicit, stable IDs/names. Avoid vague terms like "manager" or "util" (per `CLAUDE.md`)
 - **Consistency**: Don't duplicate requirements text; Design references requirement IDs; Plan references both
@@ -322,7 +322,7 @@ Update the Links section in documents when:
   - [ ] Requirements traced: All FR/NFR IDs referenced in code comments where applicable
   - [ ] ADR references: Design decisions linked to ADR numbers
 - Manual Verification:
-  - [ ] Error messages clear and in English (per `CLAUDE.md`)
+  - [ ] Error messages clear and in Japanese (per `CLAUDE.md`)
   - [ ] Documentation updated (`docs/reference.md`, user docs if needed)
   - [ ] Platform behavior validated when relevant
   - [ ] **Traceability verified**: Run `bun scripts/trace-status.ts --check`

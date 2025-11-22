@@ -1,8 +1,12 @@
 # AGENTS.md
 
+## User Interaction Policy
+- Please respond to all explanations, comments, and review results in Japanese.
+- Code and log text itself may remain in English.
+
 ## Documentation Language Policy
 
-All documentation output in this project must be written in English, including:
+All documentation output in this project must be written in Japanese, including:
 
 - Code comments
 - Commit messages
@@ -240,7 +244,7 @@ All three commands must complete without errors to finish TypeScript-related wor
 
 ### Documentation Updates
 
-- Ensure documentation, comments, and messages remain in English.
+- Ensure documentation, comments, and messages remain in Japanese.
 - For Markdown changes, run `bun format` followed by `bun lint` and resolve any reported issues before finalizing.
 - If `docs/traceability.md` is missing or you add or remove any files under `docs/`, run `bun scripts/trace-status.ts --write` to regenerate the traceability matrix before completing the work.
 - During implementation, mark the completed phase checkboxes in the relevant documents at the end of each phase so progress stays transparent and auditable.

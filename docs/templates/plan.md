@@ -187,7 +187,7 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 - [ ] Integration/perf/bench (as applicable): `[document the command]`
 - [ ] `docs/reference.md` updated; user docs updated if user-facing
 - [ ] ADRs added/updated for design decisions
-- [ ] Error messages actionable and in English
+- [ ] Error messages actionable and in Japanese
 - [ ] Platform verification completed (if platform-touching)
 - [ ] Avoid vague naming (no "manager"/"util"); avoid unchecked reflection shortcuts
 

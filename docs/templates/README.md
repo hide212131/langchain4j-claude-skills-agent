@@ -102,7 +102,7 @@ Both AI collaborators follow the same TDL conventions. Use this checklist whenev
 2. Define measurable acceptance criteria; keep brief and testable
 3. Requirements are long-lived and can be referenced by multiple tasks over time
 4. Task documents reference these requirement IDs rather than duplicating content
-5. Prefer clarity and safety: English-only messaging, avoid "manager"/"util" naming, avoid unchecked casts or reflection shortcuts
+5. Prefer clarity and safety: Japanese-only messaging, avoid "manager"/"util" naming, avoid unchecked casts or reflection shortcuts
 
 ### ADR Templates (`adr.md` and `adr-lite.md`)
 
@@ -193,7 +193,7 @@ These requirements apply to ALL documentation templates:
 
 ### Writing Standards
 
-- **Language**: All documentation must be written in English (per `CLAUDE.md` and `AGENTS.md`)
+- **Language**: All documentation must be written in Japanese (per `CLAUDE.md` and `AGENTS.md`)
 - **Date Format**: Use `YYYY-MM-DD` format consistently
 - **IDs & Naming**: Use explicit, stable IDs/names. Avoid vague terms like "manager" or "util"
 - **Consistency**: Don't duplicate requirements text; Design references requirement IDs; Plan references both
