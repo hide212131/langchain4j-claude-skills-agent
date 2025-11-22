@@ -80,16 +80,16 @@
 
 - High-level plan, phases, or priority for adopting the decision.
 - Interfaces/CLI/UX conventions (args, flags, exit codes) if part of the decision.
-- Storage paths, data models, and error handling patterns (reference KopiError/ErrorContext if applicable).
+- Storage paths, data models, and error handling patterns (reference project-standard error types if applicable).
 
 ## Examples (optional)
 
 ```bash
 # Example commands or usage that illustrate the decision
-kopi <command> `[args]`
+[cli-or-api] <command> `[args]`
 ```
 
-```rust
+```java
 // Code/pseudocode illustrating core mechanics
 ```
 

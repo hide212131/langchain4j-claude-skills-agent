@@ -25,11 +25,11 @@
 
 ## Background and Current State
 
-- Context: `[Where this fits in Kopi; user workflows it affects]`
+- Context: `[Where this fits in the agent; user workflows it affects]`
 - Current behavior: `[What exists today; relevant modules/paths]`
 - Pain points: `[Current issues/limitations]`
 - Constraints: `[Time/tech/platform/compliance]`
-- Related ADRs: `[/docs/adr/0xx-...md]`
+- Related ADRs: `[/docs/adr/ADR-<id>-...md]`
 
 ## Proposed Design
 
@@ -41,7 +41,7 @@
 
 ### Components
 
-- `[Modules/structs/functions and responsibilities]`
+- `[Packages/classes/methods and responsibilities]`
 
 ### Data Flow
 
@@ -49,63 +49,53 @@
 
 ### Storage Layout and Paths (if applicable)
 
-- JDKs: `~/.kopi/jdks/<vendor>-<version>/`
-- Shims: `~/.kopi/shims/`
-- Config: `~/.kopi/config.toml`
-- Cache: `~/.kopi/cache/`
+- `[Config/data/cache locations relevant to this change]`
+- `[File naming/rotation/versioning expectations]`
 
-### CLI/API Design (if applicable)
+### API/Interface Design (if applicable)
 
 Usage
 
 ```bash
-kopi <command> `[options]`
+[Endpoint or CLI] <command>|<method> `[options/body]`
 ```
 
-Options
-
-- `--flag`: `[Description]`
-- `--option <value>`: `[Description]`
-
-Examples
-
-```bash
-kopi <command> <example-1>
-kopi <command> <example-2> --flag
-```
+- `[Describe key options/parameters/headers]`
+- `[Show example requests/responses or CLI invocations]`
 
 Implementation Notes
 
-- Use `clap` derive API for argument parsing with clear, English help messages.
+- `[Interfaces or abstractions to reuse]`
+- `[Naming and configuration conventions to follow]`
 
 ### Data Models and Types
 
-- `[Structs/enums/fields; serialization formats; version formats]`
+- `[Classes/enums/fields; serialization formats; version formats]`
 
 ### Error Handling
 
-- Use `KopiError` variants with actionable, English messages.
-- Integrate with `ErrorContext` for enriched output and correct exit codes.
-- Exit codes: `[2 invalid input/config, 3 no local version, 4 JDK not installed, 13 permission, 20 network, 28 disk, 127 not found]`.
+- Use descriptive exceptions or error responses with actionable, English messages.
+- Map exceptions to clear outcomes (HTTP status/return codes/log levels) and document them.
+- `[Exit codes or error surfaces relevant to this change]`
 
 ### Security Considerations
 
-- `[HTTPS verification, checksum validation, unsafe path handling, permission checks]`
+- `[Authentication/authorization, secrets handling, validation, permissions]`
 
 ### Performance Considerations
 
-- `[Hot paths; caching strategy; async/concurrency; I/O; progress indicators]`
-- Reference perf workflows: `cargo perf`, `cargo bench`.
+- `[Hot paths; caching strategy; concurrency model; I/O considerations]`
+- `[Baseline/target throughput or latency and how it will be measured]`
 
 ### Platform Considerations
 
 #### Unix
 
-- `[Paths/permissions/behavior; symlinks]`
+- `[Paths/permissions/behavior]`
 
 #### Windows
 
-- `[Registry/junctions; path separators; ACLs]`
+- `[Filesystem/path separators/permissions]`
 
 #### Filesystem
 
@@ -134,25 +124,25 @@ Decision Rationale
 
 ### Unit Tests
 
-- Place tests next to code with `#[cfg(test)]`; cover happy paths and edge cases.
+- Place tests under `src/test/java/`; cover happy paths and edge cases with JUnit (or the project's chosen test framework).
 
 ### Integration Tests
 
-- Add scenarios under `tests/`; avoid mocks; exercise CLI/IO boundaries.
-- Use alias `cargo it` for quick runs.
+- Add scenarios that exercise boundaries (I/O, network, database) without over-mocking; use Testcontainers or similar when appropriate.
 
 ### External API Parsing (if applicable)
 
-- Include at least one unit test with captured JSON (curl) as an inline string parsed with `serde`; assert key fields.
+- Include at least one test with captured JSON (curl or equivalent) as an inline string or fixture and assert key fields using the project parser (e.g., Jackson).
 
 ### Performance & Benchmarks (if applicable)
 
-- `cargo perf` (feature `perf_tests`) and `cargo bench`; define thresholds and compare trends.
+- `[How to measure: JMH harness, representative load tests, or targeted benchmarks]`
+- `[Targets/thresholds and where results are recorded]`
 
 ## Documentation Impact
 
-- Update `docs/reference.md` for CLI/behavior changes.
-- Update user docs in `../kopi-vm.github.io/` if user-facing.
+- Update `docs/reference.md` or feature-specific docs for behavior changes.
+- Update README/user docs for user-facing impacts.
 - Add or update `/docs/adr/` entries for design decisions (rationale and alternatives).
 
 ## External References (optional)

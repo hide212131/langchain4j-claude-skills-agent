@@ -17,16 +17,15 @@
       "Bash(grep:*)",
       "Bash(sed:*)",
       "Bash(cat:*)",
-      "Bash(cargo:*)",
       "Bash(tree:*)",
       "Bash(ls:*)",
       "Bash(jq:*)",
       "Bash(rg:*)",
       "Bash(cat:*)",
-      "Bash(rustc:*)",
       "Bash(kill:*)",
       "Bash(chmod:*)",
-      "Bash(sccache:*)",
+      "Bash(gradle:*)",
+      "Bash(mvn:*)",
       "Bash(bun install:*)",
       "Bash(bun format:*)",
       "Bash(bun lint:*)",
@@ -38,10 +37,10 @@
       "mcp__serena__write_memory",
       "mcp__serena__list_memories",
       "mcp__serena__search_for_pattern",
-			"mcp__serena__find_referencing_symbols",
-			"mcp__serena__list_dir",
-			"mcp__serena__find_symbol",
-			"mcp__serena__find_file",
+      "mcp__serena__find_referencing_symbols",
+      "mcp__serena__list_dir",
+      "mcp__serena__find_symbol",
+      "mcp__serena__find_file",
       "mcp__serena__get_symbols_overview",
       "mcp__serena__insert_after_symbol",
       "mcp__serena__replace_symbol_body",
@@ -58,11 +57,7 @@
       "Bash(git reset:*)",
       "Bash(git rebase:*)"
     ],
-    "additionalDirectories": [
-      "/workspaces/kopi-workspace/ppa-kopi",
-      "/workspaces/kopi-workspace/kopi-vm.github.io",
-      "/workspaces/kopi-workspace/metadata"
-    ]
+    "additionalDirectories": []
   },
   "statusLine": {
     "type": "command",

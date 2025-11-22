@@ -194,9 +194,7 @@ This project supports parallel development using git-worktree with unique IDs to
 - **Output**: Phased execution plan with tasks, verification steps, and DoD
 - **References**: FR/NFR IDs being implemented, link to design.md
 - **Status Tracking**: Mark each completed task or subtask checkbox as `[x]` immediately. If you intentionally skip or defer work, annotate the checklist entry (e.g., strike-through with a note) instead of leaving it unchecked.
-- **Verification**: Use commands from `CLAUDE.md`:
-  - `cargo check`, `cargo fmt`, `cargo clippy --all-targets -- -D warnings`
-  - `cargo test --lib --quiet`, `cargo it`, `cargo perf`, `cargo bench`
+- **Verification**: Use the standard Java build tasks from `AGENTS.md` (for example `./gradlew check`, `./gradlew test`, `./gradlew build`). If a module uses another toolchain, list the exact commands here.
 - **Location**: `docs/tasks/T-<id>-<task>/plan.md` (task-scoped)
 - **Naming**: Task directory + fixed name (e.g., `docs/tasks/T-e7fa1-cache-refresh/plan.md`)
 - **Transition**: Execute the plan, updating status and traceability matrix
@@ -253,7 +251,7 @@ Use `N/A – <reason>` when a link grouping does not apply.
 
 ### Process Requirements
 
-- **Verification**: Use canonical cargo commands from `CLAUDE.md` in Verification blocks and Definition of Done
+- **Verification**: Use the documented Java build commands (see `AGENTS.md`) in Verification blocks and the Definition of Done; note toolchain-specific equivalents when Gradle is not available
 - **PR Integration**: Link Requirements/Design/Plan and relevant ADRs in PRs; verify DoD items from `AGENTS.md`
 - **Legacy Alignment**: Treat detected mismatches between current code and approved ADR/design decisions as risks—record them in the task plan (with follow-up subtasks) instead of inheriting the legacy behavior by default.
 
@@ -318,9 +316,9 @@ Update the Links section in documents when:
   - Affected task folder(s) under `docs/tasks/T-<id>-<task>`
   - Related ADRs
 - Automated Verification Checklist:
-  - [ ] Format verified: `cargo fmt --check`
-  - [ ] Linting clean: `cargo clippy --all-targets -- -D warnings`
-  - [ ] All test commands pass: `cargo test --lib --quiet`
+  - [ ] Build/lint verified: `./gradlew check` (or the equivalent module command)
+  - [ ] Tests pass: `./gradlew test` (module-specific targets permitted)
+  - [ ] Integration/perf runs (if applicable): document the exact command for the module
   - [ ] Requirements traced: All FR/NFR IDs referenced in code comments where applicable
   - [ ] ADR references: Design decisions linked to ADR numbers
 - Manual Verification:

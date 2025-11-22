@@ -1193,7 +1193,7 @@ export function renderTraceabilityMarkdown(
   } = buildRequirementDependencyInfo(documents);
 
   const lines: string[] = [];
-  lines.push("# Kopi Traceability Overview");
+  lines.push("# TDL Traceability Overview");
   lines.push("");
   lines.push(`Generated on ${new Date().toISOString()}`);
   lines.push("");
@@ -1452,7 +1452,7 @@ export function printStatus(
   const designPlanIssues = collectTaskDesignPlanIssues(documents);
   const duplicateIdIssues = findDuplicateIdIssues(documents);
 
-  console.log("=== Kopi TDL Status ===\n");
+  console.log("=== TDL Status ===\n");
   if (showStatusDetails) {
     const coverage = calculateCoverage(documents);
     console.log("Coverage:");

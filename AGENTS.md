@@ -17,19 +17,7 @@ All documentation output in this project must be written in English, including:
 
 ## Project Overview
 
-Kopi is a JDK version management tool written in Rust that integrates with your shell to seamlessly switch between different Java Development Kit versions. It fetches JDK metadata from foojay.io and provides a simple, fast interface similar to tools like volta, nvm, and pyenv.
-
-Key features:
-
-- Automatic JDK version switching based on project configuration
-- Multiple JDK vendor support (AdoptOpenJDK, Amazon Corretto, Azul Zulu, etc.)
-- Shell integration via shims for transparent version management
-- Project-specific JDK pinning via `.kopi-version` or `.java-version` files
-- Fast performance using Rust
-
-### User Documentation
-
-The user-facing documentation for Kopi is maintained in a separate repository at `../kopi-vm.github.io/`. This repository uses MkDocs to generate and publish documentation for end users.
+This repository hosts a Java-based LangChain4j/Claude skills agent and supporting templates for the Traceable Development Lifecycle (TDL). TDL materials were originally authored for the Kopi project (Apache License 2.0); original rights remain with the Kopi authors and are acknowledged here.
 
 ## Agent Operating Environment
 
@@ -49,66 +37,59 @@ The user-facing documentation for Kopi is maintained in a separate repository at
 
 ## Developer Principles
 
-### Memory Safety Over Micro-optimization
+### Resource Safety Over Micro-optimization
 
-- Prioritize memory safety and correctness over micro-optimizations
-- Accept reasonable overhead (e.g., cloning small strings) to avoid memory leaks
-- Follow Rust's ownership model strictly - avoid `unsafe` code and memory leaks from techniques like `Box::leak()`
-- When faced with lifetime complexity, prefer simpler solutions that may use slightly more memory but are correct
-- Example: Clone strings for HTTP headers instead of using `Box::leak()` to create static references
+- Prioritize correctness and predictable behavior over micro-optimizations.
+- Use clear ownership of resources: rely on `try-with-resources`/closeable patterns for anything that needs closing.
+- Avoid global/static state unless justified; prefer explicit dependency injection, instance fields, or method-local variables.
+- Accept reasonable overhead if it simplifies reasoning and prevents leaks or concurrency pitfalls.
 
 ### Code Clarity
 
 - Write clear, readable code that is easy to understand and maintain
-- Use descriptive variable and function names
+- Use descriptive variable, class, and method names; avoid abbreviations that hide intent
 - Add comments for complex logic, but prefer self-documenting code
 - Structure code to minimize cognitive load for future developers
 
 ### Clean Code Maintenance
 
-- Remove unused variables, parameters, and struct members promptly
+- Remove unused variables, parameters, and class members promptly
 - When refactoring, trace through all callers to eliminate unnecessary parameters
-- Keep structs lean by removing fields that are no longer used
-- Use `cargo clippy` to identify unused code elements
+- Keep data classes lean by removing fields that are no longer used
+- Use static analysis and linting configured for the project (e.g., Gradle `check`, SpotBugs/Checkstyle) to surface issues early
 - Example: If a function parameter like `arch` is no longer used in the implementation, remove it from the function signature and update all callers
 
-### Prefer Functions Over Structs Without State
+### Prefer Functions Over Classes Without State
 
-- When there's no state to manage, prefer implementing functionality as standalone functions rather than defining structs
-- Only create structs when you need to maintain state, implement traits, or group related data
+- When there's no state to manage, prefer implementing functionality as static functions in well-named classes rather than creating empty shells
+- Only create classes when you need to maintain state, implement interfaces, or group related data
 - This keeps the code simpler and more straightforward
-- Example: For utility operations like file validation or string parsing, use functions directly instead of creating a struct with methods
+- Example: For utility operations like file validation or string parsing, use static methods in a clearly named class instead of a stateful object
 
 ### External API Testing
 
-- When writing code that calls external Web APIs, implement at least one unit test that includes the actual JSON response obtained from calling the API with curl
-- Store the JSON response as a string within the test code
+- When writing code that calls external Web APIs, implement at least one unit test that includes the actual JSON response obtained from calling the API (captured via curl or similar)
+- Store the JSON response as a string within the test code or fixtures.
 - This ensures that the parsing logic is tested against real API responses
 - Example:
 
-```rust
-#[test]
-fn test_parse_foojay_api_response() {
+```java
+@Test
+void parsesFoojayApiResponse() {
     // JSON response obtained from: curl https://api.foojay.io/disco/v3.0/packages?version=21
-    let json_response = r#"{
-        "result": [
-            {
-                "id": "abcd1234",
-                "distribution": "temurin",
-                "major_version": 21,
-                ...
-            }
-        ]
-    }"#;
+    String json = """
+        {"result":[{"id":"abcd1234","distribution":"temurin","major_version":21}]}
+        """;
 
-    let packages: Vec<Package> = serde_json::from_str(json_response).unwrap();
-    assert_eq!(packages[0].distribution, "temurin");
+    ObjectMapper mapper = new ObjectMapper();
+    JsonNode root = mapper.readTree(json);
+    assertEquals("temurin", root.get("result").get(0).get("distribution").asText());
 }
 ```
 
 ### Avoid Generic "Manager" Naming
 
-- When the name "manager" appears in file names, structs, traits, or similar constructs, consider more specific and descriptive alternatives
+- When the name "manager" appears in file names, classes, interfaces, or similar constructs, consider more specific and descriptive alternatives
 - "Manager" is often too abstract and doesn't clearly communicate the responsibility
 - Choose names that describe what the component actually does
 - Examples of better alternatives:
@@ -120,29 +101,29 @@ fn test_parse_foojay_api_response() {
 
 ### Avoid Vague "Util" or "Utils" Naming
 
-- Never use "util" or "utils" in directory names, file names, class names, or variable names
-- These terms are too generic and don't clearly convey the purpose or responsibility
-- Always choose specific names that describe the actual functionality
-- Examples of better alternatives:
-  - `utils/strings.rs` → `string_operations.rs`, `text_processing.rs`, `string_formatter.rs`
-  - `FileUtils` → `FileOperations`, `FileSystem`, `PathValidator`
-  - `DateUtil` → `DateFormatter`, `DateParser`, `TimeCalculator`
-  - `CommonUtils` → Split into specific modules based on functionality
-  - `util_function()` → Name based on what it does: `validate_input()`, `format_output()`
-- This principle ensures code is self-documenting and responsibilities are clear
+- In Java, utility classes with static methods are acceptable when their responsibility is clear (e.g., `FileUtils`, `StringUtils`).
+- Avoid generic catch-all utility classes; organize by focused responsibility instead.
+- Choose names that clearly describe what utilities the class provides.
+- Examples of better organization:
+  - `com.example.util.string` → `com.example.text.StringValidator` or `com.example.text.TextFormatter`
+  - Focused `FileUtils` is acceptable; refactor only if it handles multiple unrelated concerns
+  - `DateUtil` → `DateFormatter` or `DateTimeParser` when single-purpose
+  - `CommonUtils` → Split into `ValidationUtils`, `ConversionUtils`, etc. by domain
+  - `utilFunction()` → Rename to `validateInput()`, `formatOutput()` to reflect actual behavior
+- Even utility classes should have clear purpose; good naming makes them easy to locate and understand
 
 ### Module Placement Consistency
 
 - Consult `docs/architecture.md` before creating or moving modules so directory structure stays aligned with the documented layout.
-- Keep platform-dependent code under `src/platform/` (and its submodules) and expose only cross-platform interfaces from higher layers.
+- Keep platform-dependent code under appropriate platform-specific packages and expose only cross-platform interfaces from higher layers.
 - When introducing new components, document their location rationale in the relevant design or plan to aid future maintainers.
 
 ### Prevent Circular Module Dependencies
 
 - Keep the module graph acyclic so features remain testable and maintainable.
-- Favor dependency inversion (traits, interfaces) or data transfer structures instead of bidirectional imports when modules must collaborate.
+- Favor dependency inversion (interfaces) or data transfer structures instead of bidirectional imports when modules must collaborate.
 - If a new dependency would close a cycle, refactor by extracting shared functionality into a dedicated module documented in the architecture references.
-- Run dependency analysis tools or targeted `cargo check` commands when restructuring to confirm cycles are not introduced.
+- Run dependency analysis tools or targeted checks when restructuring to confirm cycles are not introduced.
 
 ## Traceable Development Lifecycle (TDL)
 
@@ -222,13 +203,13 @@ graph LR
 
 ### Completing Work
 
-#### Rust Code
+#### Java Code
 
-When finishing any Rust coding task, always run the following commands in order and fix any issues:
+When finishing any Java coding task, run the following commands in order and fix any issues:
 
-1. `cargo fmt` - Auto-format code
-2. `cargo clippy --all-targets -- -D warnings` - Check for linting errors in test code
-3. `cargo test --lib --quiet` - Run unit tests (faster than full test suite)
+1. `./gradlew check` - Format/lint/static analysis as configured
+2. `./gradlew test` - Run unit/integration tests
+3. `./gradlew build` - Verify packaging/build
 
 Address any errors from each command before proceeding to the next. All must pass successfully before considering the work complete.
 
@@ -266,10 +247,9 @@ All three commands must complete without errors to finish TypeScript-related wor
 
 ## Essential Commands
 
-- **Format**: `cargo fmt` - Format code using rustfmt
-- **Lint**: `cargo clippy --all-targets -- -D warnings` - Run linter with strict warnings
-- **Build**: `cargo build` (debug), `cargo build --release` (production)
-- **Test**: `cargo test --lib --quiet` - Run unit tests efficiently
+- **Check/Lint**: `./gradlew check` (or module equivalent)
+- **Test**: `./gradlew test`
+- **Build**: `./gradlew build`
 
 ## Additional Documentation
 

@@ -64,7 +64,7 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
   - `/src/...` – `[Purpose]`
 - Dependencies:
   - Internal: `src/[module]/` – `[Description]`
-  - External crates: `[crate_name]` – `[Purpose]`
+  - External: `[dependency]` – `[Purpose]`
 
 ### Tasks
 
@@ -83,13 +83,9 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 
 ```bash
 # Build and checks
-cargo check
-cargo fmt
-cargo clippy --all-targets -- -D warnings
-# Focused unit tests
-cargo test --lib --quiet [module_name]
-# If integration relevant
-cargo it        # alias: test --quiet --features integration_tests
+./gradlew check
+# Focused unit tests (module-specific)
+./gradlew test --tests "<suite or package>"
 ```
 
 ### Acceptance Criteria (Phase Gate)
@@ -129,12 +125,10 @@ cargo it        # alias: test --quiet --features integration_tests
 ### Phase 2 Verification
 
 ```bash
-cargo check
-cargo fmt
-cargo clippy --all-targets -- -D warnings
-cargo test --lib --quiet [module_name]
+./gradlew check
+./gradlew test --tests "<suite or package>"
 # Optional: broader runs
-cargo it
+./gradlew test
 ```
 
 ### Phase 2 Acceptance Criteria
@@ -164,7 +158,7 @@ cargo it
   - [ ] Edge cases
 - [ ] Concurrency & cleanup
   - [ ] Boundary conditions
-  - [ ] Concurrent operations (honor `RUST_TEST_THREADS=4`)
+  - [ ] Concurrent operations
   - [ ] Resource cleanup
 
 ### Phase 3 Deliverables
@@ -175,12 +169,9 @@ cargo it
 ### Phase 3 Verification
 
 ```bash
-cargo fmt
-cargo clippy --all-targets -- -D warnings
-# Integration tests
-cargo it
+./gradlew check
 # Full test suite (consider runtime)
-cargo test --quiet
+./gradlew test
 ```
 
 ### Phase 3 Acceptance Criteria
@@ -191,16 +182,14 @@ cargo test --quiet
 
 ## Definition of Done
 
-- [ ] `cargo check`
-- [ ] `cargo fmt`
-- [ ] `cargo clippy --all-targets -- -D warnings`
-- [ ] `cargo test --lib --quiet`
-- [ ] Integration/perf/bench (as applicable): `cargo it`, `cargo perf`, `cargo bench`
+- [ ] `./gradlew check` (or module equivalent)
+- [ ] `./gradlew test`
+- [ ] Integration/perf/bench (as applicable): `[document the command]`
 - [ ] `docs/reference.md` updated; user docs updated if user-facing
 - [ ] ADRs added/updated for design decisions
-- [ ] Error messages actionable and in English; exit codes correct
+- [ ] Error messages actionable and in English
 - [ ] Platform verification completed (if platform-touching)
-- [ ] No `unsafe` and no vague naming (no "manager"/"util")
+- [ ] Avoid vague naming (no "manager"/"util"); avoid unchecked reflection shortcuts
 
 ## Open Questions
 

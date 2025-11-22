@@ -83,7 +83,7 @@ Both AI collaborators follow the same TDL conventions. Use this checklist whenev
 
 - Start by running `./scripts/tdl-new-id.ts` to obtain a fresh ID before copying any template.
 - Copy the appropriate template, replace every placeholder, and update Metadata and Links immediately.
-- When documentation changes accompany code, queue the required verification commands from this README (`bun format`, `bun lint`) plus language-specific toolchains noted in `CLAUDE.md` (Claude) or `AGENTS.md` (Codex).
+- When documentation changes accompany code, queue the verification commands used by this repository (for example `./gradlew check` and `./gradlew test`) plus any language-specific steps noted in `CLAUDE.md` (Claude) or `AGENTS.md` (Codex).
 - Before handing off between agents, run `bun scripts/trace-status.ts --check` to confirm there are no orphan links or placeholder leftovers.
 - If a task is created ahead of its upstream analysis, requirement, or ADR, capture the scope in the task README immediately and rely on `bun scripts/trace-status.ts` to highlight the missing upstream relationship until the source document exists or the task closes.
 - Note any template sections intentionally removed or marked `N/A – <reason>` so the next agent retains context without reopening the template.
@@ -102,7 +102,7 @@ Both AI collaborators follow the same TDL conventions. Use this checklist whenev
 2. Define measurable acceptance criteria; keep brief and testable
 3. Requirements are long-lived and can be referenced by multiple tasks over time
 4. Task documents reference these requirement IDs rather than duplicating content
-5. Prefer clarity and safety: English-only messaging, avoid "manager"/"util" naming, do not use `unsafe`
+5. Prefer clarity and safety: English-only messaging, avoid "manager"/"util" naming, avoid unchecked casts or reflection shortcuts
 
 ### ADR Templates (`adr.md` and `adr-lite.md`)
 
@@ -162,7 +162,7 @@ Both AI collaborators follow the same TDL conventions. Use this checklist whenev
 3. Capture measurable success metrics to guide verification.
 4. Call out platform differences explicitly when touching shell, shims, filesystem, or paths.
 5. Specify testing strategy early, including external API parsing tests when applicable.
-6. Prefer clarity and safety over micro-optimizations; avoid `unsafe`, avoid vague names like "manager"/"util", and prefer functions for stateless behavior.
+6. Prefer clarity and safety over micro-optimizations; avoid unchecked casts/reflection, avoid vague names like "manager"/"util", and prefer functions for stateless behavior.
 7. Mark the design as complete and circulate for review before drafting `plan.md`; implementation work may only start after both documents exist.
 
 ### Plan Template (`plan.md`)
@@ -203,15 +203,15 @@ These requirements apply to ALL documentation templates:
 Use inline code (`` ` ``) for the following cases to ensure proper formatting and readability:
 
 - **Environment Variables**: Always use inline code for environment variable names, especially those containing underscores
-  - Example: `RUST_LOG`, `KOPI_HOME`, `RUST_TEST_THREADS`
+  - Example: `JAVA_HOME`, `GRADLE_OPTS`, `TESTCONTAINERS_RYUK_DISABLED`
 
 - **Code Identifiers**: Use inline code for all programming language identifiers
-  - Rust structs, traits, functions: `KopiError`, `ErrorContext`, `find_symbol()`
-  - Command names and flags: `cargo test`, `--verbose`, `-D warnings`
-  - File paths and extensions: `src/main.rs`, `.toml`, `~/.kopi/`
+  - Java classes and methods: `SkillRegistry`, `TraceabilityReport`, `toPlanDocument()`
+  - Command names and flags: `./gradlew test`, `mvn test`, `-DskipTests`
+  - File paths and extensions: `src/main/java/`, `src/test/java/`, `.properties`
 
 - **Special Characters**: Use inline code when describing text containing special characters
-  - Version strings with special chars: `temurin@21`, `~/.kopi/jdks/`
+  - Version strings with special chars: `temurin@21`, `1.0.0-SNAPSHOT`
   - Comparison operators: `< 200ms`, `> 8 hours`
   - Shell operators and paths: `&&`, `|`, `./scripts/`
 
@@ -236,7 +236,7 @@ Use inline code (`` ` ``) for the following cases to ensure proper formatting an
 
 ### Process Requirements
 
-- **Verification**: Use canonical cargo commands referenced in `CLAUDE.md` (Claude) or `AGENTS.md` (Codex) in Verification blocks and Definition of Done
+- **Verification**: Use the standard Java build/test commands referenced in `AGENTS.md` (or module-specific equivalents) in Verification blocks and the Definition of Done
 - **PR Integration**: Link Requirements/Design/Plan and relevant ADRs in PRs
 
 ## Examples
