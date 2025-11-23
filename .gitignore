@@ -1,3 +1,6 @@
+# macOS
+.DS_Store
+
 # Java artifacts
 *.class
 *.log
@@ -28,3 +31,6 @@ benchmarks/results/
 
 # Generated traceability report
 docs/traceability.md
+
+# Reference materials - external sources (not tracked, local-use only)
+docs/reference/external-materials/
