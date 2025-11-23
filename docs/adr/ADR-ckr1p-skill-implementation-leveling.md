@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: ADR
-- Status: Accepted
+- Status: Approved
 
 ## Links
 

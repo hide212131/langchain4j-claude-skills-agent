@@ -1,6 +1,7 @@
 # AGENTS.md
 
 ## User Interaction Policy
+
 - Please respond to all explanations, comments, and review results in Japanese.
 - Code and log text itself may remain in English.
 

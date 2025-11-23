@@ -242,9 +242,3 @@ Use inline code (`` ` ``) for the following cases to ensure proper formatting an
 ## Examples
 
 Template-specific example files were removed to reduce maintenance noise. Refer to active or archived project documents for canonical usage patterns.
-
-### Real Project Examples (Archived)
-
-- Error Handling: [`../archive/adr/004-error-handling-strategy.md`](../archive/adr/004-error-handling-strategy.md) - Full ADR with multiple options analyzed
-- Logging Strategy: [`../archive/adr/009-logging-strategy.md`](../archive/adr/009-logging-strategy.md) - Comprehensive platform considerations
-- Configuration: [`../archive/adr/014-configuration-and-version-file-formats.md`](../archive/adr/014-configuration-and-version-file-formats.md) - Focused scope with clear trade-offs
