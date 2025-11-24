@@ -5,7 +5,7 @@
 ## Metadata
 
 - Type: ADR
-- Status: Draft
+- Status: Approved
 
 ## Links
 
