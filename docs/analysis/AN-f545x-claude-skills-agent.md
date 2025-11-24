@@ -15,7 +15,17 @@
 - Related Requirements:
   - N/A – 要件は本分析から発見される
 - Related ADRs:
-  - N/A – アーキテクチャ決定は要件確定後に策定
+  - [ADR-lsart LangChain4j Agentic AI 最新機能の検証と適用](../adr/ADR-lsart-langchain4j-agentic-verification.md)
+  - [ADR-ckr1p Claude Skills 実装難易度カテゴリと段階導入方針](../adr/ADR-ckr1p-skill-implementation-leveling.md)
+  - [ADR-38940 セキュリティ・リソース管理フレームワーク](../adr/ADR-38940-security-resource-management.md)
+  - [ADR-ae6nw AgenticScope の活用シナリオ](../adr/ADR-ae6nw-agenticscope-scenarios.md)
+  - [ADR-ylsqt スキル実行の検証・許可フロー](../adr/ADR-ylsqt-skill-validation-approval.md)
+  - [ADR-lq67e プロンプト改善メトリクスの定義と測定](../adr/ADR-lq67e-prompt-metrics-definition.md)
+  - [ADR-ij1ew Observability 基盤の統合戦略](../adr/ADR-ij1ew-observability-integration.md)
+  - [ADR-ehfcj スキル実行エンジン設計](../adr/ADR-ehfcj-skill-execution-engine.md)
+  - [ADR-xoqky スキル定義メタデータモデル](../adr/ADR-xoqky-skill-metadata-model.md)
+  - [ADR-mpiub Context Engineering 実装方針（Progressive Disclosure）](../adr/ADR-mpiub-context-engineering-strategy.md)
+  - [ADR-q333d Agentic パターンの選択基準](../adr/ADR-q333d-agentic-pattern-selection.md)
 - Related Tasks:
   - N/A – タスク作成は要件承認後に実施
 
@@ -116,11 +126,11 @@
 
 ## Stakeholder Analysis
 
-| Stakeholder | Interest/Need | Impact | Priority |
-| --- | --- | --- | --- |
-| Java 開発者（LangChain4j ユーザー） | LangChain4j の標準フローで Claude Skills が利用可能 | High | P0 |
-| Claude Platform 利用者 | エージェント機能が Java 環境で実装可能 | High | P0 |
-| プロジェクトメンテナー | スキル統合の実装パターンが標準化・文書化される | Medium | P1 |
+| Stakeholder                         | Interest/Need                                       | Impact | Priority |
+| ----------------------------------- | --------------------------------------------------- | ------ | -------- |
+| Java 開発者（LangChain4j ユーザー） | LangChain4j の標準フローで Claude Skills が利用可能 | High   | P0       |
+| Claude Platform 利用者              | エージェント機能が Java 環境で実装可能              | High   | P0       |
+| プロジェクトメンテナー              | スキル統合の実装パターンが標準化・文書化される      | Medium | P1       |
 
 ## Research & Discovery
 
@@ -146,6 +156,7 @@
 #### 1. LangChain4j Agentic AI API（v1.8.0 以降）
 
 **Agentic AI Components:**
+
 - `Agent` インターフェース：LLM からの指示を解析、Tool 呼び出しを決定
 - `Tool` インターフェース：入力スキーマ定義、関数型処理
 - `Workflow`：逐次・ループ・並列・条件分岐などを制御（Workflow型）
@@ -153,10 +164,12 @@
 - `AgenticScope`：エージェント間の情報（メモリ、コンテキスト）を共有
 
 **実装パターン:**
+
 - **Workflow型**：明示的な制御フロー、決定的、可観測性が高い
 - **Pure Agent型**：LLM 主導、柔軟・適応的、Context Engineering が重要
 
 **参照:**
+
 - [LangChain4j Agent Tutorials](https://docs.langchain4j.dev/tutorials/agents)
 - [LangChain4j Agents Module (GitHub)](https://github.com/langchain4j/langchain4j/tree/main/langchain4j-agentic)
 
@@ -177,10 +190,12 @@ description: スキルの説明。何ができるか、どんな時に使うか�
 Instructions - クロードが従うべき詳細な指示
 
 ## Examples
+
 - 使用例 1
 - 使用例 2
 
 ## Guidelines
+
 - ガイドライン 1
 - ガイドライン 2
 ```
@@ -205,24 +220,25 @@ Instructions - クロードが従うべき詳細な指示
 
 Claude は必要なコンテキストのみを段階的にロードして効率化：
 
-- **Level 1（メタデータ）**：YAML frontmatter（name、description）をシステムプロンプトに含める（~100 トークン）→ スキル発見・選択時に常時参照
+- **Level 1（メタデータ）**：YAML frontmatter（name、description）をシステムプロンプトに含める（\~100 トークン）→ スキル発見・選択時に常時参照
 - **Level 2（Instructions）**：SKILL.md 本文をbash で読み取り、関連リクエスト時にコンテキストに含める（<500 行推奨）→ 手順書として必要時のみロード
 - **Level 3（Resources/Code）**：スクリプト・参照ファイルは実行・参照時のみアクセス（スクリプト実行時は出力結果のみコンテキストに含まれ、コード自体はロードされない）
 
 **参照:**
+
 - [Claude Agent Skills Overview - How Skills Work](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview#how-skills-work)（Progressive Disclosure の 3 段階ロードメカニズム）
 - [Claude Agent Skills Best Practices - Progressive Disclosure Patterns](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices#progressive-disclosure-patterns)（構造化ガイドライン）
 - [Anthropic Skills Repository (GitHub)](https://github.com/anthropics/skills)（実装例）
 
 #### 3. Context Engineering と実装上の課題
 
-| 課題 | 説明 | 影響 |
-| --- | --- | --- |
-| コンテキスト管理の可視化 | Pure Agent 型では LLM へのプロンプト内容が隠蔽される（ブラックボックス化） | Context Engineering の実装・最適化が困難 |
-| Workflow vs Pure Agent の選択 | 仕様の複雑性、柔軟性要件に応じた選択基準がない | アーキテクチャ決定が曖昧 |
-| SKILL.md フロントマター・本文のパース | SKILL.md の YAML frontmatter（name、description）と Markdown 本文（Instructions、Examples、Guidelines）を解析し、Java オブジェクトに変換する処理 | 実装複雑度が増加、YAML・Markdown パーサの選定・エラー対応が必要 |
+| 課題                                               | 説明                                                                                                                                                                                                                                                                      | 影響                                                               |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| コンテキスト管理の可視化                           | Pure Agent 型では LLM へのプロンプト内容が隠蔽される（ブラックボックス化）                                                                                                                                                                                                | Context Engineering の実装・最適化が困難                           |
+| Workflow vs Pure Agent の選択                      | 仕様の複雑性、柔軟性要件に応じた選択基準がない                                                                                                                                                                                                                            | アーキテクチャ決定が曖昧                                           |
+| SKILL.md フロントマター・本文のパース              | SKILL.md の YAML frontmatter（name、description）と Markdown 本文（Instructions、Examples、Guidelines）を解析し、Java オブジェクトに変換する処理                                                                                                                          | 実装複雑度が増加、YAML・Markdown パーサの選定・エラー対応が必要    |
 | Progressive Disclosure（段階的コンテキスト効率化） | Claude Skills の 3 段階ロード（Level 1: メタデータ常時 → Level 2: 本文は必要時 → Level 3: リソースは実行時のみ）に基づくパターンを LangChain4j エージェント・スキル実装に適用。スキル定義・プロンプト・リソースを必要なタイミングでのみロードし、コンテキスト効率を最大化 | トークン消費削減、複数スキルの効率的管理、エージェント判断精度向上 |
-| スキル実行のエラーハンドリング | 失敗時の再試行、フォールバック、Agent Loop 内での復帰戦略 | システム堅牢性に必須 |
+| スキル実行のエラーハンドリング                     | 失敗時の再試行、フォールバック、Agent Loop 内での復帰戦略                                                                                                                                                                                                                 | システム堅牢性に必須                                               |
 
 ### Data Analysis
 
@@ -289,7 +305,7 @@ Claude は必要なコンテキストのみを段階的にロードして効率�
   - Rationale: Claude Skills の 3 段階ロード（メタデータ → 本文 → 参照リソース）を LangChain4j エージェント実装に適用し、トークン消費を最適化。FR-DRAFT-1～3 での複数スキル運用を効率化
   - **Implementation Strategy**: FR-DRAFT-1～3 の実装進行に伴走。メタデータ常時ロード、本文必要時ロード、参照リソース実行時アクセスの 3 段階を実装。トークン消費削減を測定・可視化
   - Acceptance Criteria:
-    1. Level 1（メタデータ常時）：frontmatter をシステムプロンプトに含める（~100 トークン）
+    1. Level 1（メタデータ常時）：frontmatter をシステムプロンプトに含める（\~100 トークン）
     2. Level 2（本文必要時）：Markdown 本文をコンテキストに動的ロード（スキル選択時のみ）
     3. Level 3（リソース実行時）：参照ファイルを実行時アクセス（実行時の出力のみコンテキストに含める）
     4. トークン削減効果が測定可能（フル ロード時 vs Progressive Disclosure 時の比較）
@@ -486,104 +502,104 @@ Claude は必要なコンテキストのみを段階的にロードして効率�
   - Claude Skills SKILL.md 仕様の Java モデリング
 
 - **アーキテクチャ決定記録（ADR）が必要な項目**：
-  1. **Agentic パターンの選択**：Workflow型 vs Pure Agent型 vs Hybrid（層状）の判定基準
-  2. **スキル定義メタデータ モデル**：SKILL.md 仕様を Java オブジェクトにマップする手法
-  3. **Context Engineering 実装方針**：Layer-based progressive disclosure、プロンプト圧縮の標準パターン
-  4. **エラーハンドリング・リトライ戦略**：LangChain4j ネイティブ機構との整合性
-  5. **AgenticScope の活用シナリオ**：Workflow型・Pure Agent型の両アーキテクチャにおけるコンテキスト管理とコンテキスト共有ルール
-  6. **セキュリティ・リソース管理フレームワーク**：命令種類固定化、LangChain4j Code Execution Engines を活用したサンドボックス化、リソース制限の実装方針
-  7. **スキル実行の検証・許可フロー**：信頼されたスキルの定義、実行前コード分析、マルチテナント隔離の仕組み
-  8. **Observability 基盤の統合戦略**：OTLP（OpenTelemetry Protocol）の採用、LangFuse（ローカル開発）と Azure Application Insights（本番）の選択基準と統合パターン
-  9. **プロンプト改善メトリクスの定義と測定**：精度・効率・性能・コスト・信頼性メトリクスの標準化
-  10. **LangChain4j Agentic AI 最新機能の検証と適用**：[Custom Agentic Patterns](https://docs.langchain4j.dev/tutorials/agents#custom-agentic-patterns) を含む最新の Agentic AI 機能が本要件に対応可能かの調査・検証、API 仕様の詳細確認
+  1. **[ADR-q333d Agentic パターンの選択基準](../adr/ADR-q333d-agentic-pattern-selection.md)**：Workflow型 vs Pure Agent型 vs Hybrid（層状）の判定基準
+  2. **[ADR-xoqky スキル定義メタデータモデル](../adr/ADR-xoqky-skill-metadata-model.md)**：SKILL.md 仕様を Java オブジェクトにマップする手法
+  3. **[ADR-mpiub Context Engineering 実装方針](../adr/ADR-mpiub-context-engineering-strategy.md)**：Layer-based progressive disclosure、プロンプト圧縮の標準パターン
+  4. **[ADR-ehfcj スキル実行エンジン設計](../adr/ADR-ehfcj-skill-execution-engine.md)**：複数スキル組み合わせ、エラーハンドリング・リトライ戦略、LangChain4j ネイティブ機構との整合性
+  5. **[ADR-ae6nw AgenticScope の活用シナリオ](../adr/ADR-ae6nw-agenticscope-scenarios.md)**：Workflow型・Pure Agent型の両アーキテクチャにおけるコンテキスト管理とコンテキスト共有ルール
+  6. **[ADR-38940 セキュリティ・リソース管理フレームワーク](../adr/ADR-38940-security-resource-management.md)**：命令種類固定化、LangChain4j Code Execution Engines を活用したサンドボックス化、リソース制限の実装方針
+  7. **[ADR-ylsqt スキル実行の検証・許可フロー](../adr/ADR-ylsqt-skill-validation-approval.md)**：信頼されたスキルの定義、実行前コード分析、マルチテナント隔離の仕組み
+  8. **[ADR-ij1ew Observability 基盤の統合戦略](../adr/ADR-ij1ew-observability-integration.md)**：OTLP（OpenTelemetry Protocol）の採用、LangFuse（ローカル開発）と Azure Application Insights（本番）の選択基準と統合パターン
+  9. **[ADR-lq67e プロンプト改善メトリクスの定義と測定](../adr/ADR-lq67e-prompt-metrics-definition.md)**：精度・効率・性能・コスト・信頼性メトリクスの標準化
+  10. **[ADR-lsart LangChain4j Agentic AI 最新機能の検証と適用](../adr/ADR-lsart-langchain4j-agentic-verification.md)**：[Custom Agentic Patterns](https://docs.langchain4j.dev/tutorials/agents#custom-agentic-patterns) を含む最新の Agentic AI 機能が本要件に対応可能かの調査・検証、API 仕様の詳細確認
 
 ## Risk Assessment
 
-| Risk | Probability | Impact | Mitigation Strategy |
-| --- | --- | --- | --- |
-| LangChain4j Agentic API の仕様変更（v1.8.0 -> v2.0 など） | Medium | Medium | 版を明示的に固定し、API 変更ノートを継続監視；定期的な互換性チェック実装 |
-| Pure Agent型のコンテキスト管理が「ブラックボックス化」 | High | High | 初期実装では Workflow型またはHybrid パターンを優先；Context 可視化の仕組みを設計 |
-| Workflow型の実装が複雑・保守性低下 | Medium | Medium | 段階的実装（単純 Workflow → Supervisor/SubAgents）；テンプレート化・ドキュメント充実 |
-| スキル定義メタデータモデルと SKILL.md 仕様の乖離 | Medium | Medium | 仕様を明確化する ADR 作成；SKILL.md のバージョン管理を文書に含める |
-| AgenticScope でのコンテキスト共有制御の複雑化 | Low | Medium | MVP は単一 scope パターンのみ；複数 scope 運用は Phase 2 へ延期 |
-| トークン消費量の予測不可（Context Engineering パターン選択に依存） | High | High | 早期ベンチマーク実施（複数パターン）；トークン計数の可視化ロジック実装 |
-| Java リフレクションによるスキル定義解析の性能 | Low | Medium | Jackson など成熟した JSON ライブラリで解析；AOT コンパイル対応を検討 |
-| JJUG CCC 発表例での実装例と実際の LangChain4j API の齟齬 | Medium | Medium | 発表スライドの詳細確認と実装検証用 PoC；問題があれば設計段階で対応 |
-| **スキル実行の任意性による安全性リスク**（セキュリティ） | High | High | 初期実装で命令種類固定化・許可リスト型を採用；サンドボックス化・リソース制限を必須設計パターンとする |
-| **マルチテナント環境でのリソース枯渇**（クロステナント影響） | Medium | High | リソースクォータ実装、スレッドプール制限、実行タイムアウト強制；監視・アラート設定 |
-| **スキル実行の検証フロー欠如**（信頼できないスキル実行） | Medium | High | スキル信頼度レベル定義、実行前コード分析、管理者承認フロー等を design phase で明確化 |
-| **ログ・監査の不完全性**（本番トラブル対応困難） | Medium | Medium | 実行ライフサイクル（入力・実行ユーザ・時刻・結果）の完全ログ、分散トレース対応を必須要件とする |
-| **Observability データの個人情報漏洩リスク**（セキュリティ） | Medium | High | プロンプト内の PII（個人情報）マスキング、Observability ツールのアクセス制御、データ保護ポリシーの明確化 |
-| **Observability による性能オーバーヘッド**（性能） | Medium | Medium | ログレベル切り替え（本番は最小ロギング）、バッチ処理による Observability データ送信、遅延許容度の評価 |
-| **開発環境と本番環境の Observability 差異**（開発効率） | Medium | Medium | ローカル（LangFuse）と本番（Application Insights）での可視化ギャップを埋めるアダプタ層実装 |
+| Risk                                                               | Probability | Impact | Mitigation Strategy                                                                                      |
+| ------------------------------------------------------------------ | ----------- | ------ | -------------------------------------------------------------------------------------------------------- |
+| LangChain4j Agentic API の仕様変更（v1.8.0 -> v2.0 など）          | Medium      | Medium | 版を明示的に固定し、API 変更ノートを継続監視；定期的な互換性チェック実装                                 |
+| Pure Agent型のコンテキスト管理が「ブラックボックス化」             | High        | High   | 初期実装では Workflow型またはHybrid パターンを優先；Context 可視化の仕組みを設計                         |
+| Workflow型の実装が複雑・保守性低下                                 | Medium      | Medium | 段階的実装（単純 Workflow → Supervisor/SubAgents）；テンプレート化・ドキュメント充実                     |
+| スキル定義メタデータモデルと SKILL.md 仕様の乖離                   | Medium      | Medium | 仕様を明確化する ADR 作成；SKILL.md のバージョン管理を文書に含める                                       |
+| AgenticScope でのコンテキスト共有制御の複雑化                      | Low         | Medium | MVP は単一 scope パターンのみ；複数 scope 運用は Phase 2 へ延期                                          |
+| トークン消費量の予測不可（Context Engineering パターン選択に依存） | High        | High   | 早期ベンチマーク実施（複数パターン）；トークン計数の可視化ロジック実装                                   |
+| Java リフレクションによるスキル定義解析の性能                      | Low         | Medium | Jackson など成熟した JSON ライブラリで解析；AOT コンパイル対応を検討                                     |
+| JJUG CCC 発表例での実装例と実際の LangChain4j API の齟齬           | Medium      | Medium | 発表スライドの詳細確認と実装検証用 PoC；問題があれば設計段階で対応                                       |
+| **スキル実行の任意性による安全性リスク**（セキュリティ）           | High        | High   | 初期実装で命令種類固定化・許可リスト型を採用；サンドボックス化・リソース制限を必須設計パターンとする     |
+| **マルチテナント環境でのリソース枯渇**（クロステナント影響）       | Medium      | High   | リソースクォータ実装、スレッドプール制限、実行タイムアウト強制；監視・アラート設定                       |
+| **スキル実行の検証フロー欠如**（信頼できないスキル実行）           | Medium      | High   | スキル信頼度レベル定義、実行前コード分析、管理者承認フロー等を design phase で明確化                     |
+| **ログ・監査の不完全性**（本番トラブル対応困難）                   | Medium      | Medium | 実行ライフサイクル（入力・実行ユーザ・時刻・結果）の完全ログ、分散トレース対応を必須要件とする           |
+| **Observability データの個人情報漏洩リスク**（セキュリティ）       | Medium      | High   | プロンプト内の PII（個人情報）マスキング、Observability ツールのアクセス制御、データ保護ポリシーの明確化 |
+| **Observability による性能オーバーヘッド**（性能）                 | Medium      | Medium | ログレベル切り替え（本番は最小ロギング）、バッチ処理による Observability データ送信、遅延許容度の評価    |
+| **開発環境と本番環境の Observability 差異**（開発効率）            | Medium      | Medium | ローカル（LangFuse）と本番（Application Insights）での可視化ギャップを埋めるアダプタ層実装               |
 
 ## Open Questions
 
 - [ ] **Workflow型 vs Pure Agent型の実装複雑性の実測**
   - LangChain4j のドキュメントでは両者の学習曲線が明記されていない
   - 小規模 PoC で両パターンを実装し、実測による判定基準を確立する必要がある
-  → Next step: 両パターンの最小実装例（単一スキル実行）を PoC で作成・測定
+    → Next step: 両パターンの最小実装例（単一スキル実行）を PoC で作成・測定
 
 - [ ] **Claude Skills SKILL.md フォーマットの Java モデルマッピング**
   - Claude Skills 公開仕様では metadata、inputs、resources の構造が示されているが、Java での最適なモデリング方法が未決定
   - Jackson・Lombok・Record クラスなど、複数の実装パターンが考えられる
-  → Next step: 仕様の詳細分析と、プロトタイプでの検証；ADR での設計決定記録
+    → Next step: 仕様の詳細分析と、プロトタイプでの検証；ADR での設計決定記録
 
 - [ ] **Context Engineering 実装の自由度と複雑性のバランス**
   - Layer-based progressive disclosure は有効だが、各層でのスキル定義・メタデータ管理がどの程度複雑化するか不明
   - MVP では単一層か多層か、決定基準が未確立
-  → Method: JJUG CCC 発表例の詳細確認；設計段階での層構造の定義
+    → Method: JJUG CCC 発表例の詳細確認；設計段階での層構造の定義
 
 - [ ] **LangChain4j Agentic API の本番環境への適合性**
   - v1.8.0 の安定性・パフォーマンス・本番利用の実績を確認する必要がある
   - エラーハンドリング・パフォーマンス・ホットリロード対応が必要かどうか、早期に検証する必要がある
-  → Method: GitHub Issues、コミュニティチャットでの実装例収集；複数シナリオでの PoC 実施
+    → Method: GitHub Issues、コミュニティチャットでの実装例収集；複数シナリオでの PoC 実施
 
 - [ ] **AgenticScope での複数 Agent 間のコンテキスト共有の制御方法**
   - Supervisor/SubAgents パターンで複数エージェントが走る場合、コンテキスト管理のスコープ定義がどうなるか、ドキュメント不備
-  → Method: LangChain4j の Supervisor・SubAgent サンプルコード詳細読解；実装時に ADR で明確化
+    → Method: LangChain4j の Supervisor・SubAgent サンプルコード詳細読解；実装時に ADR で明確化
 
 - [ ] **スキル実行のサンドボックス化・隔離方法**（セキュリティ）
   - Claude Skills の「自由度極めて高い」設計（CLI、任意コード実行）をサーバサイド環境でどう実装するか
   - コンテナ隔離、プロセス隔離、言語・ランタイムごとの制約方法が不明確
   - Java プロセス内での命令種類固定化 vs 外部プロセス/コンテナ化のトレードオフが未決定
-  → Method: セキュリティ PoC（サンドボックス実装例）を複数パターン作成；ADR で選択基準を明確化
+    → Method: セキュリティ PoC（サンドボックス実装例）を複数パターン作成；ADR で選択基準を明確化
 
 - [ ] **マルチテナント環境でのリソース隔離・ 監視**（信頼性・セキュリティ）
   - 複数テナントが同一 JVM 内でスキル実行する場合、リソースクォータ・実行制限の実装方法
   - 1 テナントのリソース枯渇が他テナントに影響しない設計が必要だが、Java の標準機構では限界がある可能性
   - リソース監視・アラート設定の粒度（テナント単位、スキル単位）が未決定
-  → Method: マルチテナント リソース管理の PoC（ThreadPoolExecutor、タイムアウト、メモリ制限等）を実装；ADR で方針決定
+    → Method: マルチテナント リソース管理の PoC（ThreadPoolExecutor、タイムアウト、メモリ制限等）を実装；ADR で方針決定
 
 - [ ] **スキル実行の検証・許可フロー**（セキュリティ・ガバナンス）
   - どのスキルを「信頼できるか」定義する基準が不明確（署名検証、ソースコード分析、管理者承認など）
   - 未検証スキル実行の拒否・制限ポリシーをどう実装するか
   - スキル更新時の版管理・ロールバック仕組みが必要かどうか
-  → Method: スキル信頼度レベル定義と、実行前検証ロジックを設計段階で明確化；ガバナンス ADR を作成
+    → Method: スキル信頼度レベル定義と、実行前検証ロジックを設計段階で明確化；ガバナンス ADR を作成
 
 - [ ] **LangFuse vs Azure Application Insights の選択基準**（Observability）
   - LangFuse（ローカル開発、高速フィードバック）の利点と限界
   - Azure Application Insights（クラウド本番、長期監視）の利点と統合複雑性
   - 両ツールの統合アーキテクチャ（ローカル → 本番への移行パターン）が未定義
-  → Method: 各ツールの PoC 実装による比較検証；ADR で統合戦略を明確化
+    → Method: 各ツールの PoC 実装による比較検証；ADR で統合戦略を明確化
 
 - [ ] **AgenticScope 状態・プロンプトのデータモデル化**（Observability）
   - LLM へ送信されるプロンプト（入力、システムプロンプト、Context Engineering 後の形式）のログ形式
   - AgenticScope 内のコンテキスト・メモリ・実行履歴の可視化形式・粒度
   - Observability ツール固有の制約（ペイロードサイズ、カーディナリティ制限など）への対応方法
-  → Method: AgenticScope のデータモデル設計、Observability スキーマ PoC を実装
+    → Method: AgenticScope のデータモデル設計、Observability スキーマ PoC を実装
 
 - [ ] **プロンプト改善の定量評価フレームワーク**（Observability）
   - メトリクス間の関係性：精度向上がトークン消費増加につながる可能性
   - 多変量テスト設計（A/B テスト以上の複雑性）、統計的有意性の判定方法
   - 改善サイクルの自動化（プロンプト改善提案、ロールバック判定など）の実装度合い
-  → Method: メトリクス定義の設計ドキュメント、A/B テストフレームワークの PoC を実装
+    → Method: メトリクス定義の設計ドキュメント、A/B テストフレームワークの PoC を実装
 
 - [ ] **ローカル・本番環境の Observability ギャップ管理**（開発効率）
   - ローカル（LangFuse）でのテスト→本番（Application Insights）への移行時の可視化差異
   - 本番環境で新たに発見される問題へのアダプタ層実装の負担
   - ログレベル・ロギング量の環境別切り替え戦略が不明確
-  → Method: アダプタ層の設計、本番環境との検証環境（staging）での PoC 実施
+    → Method: アダプタ層の設計、本番環境との検証環境（staging）での PoC 実施
 
 ## Recommendations
 
@@ -607,23 +623,23 @@ Claude は必要なコンテキストのみを段階的にロードして効率�
    - SKILL.md フォーマット・メタデータ構造の確認
    - GitHub の [Anthropic Skills Repository](https://github.com/anthropics/skills) でスキル定義例を複数確認
 
-3. **JJUG CCC 2025 Fall 発表スライドの詳細分析**
+4. **JJUG CCC 2025 Fall 発表スライドの詳細分析**
    - P35 以降の Agentic AI アーキテクチャパターンの図解を精読
    - Plan/Act/Reflect パターン、Workflow型 vs Pure Agent型のトレードオフを理解
    - Context Engineering 実装例の詳細確認
 
-4. **プロトタイプ実装による検証**
+5. **プロトタイプ実装による検証**
    - **PoC-1 (Workflow型)**：LangChain4j Workflow API を使用した単一スキル実行（3日）
    - **PoC-2 (Pure Agent型)**：LangChain4j Pure Agent API を使用した同一タスク実行（3日）
    - 両者の実装複雑性・トークン消費・コンテキスト可視性を比較測定
 
-5. **セキュリティ・マルチテナント考慮の PoC**
+6. **セキュリティ・マルチテナント考慮の PoC**
    - **PoC-3 (サンドボックス化)**：Java プロセス内での命令種類固定化、外部プロセス隔離のパターン実装
    - **PoC-4 (リソース管理)**：ThreadPoolExecutor、タイムアウト、メモリ制限による複数スキルの並行実行管理
    - **PoC-5 (スキル検証)**：スキル実行前の信頼度検証、許可リスト管理の仕組みプロトタイプ
    - セキュリティ PoC で判明した実装課題を ADR へ反映
 
-6. **Observability・プロンプト可視化の PoC**
+7. **Observability・プロンプト可視化の PoC**
    - **PoC-6 (LangFuse 統合)**：
      - ローカル開発環境での LangFuse セットアップ（Docker）
      - LLM へ送信するプロンプト・エージェント実行状態の可視化
@@ -645,16 +661,16 @@ Claude は必要なコンテキストのみを段階的にロードして効率�
    - 各要件の受け入れ基準（Acceptance Criteria）を詳細に記述
 
 2. [ ] **Architecture Decision Record（ADR）を 10 件作成**
-   - **ADR-1**：Agentic パターンの選択基準（Workflow型 vs Pure Agent型 vs Hybrid）
-   - **ADR-2**：SKILL.md パース・メタデータモデル実装方式
-   - **ADR-3**：Context Engineering 実装方針（Progressive Disclosure による段階的ロード）
-   - **ADR-4**：スキル実行エンジン設計（複数スキル組み合わせ、エラーハンドリング）
-   - **ADR-5**：AgenticScope の活用シナリオ（Workflow型・Pure Agent型の両パターン）
-   - **ADR-6**：セキュリティ・リソース管理フレームワーク（命令種類固定化、LangChain4j Code Execution Engines 活用、リソース制限）
-   - **ADR-7**：スキル実行の検証・許可フロー（信頼度レベル、ガバナンス）
-   - **ADR-8**：Observability 基盤の統合戦略（OTLP、LangFuse、Azure Application Insights の統合）
-   - **ADR-9**：プロンプト改善メトリクスの定義と測定（精度・効率・性能・コスト・信頼性）
-   - **ADR-10**：LangChain4j Agentic AI 最新機能の検証（Custom Agentic Patterns を含む）
+   - **[ADR-q333d Agentic パターンの選択基準](../adr/ADR-q333d-agentic-pattern-selection.md)**：Workflow型 vs Pure Agent型 vs Hybrid の判定基準
+   - **[ADR-xoqky スキル定義メタデータモデル](../adr/ADR-xoqky-skill-metadata-model.md)**：SKILL.md パース・メタデータモデル実装方式
+   - **[ADR-mpiub Context Engineering 実装方針](../adr/ADR-mpiub-context-engineering-strategy.md)**：Progressive Disclosure による段階的ロード
+   - **[ADR-ehfcj スキル実行エンジン設計](../adr/ADR-ehfcj-skill-execution-engine.md)**：複数スキル組み合わせ、エラーハンドリング
+   - **[ADR-ae6nw AgenticScope の活用シナリオ](../adr/ADR-ae6nw-agenticscope-scenarios.md)**：Workflow型・Pure Agent型の両パターン
+   - **[ADR-38940 セキュリティ・リソース管理フレームワーク](../adr/ADR-38940-security-resource-management.md)**：命令種類固定化、LangChain4j Code Execution Engines 活用、リソース制限
+   - **[ADR-ylsqt スキル実行の検証・許可フロー](../adr/ADR-ylsqt-skill-validation-approval.md)**：信頼度レベル、ガバナンス
+   - **[ADR-ij1ew Observability 基盤の統合戦略](../adr/ADR-ij1ew-observability-integration.md)**：OTLP、LangFuse、Azure Application Insights の統合
+   - **[ADR-lq67e プロンプト改善メトリクスの定義と測定](../adr/ADR-lq67e-prompt-metrics-definition.md)**：精度・効率・性能・コスト・信頼性
+   - **[ADR-lsart LangChain4j Agentic AI 最新機能の検証と適用](../adr/ADR-lsart-langchain4j-agentic-verification.md)**：Custom Agentic Patterns を含む
 
 3. [ ] **Task パッケージを作成し、MVP Design & Plan フェーズへ**
    - Design: 選択された Agentic パターン、モジュール構成、Progressive Disclosure 層の設計
@@ -687,17 +703,20 @@ Claude は必要なコンテキストのみを段階的にロードして効率�
 ### References
 
 **LangChain4j Agentic AI API**
+
 - [LangChain4j Agent Tutorials](https://docs.langchain4j.dev/tutorials/agents)
 - [LangChain4j Agents Module (GitHub)](https://github.com/langchain4j/langchain4j/tree/main/langchain4j-agentic)
 - [LangChain4j AgenticServices API Documentation](https://docs.langchain4j.dev/tutorials/agents#agenticservices)
 
 **Claude Skills 仕様**
+
 - [Claude Agent Skills Overview](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview)
 - [Claude Agent Skills Overview - How Skills Work](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview#how-skills-work)（Progressive Disclosure の 3 段階ロードメカニズム）
 - [Claude Agent Skills Best Practices - Progressive Disclosure Patterns](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices#progressive-disclosure-patterns)（構造化ガイドライン）
 - [Anthropic Skills Repository (GitHub)](https://github.com/anthropics/skills)
 
 **Agentic AI アーキテクチャ参考文献**
+
 - JJUG CCC 2025 Fall - LangChain4j presentation（P35 以降：Plan/Act/Reflect パターン、Workflow型 vs Pure Agent型、Context Engineering について詳述）
 
 ### Raw Data
