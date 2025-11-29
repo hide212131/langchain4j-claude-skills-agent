@@ -11,7 +11,6 @@
   - [AN-f545x Claude Skills エージェント実装 | LangChain4j Agent 統合分析](../analysis/AN-f545x-claude-skills-agent.md)
 - Related ADRs:
   - [ADR-1 Agentic パターンの選択基準](ADR-q333d-agentic-pattern-selection.md)
-  - [ADR-2 スキル定義メタデータモデル](ADR-xoqky-skill-metadata-model.md)
 - Impacted Requirements:
   - FR-DRAFT-4（Progressive Disclosure 実装）
   - NFR-DRAFT-1（Context Engineering 最適化）

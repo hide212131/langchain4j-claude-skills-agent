@@ -11,7 +11,6 @@
   - [AN-f545x Claude Skills エージェント実装 | LangChain4j Agent 統合分析](../analysis/AN-f545x-claude-skills-agent.md)
 - Related ADRs:
   - [ADR-1 Agentic パターンの選択基準](ADR-q333d-agentic-pattern-selection.md)
-  - [ADR-2 スキル定義メタデータモデル](ADR-xoqky-skill-metadata-model.md)
   - [ADR-3 Context Engineering 実装方針](ADR-mpiub-context-engineering-strategy.md)
 - Impacted Requirements:
   - FR-DRAFT-1（単一スキル実行）
@@ -70,7 +69,7 @@
 1. **スケールと再利用性**：1000スキルを想定しても、オペレーション宣言と共通コンポーネントの組み合わせで実装爆発を防げる。
 2. **堅牢性と安全性**：全実行をツールチェイン枠（1ステップ含む）に載せ、許可コマンド検証・リソース上限・ログ採取を標準化することで、外部プロセス/ビルド/ブラウザを安全に扱える。
 3. **成果物の一貫性**：複数ファイル・ログ・スクリーンショット等を成果物カタログで返却し、下流の検証/配布を容易にする。
-4. **宣言と実装の分離**：SKILL.md メタデータ（ADR-2）で必要オペレーション/ツールを明示し、ランタイムが実行計画を構築することで、リポジトリ差分や未知スキルにも対応できる。
+4. **宣言と実装の分離**：SKILL.md メタデータで必要オペレーション/ツールを明示し、ランタイムが実行計画を構築することで、リポジトリ差分や未知スキルにも対応できる。
 
 ## Consequences
 

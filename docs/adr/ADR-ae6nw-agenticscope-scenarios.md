@@ -227,4 +227,4 @@ var response = workflow.run(input); // AgenticScope は内部で生成・共有�
 ## External References
 
 - [LangChain4j AgenticScope API](https://docs.langchain4j.dev/tutorials/agents/#introducing-the-agenticscope)
-- [Concurrent Collections in Java](https://docs.oracle.com/javase/tutorial/collections/implementations/concurrent.html)
+- [Concurrent Collections in Java](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html)
