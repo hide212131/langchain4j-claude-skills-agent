@@ -15,9 +15,9 @@
   - [ADR-ae6nw AgenticScope の活用シナリオ](ADR-ae6nw-agenticscope-scenarios.md)
   - [ADR-q333d Agentic パターンの選択基準](ADR-q333d-agentic-pattern-selection.md)
 - Impacted Requirements:
-  - NFR-DRAFT-3（セキュリティ・リソース管理）
-  - NFR-DRAFT-4（スキル実行の検証・監査）
-  - FR-DRAFT-x（スキルチェーン / 成果物連携）
+  - [NFR-3gjla セキュリティとリソース管理](../requirements/NFR-3gjla-security-resource-governance.md)
+  - [NFR-yiown スキル検証・監査](../requirements/NFR-yiown-skill-verification-auditability.md)
+  - [FR-2ff4z 複数スキル連鎖実行](../requirements/FR-2ff4z-multi-skill-composition.md)
 
 ---
 

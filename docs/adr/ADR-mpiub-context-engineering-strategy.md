@@ -12,8 +12,8 @@
 - Related ADRs:
   - [ADR-1 Agentic パターンの選択基準](ADR-q333d-agentic-pattern-selection.md)
 - Impacted Requirements:
-  - FR-DRAFT-4（Progressive Disclosure 実装）
-  - NFR-DRAFT-1（Context Engineering 最適化）
+  - [FR-uu07e Progressive Disclosure 実装](../requirements/FR-uu07e-progressive-disclosure.md)
+  - [NFR-kc6k1 Context Engineering 最適化](../requirements/NFR-kc6k1-context-engineering-optimization.md)
 
 ## Context
 
@@ -79,7 +79,7 @@ Context Engineering は、限られたトークン予算内で LLM エージェ�
 
 3. **デバッグ・Observability の容易性**
    - 各レベルでのコンテキスト内容が明確
-   - Observability フレームワーク（FR-DRAFT-4）での可視化が直結
+   - Observability フレームワーク（FR-hjz63）での可視化が直結
 
 4. **段階的なスケーリング**
    - Phase 1：Progressive Disclosure で基盤確立
