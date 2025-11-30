@@ -19,11 +19,9 @@
   - [ADR-ckr1p Claude Skills 実装難易度カテゴリと段階導入方針](../adr/ADR-ckr1p-skill-implementation-leveling.md)
   - [ADR-38940 セキュリティ・リソース管理フレームワーク](../adr/ADR-38940-security-resource-management.md)
   - [ADR-ae6nw AgenticScope の活用シナリオ](../adr/ADR-ae6nw-agenticscope-scenarios.md)
-  - [ADR-ylsqt スキル実行の検証・許可フロー](../adr/ADR-ylsqt-skill-validation-approval.md)
   - [ADR-lq67e プロンプト改善メトリクスの定義と測定](../adr/ADR-lq67e-prompt-metrics-definition.md)
   - [ADR-ij1ew Observability 基盤の統合戦略](../adr/ADR-ij1ew-observability-integration.md)
   - [ADR-ehfcj スキル実行エンジン設計](../adr/ADR-ehfcj-skill-execution-engine.md)
-  - [ADR-xoqky スキル定義メタデータモデル](../adr/ADR-xoqky-skill-metadata-model.md)
   - [ADR-mpiub Context Engineering 実装方針（Progressive Disclosure）](../adr/ADR-mpiub-context-engineering-strategy.md)
   - [ADR-q333d Agentic パターンの選択基準](../adr/ADR-q333d-agentic-pattern-selection.md)
 - Related Tasks:
@@ -31,7 +29,7 @@
 
 ## Executive Summary
 
-本分析は、LangChain4j v1.8.0 以降の最新 Agentic AI API（Plan/Act/Reflect パターン）を活用して、Claude Skills の仕様に基づいた Java エージェント実装の最小限の実行系構築に向けた問題空間の探索を行うもの。主な目的は 4 つ：
+本分析は、LangChain4j v1.9.0 以降の最新 Agentic AI API（Plan/Act/Reflect パターン）を活用して、Claude Skills の仕様に基づいた Java エージェント実装の最小限の実行系構築に向けた問題空間の探索を行うもの。主な目的は 4 つ：
 
 1. **LangChain4j の Agentic AI API 実装例の提示**
    - Workflow型 および Pure Agent型（Supervisor/SubAgents）の実装パターン
@@ -59,8 +57,8 @@
 
 ### Current State
 
-- **LangChain4j v1.8.0 以降**：最新 Agentic AI API（Agents モジュール）により、複数エージェントの協調（Supervisor/SubAgents）、Workflow 制御、AgenticScope による情報共有などが提供されている
-  - 参照：[LangChain4j Agentic Support](https://docs.langchain4j.dev/tutorials/agents)
+- **LangChain4j v1.9.0 以降**：最新 Agentic AI API（Agents モジュール）により、複数エージェントの協調（Supervisor/SubAgents）、Workflow 制御、AgenticScope による情報共有などが提供されている
+  - 参照：[LangChain4j Agentic Support](https://docs.langchain4j.dev/tutorials/agents/)
 - **実装パターンの課題**：
   - Workflow型（明示的な制御）と Pure Agent型（柔軟・適応的）のトレードオフ理解が不十分
   - Context Engineering（コンテキスト最適化）の実装パターンが示されていない
@@ -153,7 +151,7 @@
 
 ### Technical Investigation
 
-#### 1. LangChain4j Agentic AI API（v1.8.0 以降）
+#### 1. LangChain4j Agentic AI API（v1.9.0 以降）
 
 **Agentic AI Components:**
 
@@ -170,7 +168,7 @@
 
 **参照:**
 
-- [LangChain4j Agent Tutorials](https://docs.langchain4j.dev/tutorials/agents)
+- [LangChain4j Agent Tutorials](https://docs.langchain4j.dev/tutorials/agents/)
 - [LangChain4j Agents Module (GitHub)](https://github.com/langchain4j/langchain4j/tree/main/langchain4j-agentic)
 
 #### 2. Claude Skills 仕様（公開情報に基づく）
@@ -226,8 +224,8 @@ Claude は必要なコンテキストのみを段階的にロードして効率�
 
 **参照:**
 
-- [Claude Agent Skills Overview - How Skills Work](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview#how-skills-work)（Progressive Disclosure の 3 段階ロードメカニズム）
-- [Claude Agent Skills Best Practices - Progressive Disclosure Patterns](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices#progressive-disclosure-patterns)（構造化ガイドライン）
+- [Claude Agent Skills Overview](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview)（Progressive Disclosure の 3 段階ロードメカニズム）
+- [Claude Agent Skills Best Practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)（構造化ガイドライン）
 - [Anthropic Skills Repository (GitHub)](https://github.com/anthropics/skills)（実装例）
 
 #### 3. Context Engineering と実装上の課題
@@ -369,7 +367,7 @@ Claude は必要なコンテキストのみを段階的にロードして効率�
 ### Technical Constraints
 
 1. **LangChain4j バージョン依存**
-   - Agentic AI サポート：v1.8.0 以降（langchain4j-agentic, langchain4j-agentic-a2a モジュール必須）
+   - Agentic AI サポート：v1.9.0 以降（langchain4j-agentic, langchain4j-agentic-a2a モジュール必須）
    - Java Target Version：23 以上（LangChain4j 依存）
 
 2. **Context Engineering の実装限界**
@@ -503,21 +501,19 @@ Claude は必要なコンテキストのみを段階的にロードして効率�
 
 - **アーキテクチャ決定記録（ADR）が必要な項目**：
   1. **[ADR-q333d Agentic パターンの選択基準](../adr/ADR-q333d-agentic-pattern-selection.md)**：Workflow型 vs Pure Agent型 vs Hybrid（層状）の判定基準
-  2. **[ADR-xoqky スキル定義メタデータモデル](../adr/ADR-xoqky-skill-metadata-model.md)**：SKILL.md 仕様を Java オブジェクトにマップする手法
-  3. **[ADR-mpiub Context Engineering 実装方針](../adr/ADR-mpiub-context-engineering-strategy.md)**：Layer-based progressive disclosure、プロンプト圧縮の標準パターン
-  4. **[ADR-ehfcj スキル実行エンジン設計](../adr/ADR-ehfcj-skill-execution-engine.md)**：複数スキル組み合わせ、エラーハンドリング・リトライ戦略、LangChain4j ネイティブ機構との整合性
-  5. **[ADR-ae6nw AgenticScope の活用シナリオ](../adr/ADR-ae6nw-agenticscope-scenarios.md)**：Workflow型・Pure Agent型の両アーキテクチャにおけるコンテキスト管理とコンテキスト共有ルール
-  6. **[ADR-38940 セキュリティ・リソース管理フレームワーク](../adr/ADR-38940-security-resource-management.md)**：命令種類固定化、LangChain4j Code Execution Engines を活用したサンドボックス化、リソース制限の実装方針
-  7. **[ADR-ylsqt スキル実行の検証・許可フロー](../adr/ADR-ylsqt-skill-validation-approval.md)**：信頼されたスキルの定義、実行前コード分析、マルチテナント隔離の仕組み
-  8. **[ADR-ij1ew Observability 基盤の統合戦略](../adr/ADR-ij1ew-observability-integration.md)**：OTLP（OpenTelemetry Protocol）の採用、LangFuse（ローカル開発）と Azure Application Insights（本番）の選択基準と統合パターン
-  9. **[ADR-lq67e プロンプト改善メトリクスの定義と測定](../adr/ADR-lq67e-prompt-metrics-definition.md)**：精度・効率・性能・コスト・信頼性メトリクスの標準化
-  10. **[ADR-lsart LangChain4j Agentic AI 最新機能の検証と適用](../adr/ADR-lsart-langchain4j-agentic-verification.md)**：[Custom Agentic Patterns](https://docs.langchain4j.dev/tutorials/agents#custom-agentic-patterns) を含む最新の Agentic AI 機能が本要件に対応可能かの調査・検証、API 仕様の詳細確認
+  2. **[ADR-mpiub Context Engineering 実装方針](../adr/ADR-mpiub-context-engineering-strategy.md)**：Layer-based progressive disclosure、プロンプト圧縮の標準パターン
+  3. **[ADR-ehfcj スキル実行エンジン設計](../adr/ADR-ehfcj-skill-execution-engine.md)**：複数スキル組み合わせ、エラーハンドリング・リトライ戦略、LangChain4j ネイティブ機構との整合性
+  4. **[ADR-ae6nw AgenticScope の活用シナリオ](../adr/ADR-ae6nw-agenticscope-scenarios.md)**：Workflow型・Pure Agent型の両アーキテクチャにおけるコンテキスト管理とコンテキスト共有ルール
+  5. **[ADR-38940 セキュリティ・リソース管理フレームワーク](../adr/ADR-38940-security-resource-management.md)**：命令種類固定化、LangChain4j Code Execution Engines を活用したサンドボックス化、リソース制限の実装方針
+  6. **[ADR-ij1ew Observability 基盤の統合戦略](../adr/ADR-ij1ew-observability-integration.md)**：OTLP（OpenTelemetry Protocol）の採用、LangFuse（ローカル開発）と Azure Application Insights（本番）の選択基準と統合パターン
+  7. **[ADR-lq67e プロンプト改善メトリクスの定義と測定](../adr/ADR-lq67e-prompt-metrics-definition.md)**：精度・効率・性能・コスト・信頼性メトリクスの標準化
+  8. **[ADR-lsart LangChain4j Agentic AI 最新機能の検証と適用](../adr/ADR-lsart-langchain4j-agentic-verification.md)**：[Custom Agentic Patterns](https://docs.langchain4j.dev/tutorials/agents/) を含む最新の Agentic AI 機能が本要件に対応可能かの調査・検証、API 仕様の詳細確認
 
 ## Risk Assessment
 
 | Risk                                                               | Probability | Impact | Mitigation Strategy                                                                                      |
 | ------------------------------------------------------------------ | ----------- | ------ | -------------------------------------------------------------------------------------------------------- |
-| LangChain4j Agentic API の仕様変更（v1.8.0 -> v2.0 など）          | Medium      | Medium | 版を明示的に固定し、API 変更ノートを継続監視；定期的な互換性チェック実装                                 |
+| LangChain4j Agentic API の仕様変更（v1.9.0 -> v2.0 など）          | Medium      | Medium | 版を明示的に固定し、API 変更ノートを継続監視；定期的な互換性チェック実装                                 |
 | Pure Agent型のコンテキスト管理が「ブラックボックス化」             | High        | High   | 初期実装では Workflow型またはHybrid パターンを優先；Context 可視化の仕組みを設計                         |
 | Workflow型の実装が複雑・保守性低下                                 | Medium      | Medium | 段階的実装（単純 Workflow → Supervisor/SubAgents）；テンプレート化・ドキュメント充実                     |
 | スキル定義メタデータモデルと SKILL.md 仕様の乖離                   | Medium      | Medium | 仕様を明確化する ADR 作成；SKILL.md のバージョン管理を文書に含める                                       |
@@ -551,7 +547,7 @@ Claude は必要なコンテキストのみを段階的にロードして効率�
     → Method: JJUG CCC 発表例の詳細確認；設計段階での層構造の定義
 
 - [ ] **LangChain4j Agentic API の本番環境への適合性**
-  - v1.8.0 の安定性・パフォーマンス・本番利用の実績を確認する必要がある
+  - v1.9.0 の安定性・パフォーマンス・本番利用の実績を確認する必要がある
   - エラーハンドリング・パフォーマンス・ホットリロード対応が必要かどうか、早期に検証する必要がある
     → Method: GitHub Issues、コミュニティチャットでの実装例収集；複数シナリオでの PoC 実施
 
@@ -660,14 +656,12 @@ Claude は必要なコンテキストのみを段階的にロードして効率�
    - 本分析から発見された FR-DRAFT-1 ～ FR-DRAFT-4（4個）、NFR-DRAFT-1 ～ NFR-DRAFT-6（6個）を FR-<id>、NFR-<id> 形式に正式化
    - 各要件の受け入れ基準（Acceptance Criteria）を詳細に記述
 
-2. [ ] **Architecture Decision Record（ADR）を 10 件作成**
+2. [ ] **Architecture Decision Record（ADR）を 8 件作成**
    - **[ADR-q333d Agentic パターンの選択基準](../adr/ADR-q333d-agentic-pattern-selection.md)**：Workflow型 vs Pure Agent型 vs Hybrid の判定基準
-   - **[ADR-xoqky スキル定義メタデータモデル](../adr/ADR-xoqky-skill-metadata-model.md)**：SKILL.md パース・メタデータモデル実装方式
    - **[ADR-mpiub Context Engineering 実装方針](../adr/ADR-mpiub-context-engineering-strategy.md)**：Progressive Disclosure による段階的ロード
    - **[ADR-ehfcj スキル実行エンジン設計](../adr/ADR-ehfcj-skill-execution-engine.md)**：複数スキル組み合わせ、エラーハンドリング
    - **[ADR-ae6nw AgenticScope の活用シナリオ](../adr/ADR-ae6nw-agenticscope-scenarios.md)**：Workflow型・Pure Agent型の両パターン
    - **[ADR-38940 セキュリティ・リソース管理フレームワーク](../adr/ADR-38940-security-resource-management.md)**：命令種類固定化、LangChain4j Code Execution Engines 活用、リソース制限
-   - **[ADR-ylsqt スキル実行の検証・許可フロー](../adr/ADR-ylsqt-skill-validation-approval.md)**：信頼度レベル、ガバナンス
    - **[ADR-ij1ew Observability 基盤の統合戦略](../adr/ADR-ij1ew-observability-integration.md)**：OTLP、LangFuse、Azure Application Insights の統合
    - **[ADR-lq67e プロンプト改善メトリクスの定義と測定](../adr/ADR-lq67e-prompt-metrics-definition.md)**：精度・効率・性能・コスト・信頼性
    - **[ADR-lsart LangChain4j Agentic AI 最新機能の検証と適用](../adr/ADR-lsart-langchain4j-agentic-verification.md)**：Custom Agentic Patterns を含む
@@ -704,15 +698,14 @@ Claude は必要なコンテキストのみを段階的にロードして効率�
 
 **LangChain4j Agentic AI API**
 
-- [LangChain4j Agent Tutorials](https://docs.langchain4j.dev/tutorials/agents)
+- [LangChain4j Agent Tutorials](https://docs.langchain4j.dev/tutorials/agents/)
 - [LangChain4j Agents Module (GitHub)](https://github.com/langchain4j/langchain4j/tree/main/langchain4j-agentic)
-- [LangChain4j AgenticServices API Documentation](https://docs.langchain4j.dev/tutorials/agents#agenticservices)
+- [LangChain4j AgenticServices API Documentation](https://docs.langchain4j.dev/tutorials/agents/)
 
 **Claude Skills 仕様**
 
 - [Claude Agent Skills Overview](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview)
-- [Claude Agent Skills Overview - How Skills Work](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview#how-skills-work)（Progressive Disclosure の 3 段階ロードメカニズム）
-- [Claude Agent Skills Best Practices - Progressive Disclosure Patterns](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices#progressive-disclosure-patterns)（構造化ガイドライン）
+- [Claude Agent Skills Best Practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)（構造化ガイドライン）
 - [Anthropic Skills Repository (GitHub)](https://github.com/anthropics/skills)
 
 **Agentic AI アーキテクチャ参考文献**
@@ -721,7 +714,7 @@ Claude は必要なコンテキストのみを段階的にロードして効率�
 
 ### Raw Data
 
-- LangChain4j Version: v1.8.0 or later (check Maven Central for latest)
+- LangChain4j Version: v1.9.0 or later (check Maven Central for latest)
 - Java Target Version: 23 or later (LangChain4j 依存)
 
 ---
