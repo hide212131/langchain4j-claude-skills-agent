@@ -48,7 +48,7 @@ LangChain4j v1.9.0 以降の Agentic AI API は、複数の実装パターン・
 
 - **Planner 抽象の採用**：`Planner` インターフェースにより、エージェントの実行計画をカスタム実装可能。標準パターン（Sequence/Parallel/Supervisor 等）も同抽象で再実装されており、カスタムとの親和性が高い。
 - **Goal-Oriented Planner (GOAP)**：サブエージェントの入出力キーを前提条件・成果物として扱い、最短パスでゴール（`outputKey`）に到達するシーケンスを自動探索する。SKILL.md の frontmatter/本文を入出力のマッピング源として利用することで、AN-f545x で求める段階的実行（Level 1/2/3 Progressive Disclosure）に適合。
-- **P2P Planner**：AgenticScope の状態変化をトリガーに複数エージェントを再入呼び出しする分散型パターン。リトライや再検証をスコープの更新で駆動でき、スキル検証フロー（ADR-ylsqt）や観測/メトリクス収集との併用が容易。
+- **P2P Planner**：AgenticScope の状態変化をトリガーに複数エージェントを再入呼び出しする分散型パターン。リトライや再検証をスコープの更新で駆動でき、スキル検証フロー（ADR-ehfcj スキル実行エンジン設計）や観測/メトリクス収集との併用が容易。
 - **適用方針**：Custom Agentic Patterns を PoC の中心テーマとし、既存 Workflow/Supervisor との差分（決定性/柔軟性/可観測性）を計測・評価する。
 
 ### 検証対象領域
