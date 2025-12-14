@@ -63,7 +63,7 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
   - `src/main/java/...` パーサ
   - `src/main/java/...` ダミー Agent フロー
 - Dependencies:
-  - LangChain4j, Jackson
+  - LangChain4j
 
 ### Tasks
 
