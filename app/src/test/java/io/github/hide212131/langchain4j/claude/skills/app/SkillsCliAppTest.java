@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.hide212131.langchain4j.claude.skills.runtime.VisibilityLog;
 import java.io.ByteArrayOutputStream;
+import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -17,6 +18,7 @@ import java.util.logging.SimpleFormatter;
 import java.util.logging.StreamHandler;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import picocli.CommandLine;
 
 class SkillsCliAppTest {
 
@@ -49,6 +51,31 @@ class SkillsCliAppTest {
 
         assertThatThrownBy(() -> SkillsCliApp.executeWithRetry(action, log, true, "run-retry", "skill-x"))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("picocli 経由で SKILL.md を実行できる")
+    void runCliWithPicocli() {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        CommandLine cmd = new CommandLine(new SkillsCliApp());
+        cmd.setOut(new PrintWriter(out, true, StandardCharsets.UTF_8));
+        cmd.setErr(new PrintWriter(err, true, StandardCharsets.UTF_8));
+
+        int exit = cmd.execute(
+                "--skill",
+                "src/test/resources/skills/sample/SKILL.md",
+                "--goal",
+                "demo goal",
+                "--skill-id",
+                "sample-skill",
+                "--visibility-level",
+                "off");
+
+        assertThat(exit).isZero();
+        String stdout = out.toString(StandardCharsets.UTF_8);
+        assertThat(stdout).contains("Plan:").contains("Skill: sample-skill");
+        assertThat(err.toString(StandardCharsets.UTF_8)).isBlank();
     }
 
     private Logger newLogger(ByteArrayOutputStream out) {

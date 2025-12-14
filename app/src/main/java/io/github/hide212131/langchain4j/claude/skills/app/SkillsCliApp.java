@@ -6,64 +6,117 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.SkillDocumentParse
 import io.github.hide212131.langchain4j.claude.skills.runtime.VisibilityLevel;
 import io.github.hide212131.langchain4j.claude.skills.runtime.VisibilityLog;
 import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
+import picocli.CommandLine.Spec;
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.ITypeConverter;
 
 /**
  * 最小構成の CLI。SKILL.md をパースし、ダミー Plan/Act/Reflect フローを実行する。
  */
-public final class SkillsCliApp {
+@Command(
+        name = "skills",
+        description = "SKILL.md を読み込みダミー Plan/Act/Reflect を実行します。",
+        mixinStandardHelpOptions = true)
+public final class SkillsCliApp implements Callable<Integer> {
 
-    private static final int EXIT_USAGE = 1;
     private static final int EXIT_PARSE_ERROR = 2;
     private static final int EXIT_EXECUTION_ERROR = 3;
 
+    @Spec
+    CommandSpec spec;
+
+    @Option(
+            names = "--skill",
+            required = true,
+            paramLabel = "SKILL.md",
+            description = "実行する SKILL.md のパス")
+    Path skillPath;
+
+    @Option(
+            names = "--goal",
+            paramLabel = "TEXT",
+            description = "エージェントに与えるゴール（任意）")
+    String goal;
+
+    @Option(
+            names = "--skill-id",
+            paramLabel = "ID",
+            description = "SKILL ID を明示的に指定（任意）")
+    String skillId;
+
+    @Option(
+            names = "--visibility-level",
+            paramLabel = "LEVEL",
+            defaultValue = "basic",
+            description = "可視化ログレベル (basic|off)",
+            converter = VisibilityLevelConverter.class)
+    VisibilityLevel visibilityLevel = VisibilityLevel.BASIC;
+
     public static void main(String[] args) {
-        int exitCode = run(args, System.out, System.err);
+        int exitCode = new CommandLine(new SkillsCliApp()).execute(args);
         if (exitCode != 0) {
             System.exit(exitCode);
         }
     }
 
     static int run(String[] args, PrintStream out, PrintStream err) {
-        Arguments arguments = Arguments.parse(args);
-        if (arguments == null) {
-            printUsage(out);
-            return EXIT_USAGE;
-        }
+        CommandLine cmd = new CommandLine(new SkillsCliApp());
+        cmd.setOut(new PrintWriter(out, true, StandardCharsets.UTF_8));
+        cmd.setErr(new PrintWriter(err, true, StandardCharsets.UTF_8));
+        return cmd.execute(args);
+    }
 
+    @Override
+    public Integer call() {
         String runId = UUID.randomUUID().toString();
-        boolean basic = arguments.visibilityLevel() == VisibilityLevel.BASIC;
+        boolean basic = visibilityLevel == VisibilityLevel.BASIC;
         VisibilityLog log = new VisibilityLog(Logger.getLogger(SkillsCliApp.class.getName()));
         SkillDocumentParser parser = new SkillDocumentParser();
 
-        log.info(basic, runId, "-", "parse", "parse.skill", "SKILL.md を読み込みます", "path=" + arguments.skillPath(), "");
+        log.info(
+                basic,
+                runId,
+                "-",
+                "parse",
+                "parse.skill",
+                "SKILL.md を読み込みます",
+                "path=" + skillPath,
+                "");
 
         SkillDocument document;
         try {
-            document = parser.parse(arguments.skillPath(), arguments.skillId().orElse(null));
+            document = parser.parse(skillPath, skillId);
         } catch (RuntimeException ex) {
-            String fallbackSkillId = arguments.skillId().orElse("(不明)");
+            String fallbackSkillId = skillId == null ? "(不明)" : skillId;
             log.error(runId, fallbackSkillId, "error", "parse", "SKILL.md のパースに失敗しました", "", "", ex);
-            err.println("SKILL.md のパースに失敗しました: " + ex.getMessage());
+            spec.commandLine().getErr().println("SKILL.md のパースに失敗しました: " + ex.getMessage());
+            spec.commandLine().getErr().flush();
             return EXIT_PARSE_ERROR;
         }
 
         DummyAgentFlow flow = new DummyAgentFlow();
-        Supplier<DummyAgentFlow.Result> action =
-                () -> flow.run(document, arguments.goal().orElse(""), log, basic, runId);
+        Supplier<DummyAgentFlow.Result> action = () -> flow.run(document, goal == null ? "" : goal, log, basic, runId);
 
         try {
             DummyAgentFlow.Result result = executeWithRetry(action, log, basic, runId, document.id());
-            out.println(result.formatted());
-            return 0;
+            spec.commandLine().getOut().println(result.formatted());
+            spec.commandLine().getOut().flush();
+            return CommandLine.ExitCode.OK;
         } catch (RuntimeException ex) {
             log.error(runId, document.id(), "error", "run.failed", "エージェント実行が失敗しました", "", "", ex);
-            err.println("エージェント実行が失敗しました: " + ex.getMessage());
+            spec.commandLine().getErr().println("エージェント実行が失敗しました: " + ex.getMessage());
+            spec.commandLine().getErr().flush();
             return EXIT_EXECUTION_ERROR;
         }
     }
@@ -85,63 +138,11 @@ public final class SkillsCliApp {
         }
     }
 
-    private static void printUsage(PrintStream out) {
-        out.println("使い方: skills --skill <path/to/SKILL.md> [--goal <text>] [--skill-id <id>] [--visibility-level basic|off]");
-        out.println("SKILL.md を読み込んでダミー Plan/Act/Reflect を実行します。");
-    }
+    private static final class VisibilityLevelConverter implements ITypeConverter<VisibilityLevel> {
 
-    private record Arguments(Path skillPath, Optional<String> goal, Optional<String> skillId, VisibilityLevel visibilityLevel) {
-
-        static Arguments parse(String[] args) {
-            if (args == null) {
-                return null;
-            }
-            Path skill = null;
-            String goal = null;
-            String skillId = null;
-            VisibilityLevel visibilityLevel = VisibilityLevel.BASIC;
-            for (int i = 0; i < args.length; i++) {
-                String arg = args[i];
-                switch (arg) {
-                    case "--skill" -> {
-                        if (i + 1 >= args.length) {
-                            return null;
-                        }
-                        skill = Path.of(args[++i]);
-                    }
-                    case "--goal" -> {
-                        if (i + 1 >= args.length) {
-                            return null;
-                        }
-                        goal = args[++i];
-                    }
-                    case "--skill-id" -> {
-                        if (i + 1 >= args.length) {
-                            return null;
-                        }
-                        skillId = args[++i];
-                    }
-                    case "--visibility-level" -> {
-                        if (i + 1 >= args.length) {
-                            return null;
-                        }
-                        String raw = args[++i];
-                        try {
-                            visibilityLevel = VisibilityLevel.parse(raw);
-                        } catch (IllegalArgumentException ex) {
-                            return null;
-                        }
-                    }
-                    default -> {
-                        // 不明な引数
-                        return null;
-                    }
-                }
-            }
-            if (skill == null) {
-                return null;
-            }
-            return new Arguments(skill, Optional.ofNullable(goal), Optional.ofNullable(skillId), visibilityLevel);
+        @Override
+        public VisibilityLevel convert(String value) {
+            return VisibilityLevel.parse(value);
         }
     }
 }

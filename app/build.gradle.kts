@@ -15,6 +15,7 @@ repositories {
 
 dependencies {
     implementation("org.yaml:snakeyaml:2.2")
+    implementation("info.picocli:picocli:4.7.6")
 
     testImplementation(platform("org.junit:junit-bom:5.10.1"))
     testImplementation("org.junit.jupiter:junit-jupiter")
