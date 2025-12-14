@@ -50,6 +50,7 @@ Agentic Workflow (Plan/Act/Reflect) --+--> OTLP Export (traces/logs/metrics)
 - Parser Hook: SKILL.md 読み込み時に YAML frontmatter/Markdown 本文、JSON Schema 検証結果をイベント化。
 - Agentic Hooks: Plan/Act/Reflect の各ステップでプロンプト/応答と決定を記録。エラーハンドリング（NFR-mt1ve）用の例外情報/リトライ情報も併記。
 - Exporters: OTLP（トレース/ログ/メトリクス）、LangFuse（ローカル比較用）。共通イベントスキーマから変換。
+- Minimal Execution Stub: ダミー LLM 応答と最小パース/実行スタブでイベント発火を先に実装し、テストファーストでスキーマとフックの契約を固める。
 
 ### Data Flow
 
@@ -139,6 +140,7 @@ Decision Rationale
 
 - VisibilityLogger のイベント生成・マスキング単体テストを追加。
 - SKILL パース成功/失敗ケースのイベント内容を検証。
+- ダミー LLM 応答と最小パース/実行スタブを用い、Plan/Act/Reflect で期待イベントが出る赤テストを先に書く。
 
 ### Integration Tests
 

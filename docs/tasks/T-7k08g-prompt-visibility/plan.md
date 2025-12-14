@@ -74,6 +74,9 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 - [ ] **SKILL パース計装**
   - [ ] YAML frontmatter/Markdown 本文のパース結果をイベント化
   - [ ] JSON Schema 検証結果と例外をイベント化
+- [ ] **最小実行スタブと赤テスト**
+  - [ ] ダミー LLM 応答とパース/実行スタブを用意し、イベントが出る赤テストを追加
+  - [ ] Plan/Act/Reflect で期待イベントのフィールドをアサート
 
 ### Deliverables
 
@@ -122,6 +125,7 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
   - [ ] LangFuse 出力の開発用パスを実装（ローカルエンドポイント/モック）
   - [ ] OTLP 出力の基本実装と設定切替（none|langfuse|otlp）
   - [ ] エラー/リトライのロギング（NFR-mt1ve 連携）
+  - [ ] LangFuse/OTLP のモック送信でフィールドマッピングを検証
 
 ### Phase 2 Deliverables
 
