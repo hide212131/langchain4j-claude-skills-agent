@@ -14,6 +14,7 @@
   - [NFR-mck7v 漸進的開発・評価サイクル支援](../requirements/NFR-mck7v-iterative-metrics-evaluation.md)
 - Related Tasks:
   - [T-7k08g プロンプト・エージェント可視化タスク](../tasks/T-7k08g-prompt-visibility/README.md)
+  - [T-9t6cj 実LLM接続タスク](../tasks/T-9t6cj-llm-integration/README.md)
 
 ## Requirement Statement
 

@@ -16,10 +16,13 @@
   - [FR-mcncb 単一スキルの簡易実行](../requirements/FR-mcncb-single-skill-basic-execution.md)
   - [FR-cccz4 単一スキルの複雑手続き実行](../requirements/FR-cccz4-single-skill-complex-execution.md)
   - [FR-2ff4z 複数スキル連鎖実行](../requirements/FR-2ff4z-multi-skill-composition.md)
+- Related Tasks:
+  - [T-0mcn0 最小実行基盤タスク](../tasks/T-0mcn0-minimal-foundation/README.md)
+  - [T-9t6cj 実LLM接続タスク](../tasks/T-9t6cj-llm-integration/README.md)
 
 ## Context
 
-LangChain4j v1.9.0 以降の Agentic AI API は、複数の実装パターン・機能を提供している。本プロジェクトでは、これらの最新機能がプロジェクト要件を満たすか、詳細に調査・検証する必要がある：
+LangChain4j v1.9.1 以降の Agentic AI API は、複数の実装パターン・機能を提供している。本プロジェクトでは、これらの最新機能がプロジェクト要件を満たすか、詳細に調査・検証する必要がある：
 
 1. **Workflow API**：明示的な制御フロー（[ADR-q333d Agentic パターンの選択基準](ADR-q333d-agentic-pattern-selection.md) で候補として検討）
 2. **Supervisor/SubAgents パターン**：LLM 主導の動的制御
@@ -30,19 +33,19 @@ LangChain4j v1.9.0 以降の Agentic AI API は、複数の実装パターン・
 
 **制約・仮定**：
 
-- LangChain4j バージョン：v1.9.0 以降
+- LangChain4j バージョン：v1.9.1 以降
 - 検証方法：GitHub リポジトリのサンプルコード・ドキュメント確認、PoC 実装
 
 ## Success Metrics
 
-- メトリック 1：`LangChain4j v1.9.0 以降の Agentic AI API が、プロジェクト要件（FR-hjz63/FR-mcncb/FR-cccz4/FR-2ff4z/FR-uu07e）に対応可能か確認される`
+- メトリック 1：`LangChain4j v1.9.1 以降の Agentic AI API が、プロジェクト要件（FR-hjz63/FR-mcncb/FR-cccz4/FR-2ff4z/FR-uu07e）に対応可能か確認される`
 - メトリック 2：`Workflow・Supervisor/SubAgents・Custom Agentic Patterns の各パターンが、技術的に実装可能か検証される`
 - メトリック 3：`LangChain4j のエラーハンドリング・リトライ機構が、プロジェクトのセキュリティ・信頼性要件に対応可能か確認される`
 - メトリック 4：`検証結果に基づき、[ADR-q333d Agentic パターンの選択基準](ADR-q333d-agentic-pattern-selection.md)・[ADR-ehfcj スキル実行エンジン設計](ADR-ehfcj-skill-execution-engine.md) の設計決定に反映される`
 
 ## Decision
 
-本 ADR では、LangChain4j v1.8 以降が提供する Agentic AI API（Workflow API, AgenticScope, Tool Execution Engine, Error Handling 等）を本プロジェクトの標準エージェント基盤として採用することを決定する。
+本 ADR では、LangChain4j v1.9.1 以降が提供する Agentic AI API（Workflow API, AgenticScope, Tool Execution Engine, Error Handling 等）を本プロジェクトの標準エージェント基盤として採用することを決定する。
 
 そのうえで、FR-mcncb/FR-cccz4/FR-2ff4z および AN-f545x で定義された要求を満たせるかを PoC ベースで検証し、結果を [ADR-q333d Agentic パターンの選択基準](ADR-q333d-agentic-pattern-selection.md) および [ADR-ehfcj スキル実行エンジン設計](ADR-ehfcj-skill-execution-engine.md) に反映する。
 
@@ -145,7 +148,7 @@ LangChain4j v1.9.0 以降の Agentic AI API は、複数の実装パターン・
 
 ## Rationale
 
-LangChain4j v1.9.0 以降の Agentic AI API は、プロジェクト要件（複数スキル実行、Context Engineering、Observability など）を満たす可能性が高い。以下の理由で、詳細な技術検証を重視：
+LangChain4j v1.9.1 以降の Agentic AI API は、プロジェクト要件（複数スキル実行、Context Engineering、Observability など）を満たす可能性が高い。以下の理由で、詳細な技術検証を重視：
 
 1. **フレームワーク選択の妥当性確認**
    - Workflow・Supervisor/SubAgents の実装成熟度
@@ -170,7 +173,7 @@ LangChain4j v1.9.0 以降の Agentic AI API は、プロジェクト要件（複
 ### Negative
 
 - LangChain4j フレームワークへの強い依存（他フレームワークへの移行困難）
-- API 仕様変更（v1.8 → v2.0 など）への追従必要性
+- API 仕様変更（v1.9.1 → v2.0 など）への追従必要性
 - 検証期間による初期開発スケジュール延長の可能性
 
 また、本 ADR により「LangChain4j Agentic AI を採用しない」という選択肢は、LangChain4j 側の仕様上の制約や重大な不具合が PoC により確認された場合にのみ再検討することとし、現時点では他フレームワークや自前オーケストレーターを第一候補とはしない。
@@ -327,7 +330,7 @@ LangChain4j v1.9.0 以降の Agentic AI API は、プロジェクト要件（複
 
 ## Platform Considerations
 
-- **LangChain4j バージョン管理**：v1.9.0 以降の変更ノートを継続監視
+- **LangChain4j バージョン管理**：v1.9.1 以降の変更ノートを継続監視
 - **互換性テスト**：定期的に最新 LangChain4j バージョンでの互換性を確認
 
 ## Security & Privacy
