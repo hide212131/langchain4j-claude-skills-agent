@@ -66,10 +66,10 @@ As a LangChain4j ユーザー, I want SKILL.md で定義した簡易スキルを
 
 ## Risks & Mitigation
 
-| Risk | Impact | Likelihood | Mitigation | Validation |
-| --- | --- | --- | --- | --- |
-| スキル定義のバリデーション漏れ | Medium | Medium | JSON Schema と型安全な POJO を併用し、必須項目を検証 | パース単体テストで例外を確認 |
-| LLM 依存による結果不安定 | Medium | Medium | システムプロンプト固定化とテストスキルで決定論的な入力を用意 | LLM への同条件リクエストで安定性を測定 |
+| Risk                           | Impact | Likelihood | Mitigation                                                   | Validation                             |
+| ------------------------------ | ------ | ---------- | ------------------------------------------------------------ | -------------------------------------- |
+| スキル定義のバリデーション漏れ | Medium | Medium     | JSON Schema と型安全な POJO を併用し、必須項目を検証         | パース単体テストで例外を確認           |
+| LLM 依存による結果不安定       | Medium | Medium     | システムプロンプト固定化とテストスキルで決定論的な入力を用意 | LLM への同条件リクエストで安定性を測定 |
 
 ## Implementation Notes
 
@@ -84,4 +84,4 @@ As a LangChain4j ユーザー, I want SKILL.md で定義した簡易スキルを
 
 ## Template Usage
 
-For detailed instructions, see [Template Usage Instructions](README.md#individual-requirement-template-requirementsmd) in the templates README.
+For detailed instructions, see [Template Usage Instructions](../templates/README.md#individual-requirement-template-requirementsmd) in the templates README.

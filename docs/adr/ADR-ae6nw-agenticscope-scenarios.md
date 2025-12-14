@@ -126,7 +126,8 @@ LangChain4j の `AgenticScope` は、エージェント間の情報共有（メ�
 
 3. **Observability 統合の容易性**
    - 実行履歴・メトリクス・プロンプト内容を AgenticScope に集約
-  - Observability フレームワーク（NFR-30zem）がスコープから直接参照可能
+
+- Observability フレームワーク（NFR-30zem）がスコープから直接参照可能
 
 4. **段階的な拡張（Phase 2 対応）**
    - Phase 1 の単一スコープ設計は Phase 2 での多階層スコープへの移行が容易

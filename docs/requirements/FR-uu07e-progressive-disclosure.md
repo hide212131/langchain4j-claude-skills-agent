@@ -67,10 +67,10 @@ As a サーバサイド開発者, I want スキル情報を必要なタイミン
 
 ## Risks & Mitigation
 
-| Risk | Impact | Likelihood | Mitigation | Validation |
-| --- | --- | --- | --- | --- |
-| 遅延ロードによる情報不足 | Medium | Medium | レベル間のフォールバックと再実行パスを用意 | 可視化ログとテストで精度を確認 |
-| 実装複雑度の増加 | Medium | Medium | レイヤー分離し、インターフェースを明確化 | 単体・統合テストで責務分離を検証 |
+| Risk                     | Impact | Likelihood | Mitigation                                 | Validation                       |
+| ------------------------ | ------ | ---------- | ------------------------------------------ | -------------------------------- |
+| 遅延ロードによる情報不足 | Medium | Medium     | レベル間のフォールバックと再実行パスを用意 | 可視化ログとテストで精度を確認   |
+| 実装複雑度の増加         | Medium | Medium     | レイヤー分離し、インターフェースを明確化   | 単体・統合テストで責務分離を検証 |
 
 ## Implementation Notes
 
@@ -85,4 +85,4 @@ As a サーバサイド開発者, I want スキル情報を必要なタイミン
 
 ## Template Usage
 
-For detailed instructions, see [Template Usage Instructions](README.md#individual-requirement-template-requirementsmd) in the templates README.
+For detailed instructions, see [Template Usage Instructions](../templates/README.md#individual-requirement-template-requirementsmd) in the templates README.

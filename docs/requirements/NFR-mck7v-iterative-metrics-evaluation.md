@@ -58,9 +58,9 @@ The system shall プロンプト/実行パラメータの効果を定量比較�
 
 ## Risks & Mitigation
 
-| Risk | Impact | Likelihood | Mitigation | Validation |
-| --- | --- | --- | --- | --- |
-| メトリクスの信頼性不足 | Medium | Medium | 計測手順を標準化し、テストデータで基準値を設定 | 定期的なベンチマークでドリフトを検知 |
+| Risk                   | Impact | Likelihood | Mitigation                                     | Validation                           |
+| ---------------------- | ------ | ---------- | ---------------------------------------------- | ------------------------------------ |
+| メトリクスの信頼性不足 | Medium | Medium     | 計測手順を標準化し、テストデータで基準値を設定 | 定期的なベンチマークでドリフトを検知 |
 
 ## Implementation Notes
 
@@ -75,4 +75,4 @@ The system shall プロンプト/実行パラメータの効果を定量比較�
 
 ## Template Usage
 
-For detailed instructions, see [Template Usage Instructions](README.md#individual-requirement-template-requirementsmd) in the templates README.
+For detailed instructions, see [Template Usage Instructions](../templates/README.md#individual-requirement-template-requirementsmd) in the templates README.

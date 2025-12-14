@@ -59,9 +59,9 @@ The system shall スキル検証と監査ログを提供する, to ensure トラ
 
 ## Risks & Mitigation
 
-| Risk | Impact | Likelihood | Mitigation | Validation |
-| --- | --- | --- | --- | --- |
-| 監査ログの欠落や不整合 | High | Medium | ライフサイクルごとに必須フィールドを定義し、失敗時はフェイルクローズ | トレース整合性テストを実施 |
+| Risk                   | Impact | Likelihood | Mitigation                                                           | Validation                 |
+| ---------------------- | ------ | ---------- | -------------------------------------------------------------------- | -------------------------- |
+| 監査ログの欠落や不整合 | High   | Medium     | ライフサイクルごとに必須フィールドを定義し、失敗時はフェイルクローズ | トレース整合性テストを実施 |
 
 ## Implementation Notes
 
@@ -76,4 +76,4 @@ The system shall スキル検証と監査ログを提供する, to ensure トラ
 
 ## Template Usage
 
-For detailed instructions, see [Template Usage Instructions](README.md#individual-requirement-template-requirementsmd) in the templates README.
+For detailed instructions, see [Template Usage Instructions](../templates/README.md#individual-requirement-template-requirementsmd) in the templates README.

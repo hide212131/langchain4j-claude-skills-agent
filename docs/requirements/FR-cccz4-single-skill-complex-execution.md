@@ -67,10 +67,10 @@ As a Java エージェント利用者, I want 条件分岐や外部リソース�
 
 ## Risks & Mitigation
 
-| Risk | Impact | Likelihood | Mitigation | Validation |
-| --- | --- | --- | --- | --- |
-| スクリプト実行によるセキュリティリスク | High | Medium | NFR-kc6k1, NFR-3gjla に準拠したサンドボックス化・クォータ管理を適用 | 侵入テストとリソース上限制御テストで確認 |
-| バイナリ出力の整合性不足 | Medium | Medium | テストデータでハッシュ検証やスナップショット比較を実施 | E2E テストで成果物を検証 |
+| Risk                                   | Impact | Likelihood | Mitigation                                                          | Validation                               |
+| -------------------------------------- | ------ | ---------- | ------------------------------------------------------------------- | ---------------------------------------- |
+| スクリプト実行によるセキュリティリスク | High   | Medium     | NFR-kc6k1, NFR-3gjla に準拠したサンドボックス化・クォータ管理を適用 | 侵入テストとリソース上限制御テストで確認 |
+| バイナリ出力の整合性不足               | Medium | Medium     | テストデータでハッシュ検証やスナップショット比較を実施              | E2E テストで成果物を検証                 |
 
 ## Implementation Notes
 
@@ -85,4 +85,4 @@ As a Java エージェント利用者, I want 条件分岐や外部リソース�
 
 ## Template Usage
 
-For detailed instructions, see [Template Usage Instructions](README.md#individual-requirement-template-requirementsmd) in the templates README.
+For detailed instructions, see [Template Usage Instructions](../templates/README.md#individual-requirement-template-requirementsmd) in the templates README.

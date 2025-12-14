@@ -13,7 +13,7 @@
 - Dependent Requirements:
   - [NFR-mck7v 漸進的開発・評価サイクル支援](../requirements/NFR-mck7v-iterative-metrics-evaluation.md)
 - Related Tasks:
-  - N/A – タスクは要件承認後に作成
+  - [T-7k08g プロンプト・エージェント可視化タスク](../tasks/T-7k08g-prompt-visibility/README.md)
 
 ## Requirement Statement
 
@@ -59,10 +59,10 @@ The system shall LangFuse と Azure Application Insights を使った観測を�
 
 ## Risks & Mitigation
 
-| Risk | Impact | Likelihood | Mitigation | Validation |
-| --- | --- | --- | --- | --- |
-| 環境差異による計測ギャップ | Medium | Medium | 送信スキーマとメトリクス名を統一し、変換レイヤーを実装 | 両環境で同一トレースを比較検証 |
-| 観測コストの増加 | Medium | Medium | サンプリングやログレベルを環境別に設定 | コストモニタリングで調整 |
+| Risk                       | Impact | Likelihood | Mitigation                                             | Validation                     |
+| -------------------------- | ------ | ---------- | ------------------------------------------------------ | ------------------------------ |
+| 環境差異による計測ギャップ | Medium | Medium     | 送信スキーマとメトリクス名を統一し、変換レイヤーを実装 | 両環境で同一トレースを比較検証 |
+| 観測コストの増加           | Medium | Medium     | サンプリングやログレベルを環境別に設定                 | コストモニタリングで調整       |
 
 ## Implementation Notes
 
@@ -77,4 +77,4 @@ The system shall LangFuse と Azure Application Insights を使った観測を�
 
 ## Template Usage
 
-For detailed instructions, see [Template Usage Instructions](README.md#individual-requirement-template-requirementsmd) in the templates README.
+For detailed instructions, see [Template Usage Instructions](../templates/README.md#individual-requirement-template-requirementsmd) in the templates README.
