@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.hide212131.langchain4j.claude.skills.runtime.VisibilityLog;
 import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
@@ -78,6 +79,54 @@ class SkillsCliAppTest {
         assertThat(err.toString(StandardCharsets.UTF_8)).isBlank();
     }
 
+    @Test
+    @DisplayName("Plan/Act/Reflect の e2e 実行でログと成果物を確認できる")
+    void runE2eFlowWithLogging() {
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        ByteArrayOutputStream logs = new ByteArrayOutputStream();
+
+        Logger logger = Logger.getLogger(SkillsCliApp.class.getName());
+        Handler handler = attachHandler(logger, logs);
+        Level originalLevel = logger.getLevel();
+        boolean originalUseParent = logger.getUseParentHandlers();
+        logger.setUseParentHandlers(false);
+        logger.setLevel(Level.ALL);
+        handler.setLevel(Level.ALL);
+        logger.addHandler(handler);
+
+        try {
+            int exit = SkillsCliApp.run(
+                    new String[] {
+                        "--skill", "src/test/resources/skills/e2e/SKILL.md",
+                        "--goal", "e2e goal",
+                        "--visibility-level", "basic"
+                    },
+                    new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                    new PrintStream(stderr, true, StandardCharsets.UTF_8));
+
+            assertThat(exit).isZero();
+            assertThat(stdout.toString(StandardCharsets.UTF_8))
+                    .contains("Plan:")
+                    .contains("Act:")
+                    .contains("Reflect:")
+                    .contains("Goal: e2e goal")
+                    .contains("Skill: e2e-skill");
+            assertThat(logs.toString(StandardCharsets.UTF_8))
+                    .contains("phase=plan")
+                    .contains("phase=act")
+                    .contains("phase=reflect")
+                    .contains("skill=e2e-skill")
+                    .contains("run=");
+            assertThat(stderr.toString(StandardCharsets.UTF_8)).isBlank();
+        } finally {
+            logger.removeHandler(handler);
+            logger.setUseParentHandlers(originalUseParent);
+            logger.setLevel(originalLevel);
+            handler.close();
+        }
+    }
+
     private Logger newLogger(ByteArrayOutputStream out) {
         Logger log = Logger.getLogger("test-log-" + UUID.randomUUID());
         log.setUseParentHandlers(false);
@@ -92,5 +141,17 @@ class SkillsCliAppTest {
         handler.setLevel(Level.ALL);
         log.addHandler(handler);
         return log;
+    }
+
+    private Handler attachHandler(Logger logger, ByteArrayOutputStream out) {
+        Handler handler = new StreamHandler(out, new SimpleFormatter()) {
+            @Override
+            public synchronized void publish(LogRecord record) {
+                super.publish(record);
+                flush();
+            }
+        };
+        handler.setLevel(Level.ALL);
+        return handler;
     }
 }

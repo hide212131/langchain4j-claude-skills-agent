@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Implementation Plan
-- Status: Phase 2 In Progress
+- Status: Complete
   <!-- Draft: Planning complete, awaiting start | Phase X In Progress: Actively working | Cancelled: Work intentionally halted before completion | Complete: All phases done and verified -->
 
 ## Links
@@ -19,10 +19,10 @@ SKILL.md パース、ダミー LLM を用いた最小 Plan/Act/Reflect スタブ
 
 ## Success Metrics
 
-- [ ] サンプル SKILL.md を使った e2e 実行で固定テキストが得られる。
-- [ ] Plan/Act/Reflect 各ステップで可視化プレースホルダログが出力される。
-- [ ] 例外時に日本語ログとリトライ枠組みが動作する。
-- [ ] `./gradlew check/test/build` が成功。
+- [x] サンプル SKILL.md を使った e2e 実行で固定テキストが得られる。
+- [x] Plan/Act/Reflect 各ステップで可視化プレースホルダログが出力される。
+- [x] 例外時に日本語ログとリトライ枠組みが動作する。
+- [x] `./gradlew check/test/build` が成功。
 
 ## Scope
 
@@ -149,9 +149,9 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 
 ### Phase 3 Tasks
 
-- [ ] テスト用 SKILL.md を `src/test/resources/skills/` に追加
-- [ ] e2e テストで Plan/Act/Reflect と可視化ログを検証
-- [ ] CLI/Run タスクの引数処理を整備
+- [x] テスト用 SKILL.md を `src/test/resources/skills/` に追加
+- [x] e2e テストで Plan/Act/Reflect と可視化ログを検証
+- [x] CLI/Run タスクの引数処理を整備
 
 ### Phase 3 Deliverables
 
@@ -174,16 +174,16 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 
 ## Definition of Done
 
-- [ ] `./gradlew check`
-- [ ] `./gradlew test`
-- [ ] `./gradlew build`
-- [ ] 実行手順を README に追記
-- [ ] 日本語ログとリトライ枠組みが動作
+- [x] `./gradlew check`
+- [x] `./gradlew test`
+- [x] `./gradlew build`
+- [x] 実行手順を README に追記
+- [x] 日本語ログとリトライ枠組みが動作
 
 ## Open Questions
 
-- [ ] Workflow 型と Pure Agent 型のどちらを最小実装とするか。
-- [ ] ログレベルと終了コードのデフォルト値。
-- [ ] 可視化プレースホルダのフィールド拡張タイミング（T-7k08g との境界）。
+- [x] Workflow 型と Pure Agent 型のどちらを最小実装とするか。→ Workflow 型で固定（明示制御と決定論性を優先）。
+- [x] ログレベルと終了コードのデフォルト値。→ 可視化は basic/off、ログレベルは info/warn/error、終了コードは 0/2(parse)/3(exec) を採用。
+- [x] 可視化プレースホルダのフィールド拡張タイミング（T-7k08g との境界）。→ 現行フィールドセットを維持し、拡張は T-7k08g のスコープで検討。
 
 <!-- Complex investigations should spin out into their own ADR or analysis document -->
