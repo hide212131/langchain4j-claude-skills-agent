@@ -1,6 +1,14 @@
 # macOS
 .DS_Store
 
+# Gradle caches and build outputs
+.gradle/
+.gradle-home/
+**/build/
+/target
+/release
+/coverage
+
 # Java artifacts
 *.class
 *.log
@@ -20,6 +28,9 @@ replay_pid*
 /release
 /coverage
 
+# BlueJ files
+*.ctxt
+
 # Node/TDL tooling
 node_modules/
 benchmarks/results/
@@ -34,3 +45,16 @@ docs/traceability.md
 
 # Reference materials - external sources (not tracked, local-use only)
 docs/reference/external-materials/
+
+# Keep Gradle wrapper bootstrapping artifacts under version control
+!gradle/wrapper/gradle-wrapper.jar
+
+# Secrets / direnv
+.envrc
+.env
+
+# Local export of anthropics/skills (managed via `./gradlew updateSkills`)
+/skills/
+
+# Local runtime environments
+/env/

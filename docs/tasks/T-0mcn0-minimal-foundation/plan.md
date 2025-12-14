@@ -67,12 +67,12 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 
 ### Tasks
 
-- [ ] **パーサ**
-  - [ ] YAML frontmatter + 本文を読み取り POJO 化（必須項目のみ）
-  - [ ] エラー時の日本語メッセージ
-- [ ] **ダミー LLM フロー**
-  - [ ] 固定レスポンス LLM モック
-  - [ ] Plan/Act/Reflect スタブで入出力を通す
+- [x] **パーサ**
+  - [x] YAML frontmatter + 本文を読み取り POJO 化（必須項目のみ）
+  - [x] エラー時の日本語メッセージ
+- [x] **ダミー LLM フロー**
+  - [x] 固定レスポンス LLM モック
+  - [x] Plan/Act/Reflect スタブで入出力を通す
 
 ### Deliverables
 
