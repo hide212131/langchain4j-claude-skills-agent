@@ -80,6 +80,13 @@ graph LR
 
 Tasks may occasionally be introduced directly at the task phase without an upstream analysis, requirement, or ADR document. Treat these as ad hoc work: keep their scope documented in the task README and rely on `bun scripts/trace-status.ts` to flag the missing upstream links until the upstream document is authored or the task is completed.
 
+## Working Branch Management (All Tasks)
+
+- Naming: `feature/<taskId>-phase<index>`. Create at phase start and keep it until that phase completes.
+- Base branch: Derive from the repository’s primary integration branch (e.g., `main`/`develop`); keep it in sync via rebase/merge as needed during the phase.
+- Progress control: Use phase checkboxes and approvals as gates; do not proceed to the next phase without explicit approval.
+- Parallel work: When parallelizing tasks/phases, keep the naming consistent to avoid collisions; if using git-worktree, see `docs/parallel-development.md`.
+
 ## Parallel Development Support
 
 This project supports parallel development using git-worktree with unique IDs to prevent conflicts.
