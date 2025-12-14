@@ -1,6 +1,11 @@
 package io.github.hide212131.langchain4j.claude.skills.app;
 
-import io.github.hide212131.langchain4j.claude.skills.runtime.DummyAgentFlow;
+import io.github.hide212131.langchain4j.claude.skills.runtime.AgentFlow;
+import io.github.hide212131.langchain4j.claude.skills.runtime.AgentFlow.AgentFlowResult;
+import io.github.hide212131.langchain4j.claude.skills.runtime.AgentFlowFactory;
+import io.github.hide212131.langchain4j.claude.skills.runtime.LlmConfiguration;
+import io.github.hide212131.langchain4j.claude.skills.runtime.LlmConfigurationLoader;
+import io.github.hide212131.langchain4j.claude.skills.runtime.LlmProvider;
 import io.github.hide212131.langchain4j.claude.skills.runtime.SkillDocument;
 import io.github.hide212131.langchain4j.claude.skills.runtime.SkillDocumentParser;
 import io.github.hide212131.langchain4j.claude.skills.runtime.VisibilityLevel;
@@ -21,15 +26,16 @@ import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Spec;
 
-/** 最小構成の CLI。SKILL.md をパースし、ダミー Plan/Act/Reflect フローを実行する。 */
+/** 最小構成の CLI。SKILL.md をパースし、Plan/Act/Reflect フローを実行する。 */
 @Command(
     name = "skills",
-    description = "SKILL.md を読み込みダミー Plan/Act/Reflect を実行します。",
+    description = "SKILL.md を読み込み Plan/Act/Reflect を実行します。",
     mixinStandardHelpOptions = true)
 public final class SkillsCliApp implements Callable<Integer> {
 
   private static final int EXIT_PARSE_ERROR = 2;
   private static final int EXIT_EXECUTION_ERROR = 3;
+  private static final int EXIT_CONFIGURATION_ERROR = 4;
 
   @Spec CommandSpec spec;
 
@@ -54,6 +60,13 @@ public final class SkillsCliApp implements Callable<Integer> {
       converter = VisibilityLevelConverter.class)
   VisibilityLevel visibilityLevel = VisibilityLevel.BASIC;
 
+  @Option(
+      names = "--llm-provider",
+      paramLabel = "PROVIDER",
+      description = "LLM プロバイダ (mock|openai)。未指定時は環境変数/ .env を参照します。",
+      converter = LlmProviderConverter.class)
+  LlmProvider llmProvider;
+
   public static void main(String[] args) {
     int exitCode = new CommandLine(new SkillsCliApp()).execute(args);
     if (exitCode != 0) {
@@ -76,7 +89,14 @@ public final class SkillsCliApp implements Callable<Integer> {
     SkillDocumentParser parser = new SkillDocumentParser();
 
     log.info(
-        basic, runId, "-", "parse", "parse.skill", "SKILL.md を読み込みます", "path=" + skillPath, "");
+        basic,
+        runId,
+        "-",
+        "parse",
+        "parse.skill",
+        "SKILL.md を読み込みます",
+        "path=" + skillPath,
+        "");
 
     SkillDocument document;
     try {
@@ -89,12 +109,25 @@ public final class SkillsCliApp implements Callable<Integer> {
       return EXIT_PARSE_ERROR;
     }
 
-    DummyAgentFlow flow = new DummyAgentFlow();
-    Supplier<DummyAgentFlow.Result> action =
+    LlmConfiguration configuration;
+    try {
+      configuration = new LlmConfigurationLoader().load(llmProvider);
+    } catch (RuntimeException ex) {
+      log.error(runId, document.id(), "error", "config.load", "LLM 設定の読み込みに失敗しました", "", "", ex);
+      spec.commandLine()
+          .getErr()
+          .println("LLM 設定の読み込みに失敗しました: " + ex.getMessage());
+      spec.commandLine().getErr().flush();
+      return EXIT_CONFIGURATION_ERROR;
+    }
+
+    AgentFlowFactory factory = new AgentFlowFactory(configuration);
+    AgentFlow flow = factory.create();
+    Supplier<AgentFlowResult> action =
         () -> flow.run(document, goal == null ? "" : goal, log, basic, runId);
 
     try {
-      DummyAgentFlow.Result result = executeWithRetry(action, log, basic, runId, document.id());
+      AgentFlowResult result = executeWithRetry(action, log, basic, runId, document.id());
       spec.commandLine().getOut().println(result.formatted());
       spec.commandLine().getOut().flush();
       return CommandLine.ExitCode.OK;
@@ -129,6 +162,14 @@ public final class SkillsCliApp implements Callable<Integer> {
     @Override
     public VisibilityLevel convert(String value) {
       return VisibilityLevel.parse(value);
+    }
+  }
+
+  private static final class LlmProviderConverter implements ITypeConverter<LlmProvider> {
+
+    @Override
+    public LlmProvider convert(String value) {
+      return LlmProvider.from(value);
     }
   }
 }

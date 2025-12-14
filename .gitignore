@@ -50,7 +50,6 @@ docs/reference/external-materials/
 !gradle/wrapper/gradle-wrapper.jar
 
 # Secrets / direnv
-.envrc
 .env
 
 # Local export of anthropics/skills (managed via `./gradlew updateSkills`)

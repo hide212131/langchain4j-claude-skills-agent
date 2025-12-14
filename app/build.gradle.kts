@@ -20,6 +20,7 @@ repositories {
 dependencies {
     implementation("org.yaml:snakeyaml:2.2")
     implementation("info.picocli:picocli:4.7.6")
+    implementation("io.github.cdimascio:dotenv-java:3.2.0")
 
     testImplementation(platform("org.junit:junit-bom:5.10.1"))
     testImplementation("org.junit.jupiter:junit-jupiter")

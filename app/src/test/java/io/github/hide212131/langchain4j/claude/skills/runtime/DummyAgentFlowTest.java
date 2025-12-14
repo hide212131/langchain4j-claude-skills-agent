@@ -2,6 +2,7 @@ package io.github.hide212131.langchain4j.claude.skills.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.hide212131.langchain4j.claude.skills.runtime.AgentFlow.AgentFlowResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -13,7 +14,7 @@ class DummyAgentFlowTest {
     SkillDocument document = new SkillDocument("sample", "Sample", "Desc", "Body content");
     DummyAgentFlow flow = new DummyAgentFlow();
 
-    DummyAgentFlow.Result result = flow.run(document, "demo goal");
+    AgentFlowResult result = flow.run(document, "demo goal");
 
     assertThat(result.planLog()).contains("demo goal");
     assertThat(result.actLog()).contains("Sample");
