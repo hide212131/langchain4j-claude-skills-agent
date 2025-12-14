@@ -35,7 +35,8 @@
   - [ADR-mpiub Context Engineering 実装方針（Progressive Disclosure）](../adr/ADR-mpiub-context-engineering-strategy.md)
   - [ADR-q333d Agentic パターンの選択基準](../adr/ADR-q333d-agentic-pattern-selection.md)
 - Related Tasks:
-  - N/A – タスク作成は要件承認後に実施
+  - [T-0mcn0 最小実行基盤タスク](../tasks/T-0mcn0-minimal-foundation/README.md)
+  - [T-7k08g プロンプト・エージェント可視化タスク](../tasks/T-7k08g-prompt-visibility/README.md)
 
 ## Executive Summary
 

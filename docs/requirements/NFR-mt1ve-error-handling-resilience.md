@@ -13,7 +13,7 @@
 - Dependent Requirements:
   - N/A – 後続要件なし
 - Related Tasks:
-  - N/A – タスクは要件承認後に作成
+  - [T-0mcn0 最小実行基盤タスク](../tasks/T-0mcn0-minimal-foundation/README.md)
 
 ## Requirement Statement
 
@@ -58,9 +58,9 @@ The system shall エラーを検知・記録し安全にリカバリできる, t
 
 ## Risks & Mitigation
 
-| Risk | Impact | Likelihood | Mitigation | Validation |
-| --- | --- | --- | --- | --- |
-| リトライ暴走による負荷増大 | Medium | Medium | 再試行回数・タイムアウト・サーキットブレーカーを設定 | 耐久テストでしきい値を検証 |
+| Risk                       | Impact | Likelihood | Mitigation                                           | Validation                 |
+| -------------------------- | ------ | ---------- | ---------------------------------------------------- | -------------------------- |
+| リトライ暴走による負荷増大 | Medium | Medium     | 再試行回数・タイムアウト・サーキットブレーカーを設定 | 耐久テストでしきい値を検証 |
 
 ## Implementation Notes
 
@@ -75,4 +75,4 @@ The system shall エラーを検知・記録し安全にリカバリできる, t
 
 ## Template Usage
 
-For detailed instructions, see [Template Usage Instructions](README.md#individual-requirement-template-requirementsmd) in the templates README.
+For detailed instructions, see [Template Usage Instructions](../templates/README.md#individual-requirement-template-requirementsmd) in the templates README.

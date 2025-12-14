@@ -58,9 +58,9 @@ The system shall コンテキスト最適化を適用し効率を計測できる
 
 ## Risks & Mitigation
 
-| Risk | Impact | Likelihood | Mitigation | Validation |
-| --- | --- | --- | --- | --- |
-| 測定不足による最適化効果不明 | Medium | Medium | 計測ポイントと指標をテンプレート化 | 観測データの定期レビューを実施 |
+| Risk                         | Impact | Likelihood | Mitigation                         | Validation                     |
+| ---------------------------- | ------ | ---------- | ---------------------------------- | ------------------------------ |
+| 測定不足による最適化効果不明 | Medium | Medium     | 計測ポイントと指標をテンプレート化 | 観測データの定期レビューを実施 |
 
 ## Implementation Notes
 
@@ -75,4 +75,4 @@ The system shall コンテキスト最適化を適用し効率を計測できる
 
 ## Template Usage
 
-For detailed instructions, see [Template Usage Instructions](README.md#individual-requirement-template-requirementsmd) in the templates README.
+For detailed instructions, see [Template Usage Instructions](../templates/README.md#individual-requirement-template-requirementsmd) in the templates README.

@@ -59,10 +59,10 @@ The system shall スキル実行を許可リストとサンドボックスで制
 
 ## Risks & Mitigation
 
-| Risk | Impact | Likelihood | Mitigation | Validation |
-| --- | --- | --- | --- | --- |
-| サンドボックス不備による侵害 | High | Medium | セキュリティレビューと侵入テストを実施し、最小権限原則を適用 | 脆弱性スキャンと侵入テストで確認 |
-| 過剰制限による機能阻害 | Medium | Medium | フェーズ別に権限を段階導入し、必要な権限のみ許可 | 検証スキルで機能と安全性を両面確認 |
+| Risk                         | Impact | Likelihood | Mitigation                                                   | Validation                         |
+| ---------------------------- | ------ | ---------- | ------------------------------------------------------------ | ---------------------------------- |
+| サンドボックス不備による侵害 | High   | Medium     | セキュリティレビューと侵入テストを実施し、最小権限原則を適用 | 脆弱性スキャンと侵入テストで確認   |
+| 過剰制限による機能阻害       | Medium | Medium     | フェーズ別に権限を段階導入し、必要な権限のみ許可             | 検証スキルで機能と安全性を両面確認 |
 
 ## Implementation Notes
 
@@ -77,4 +77,4 @@ The system shall スキル実行を許可リストとサンドボックスで制
 
 ## Template Usage
 
-For detailed instructions, see [Template Usage Instructions](README.md#individual-requirement-template-requirementsmd) in the templates README.
+For detailed instructions, see [Template Usage Instructions](../templates/README.md#individual-requirement-template-requirementsmd) in the templates README.

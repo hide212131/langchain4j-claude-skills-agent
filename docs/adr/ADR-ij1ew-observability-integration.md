@@ -17,6 +17,9 @@
 - Impacted Requirements:
   - [NFR-30zem Observability 統合](../requirements/NFR-30zem-observability-integration.md)
   - [NFR-mck7v 漸進的開発・評価サイクル支援](../requirements/NFR-mck7v-iterative-metrics-evaluation.md)
+- Related Tasks:
+  - [T-0mcn0 最小実行基盤タスク](../tasks/T-0mcn0-minimal-foundation/README.md)
+  - [T-7k08g プロンプト・エージェント可視化タスク](../tasks/T-7k08g-prompt-visibility/README.md)
 
 ## Context
 

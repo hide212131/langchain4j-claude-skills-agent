@@ -66,10 +66,10 @@ As a Java エージェント利用者, I want 目的に合うスキルを自動�
 
 ## Risks & Mitigation
 
-| Risk | Impact | Likelihood | Mitigation | Validation |
-| --- | --- | --- | --- | --- |
-| スキル選択の誤りによる品質低下 | Medium | Medium | スキルメタデータの明確化と選択ロジックの評価指標を定義 | 可視化ログと評価メトリクスで選択結果を検証 |
-| コンテキスト肥大によるトークン超過 | Medium | Medium | FR-uu07e による Progressive Disclosure を適用 | トークン使用量の計測と比較テスト |
+| Risk                               | Impact | Likelihood | Mitigation                                             | Validation                                 |
+| ---------------------------------- | ------ | ---------- | ------------------------------------------------------ | ------------------------------------------ |
+| スキル選択の誤りによる品質低下     | Medium | Medium     | スキルメタデータの明確化と選択ロジックの評価指標を定義 | 可視化ログと評価メトリクスで選択結果を検証 |
+| コンテキスト肥大によるトークン超過 | Medium | Medium     | FR-uu07e による Progressive Disclosure を適用          | トークン使用量の計測と比較テスト           |
 
 ## Implementation Notes
 
@@ -84,4 +84,4 @@ As a Java エージェント利用者, I want 目的に合うスキルを自動�
 
 ## Template Usage
 
-For detailed instructions, see [Template Usage Instructions](README.md#individual-requirement-template-requirementsmd) in the templates README.
+For detailed instructions, see [Template Usage Instructions](../templates/README.md#individual-requirement-template-requirementsmd) in the templates README.

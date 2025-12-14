@@ -19,7 +19,8 @@
   - [FR-uu07e Progressive Disclosure 実装](../requirements/FR-uu07e-progressive-disclosure.md)
   - [NFR-30zem Observability 統合](../requirements/NFR-30zem-observability-integration.md)
 - Related Tasks:
-  - N/A – タスクは要件承認後に作成
+  - [T-0mcn0 最小実行基盤タスク](../tasks/T-0mcn0-minimal-foundation/README.md)
+  - [T-7k08g プロンプト・エージェント可視化タスク](../tasks/T-7k08g-prompt-visibility/README.md)
 
 ## Requirement Statement
 
@@ -71,10 +72,10 @@ As a Java エージェント開発者, I want プロンプトとエージェン�
 
 ## Risks & Mitigation
 
-| Risk | Impact | Likelihood | Mitigation | Validation |
-| --- | --- | --- | --- | --- |
-| ログ出力の機密情報露出 | High | Medium | マスキング・フィルタリングを実装し、収集範囲を最小化 | セキュリティレビューとテストデータで検証 |
-| 収集項目過多による性能劣化 | Medium | Medium | 収集レベルを設定可能にし、開発/本番で制御 | 負荷テストでオーバーヘッドを計測 |
+| Risk                       | Impact | Likelihood | Mitigation                                           | Validation                               |
+| -------------------------- | ------ | ---------- | ---------------------------------------------------- | ---------------------------------------- |
+| ログ出力の機密情報露出     | High   | Medium     | マスキング・フィルタリングを実装し、収集範囲を最小化 | セキュリティレビューとテストデータで検証 |
+| 収集項目過多による性能劣化 | Medium | Medium     | 収集レベルを設定可能にし、開発/本番で制御            | 負荷テストでオーバーヘッドを計測         |
 
 ## Implementation Notes
 
@@ -91,4 +92,4 @@ As a Java エージェント開発者, I want プロンプトとエージェン�
 
 ## Template Usage
 
-For detailed instructions, see [Template Usage Instructions](README.md#individual-requirement-template-requirementsmd) in the templates README.
+For detailed instructions, see [Template Usage Instructions](../templates/README.md#individual-requirement-template-requirementsmd) in the templates README.
