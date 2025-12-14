@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Functional Requirement
-- Status: Draft
+- Status: Approved
   <!-- Draft: Under discussion | Approved: Ready for implementation | Rejected: Decision made not to pursue this requirement -->
 
 ## Links
