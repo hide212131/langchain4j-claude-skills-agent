@@ -15,8 +15,8 @@
   - [ADR-5 AgenticScope の活用シナリオ](ADR-ae6nw-agenticscope-scenarios.md)
   - [ADR-q333d Agentic パターンの選択基準](ADR-q333d-agentic-pattern-selection.md)
 - Impacted Requirements:
-  - NFR-DRAFT-5（Observability 基盤の統合）
-  - NFR-DRAFT-6（漸進的開発・評価サイクル）
+  - [NFR-30zem Observability 統合](../requirements/NFR-30zem-observability-integration.md)
+  - [NFR-mck7v 漸進的開発・評価サイクル支援](../requirements/NFR-mck7v-iterative-metrics-evaluation.md)
 
 ## Context
 
@@ -370,7 +370,7 @@ public class Main {
 ## Monitoring & Logging
 
 - Observability データの主役はトレース／メトリクスとし、ログは最小限（初期化ログ、致命的エラー）に留める。
-- LangFuse 側ではプロンプト履歴・モデル比較、Azure 側では依存関係マップ・アラート（エラー率・レイテンシ）などを活用し、漸進的開発サイクル（NFR-DRAFT-6）の定量評価を行う。
+- LangFuse 側ではプロンプト履歴・モデル比較、Azure 側では依存関係マップ・アラート（エラー率・レイテンシ）などを活用し、漸進的開発サイクル（NFR-mck7v）の定量評価を行う。
 
 ## Open Questions
 

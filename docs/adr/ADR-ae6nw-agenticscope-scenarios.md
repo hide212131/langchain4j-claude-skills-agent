@@ -18,12 +18,12 @@
   - [ADR-4 スキル実行エンジン設計](ADR-ehfcj-skill-execution-engine.md)
 
 - Impacted Requirements:
-  - FR-DRAFT-1（単一スキル実行）
-  - FR-DRAFT-2（複雑手続きスキル実行）
-  - FR-DRAFT-3（複数スキル連鎖実行）
-  - FR-DRAFT-4（Progressive Disclosure 実装）
-  - NFR-DRAFT-1（Context Engineering 最適化）
-  - NFR-DRAFT-5（Observability 基盤の統合）
+  - [FR-mcncb 単一スキルの簡易実行](../requirements/FR-mcncb-single-skill-basic-execution.md)
+  - [FR-cccz4 単一スキルの複雑手続き実行](../requirements/FR-cccz4-single-skill-complex-execution.md)
+  - [FR-2ff4z 複数スキル連鎖実行](../requirements/FR-2ff4z-multi-skill-composition.md)
+  - [FR-uu07e Progressive Disclosure 実装](../requirements/FR-uu07e-progressive-disclosure.md)
+  - [NFR-kc6k1 Context Engineering 最適化](../requirements/NFR-kc6k1-context-engineering-optimization.md)
+  - [NFR-30zem Observability 統合](../requirements/NFR-30zem-observability-integration.md)
 
 ## Context
 
@@ -126,7 +126,7 @@ LangChain4j の `AgenticScope` は、エージェント間の情報共有（メ�
 
 3. **Observability 統合の容易性**
    - 実行履歴・メトリクス・プロンプト内容を AgenticScope に集約
-   - Observability フレームワーク（NFR-DRAFT-5）がスコープから直接参照可能
+  - Observability フレームワーク（NFR-30zem）がスコープから直接参照可能
 
 4. **段階的な拡張（Phase 2 対応）**
    - Phase 1 の単一スコープ設計は Phase 2 での多階層スコープへの移行が容易

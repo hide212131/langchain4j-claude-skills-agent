@@ -16,12 +16,12 @@
   - [ADR-ehfcj スキル実行エンジン設計](ADR-ehfcj-skill-execution-engine.md)
   - [ADR-38940 セキュリティ・リソース管理](ADR-38940-security-resource-management.md)
 - Impacted Requirements:
-  - FR-DRAFT-1（単一スキル実行）
-  - FR-DRAFT-2（複雑な手続きによるスキル実行）
-  - FR-DRAFT-3（複数スキル組み合わせ実行）
-  - FR-DRAFT-4（Progressive Disclosure 実装）
-  - NFR-DRAFT-3（セキュリティ・リソース管理）
-  - NFR-DRAFT-5（Observability 基盤の統合）
+  - [FR-mcncb 単一スキルの簡易実行](../requirements/FR-mcncb-single-skill-basic-execution.md)
+  - [FR-cccz4 単一スキルの複雑手続き実行](../requirements/FR-cccz4-single-skill-complex-execution.md)
+  - [FR-2ff4z 複数スキル連鎖実行](../requirements/FR-2ff4z-multi-skill-composition.md)
+  - [FR-uu07e Progressive Disclosure 実装](../requirements/FR-uu07e-progressive-disclosure.md)
+  - [NFR-3gjla セキュリティとリソース管理](../requirements/NFR-3gjla-security-resource-governance.md)
+  - [NFR-30zem Observability 統合](../requirements/NFR-30zem-observability-integration.md)
 
 ## Context
 
@@ -31,14 +31,14 @@
   - レベル 3：Python/Node/画像処理などローカル実行を伴うバイナリ生成
   - レベル 4：ビルドパイプライン・Playwright など複数ツール連携を伴う高度な実行
 - 現状の LangChain4j 実装では、セキュアな外部プロセス実行やヘビーな依存解決の準備が不十分。レベル 3/4 を一気に有効化するとリソース枯渇・セキュリティリスクが高い。
-- FR-DRAFT-2（複雑手続き）と FR-DRAFT-3（複数スキル）が扱う範囲が広く、実行環境の負荷と安全性を段階的に整える必要がある。
+- FR-cccz4（複雑手続き）と FR-2ff4z（複数スキル）が扱う範囲が広く、実行環境の負荷と安全性を段階的に整える必要がある。
 - 既存 ADR 群は実行エンジンやセキュリティ方針を定義しているが、どのスキルカテゴリをいつ解禁するかのロードマップは未定義。
 
 ## Success Metrics
 
 - メトリック 1：Phase 1/2（レベル 1～2）が依存追加なしで安定稼働し、テキスト・マルチファイル出力の E2E テスト成功率が 95% 以上。
 - メトリック 2：Phase 3 以降で外部プロセス実行をサンドボックス内に閉じ、CPU/メモリのクォータ超過による失敗率が 1% 未満。
-- メトリック 3：Observability（NFR-DRAFT-5）により、各レベルでのトークン消費・実行時間・エラー率がダッシュボードで可視化される。
+- メトリック 3：Observability（NFR-30zem）により、各レベルでのトークン消費・実行時間・エラー率がダッシュボードで可視化される。
 
 ## Decision
 
@@ -47,7 +47,7 @@ Claude Skills の実装難易度分類（レベル 1～4）を公式な導入フ
 ### Decision Drivers
 
 - リスク低減：外部実行を伴うレベル 3/4 を後段に送り、段階的に安全装備を追加する
-- トレーサビリティ：各フェーズの対象スキルと要件（FR-DRAFT-1～4、NFR-DRAFT-3/5）を明示し、進捗を可視化する
+- トレーサビリティ：各フェーズの対象スキルと要件（FR-mcncb/FR-cccz4/FR-2ff4z/FR-uu07e、NFR-3gjla/NFR-30zem）を明示し、進捗を可視化する
 - 実装効率：LangChain4j 側のコア改修を小さく保ち、依存導入とサンドボックス強化を順次進める
 
 ### Considered Options
@@ -60,13 +60,13 @@ Claude Skills の実装難易度分類（レベル 1～4）を公式な導入フ
 
 - Option A — Pros: 一度の設計で完結 / Cons: 依存爆増・安全性未整備で高リスク
 - Option B — Pros: リスクと依存を段階管理、フェーズごとに検証可能 / Cons: レベル 4 完了まで時間がかかる
-- Option C — Pros: 早期に安全な最小機能を提供 / Cons: FR-DRAFT-2/3 の達成が後ろ倒し、エンドユーザー価値が限定
+- Option C — Pros: 早期に安全な最小機能を提供 / Cons: FR-cccz4/FR-2ff4z の達成が後ろ倒し、エンドユーザー価値が限定
 
 ## Rationale
 
 - 参考資料の難易度分類が、必要なランタイム機能（ファイル I/O、外部プロセス、ブラウザ自動化）と直結しており、フェーズ設計の軸として妥当。
-- セキュリティ・リソース管理（NFR-DRAFT-3）を満たすには、外部プロセス・パッケージ導入をサンドボックスとクォータ付きで漸進導入するのが現実的。
-- Observability（NFR-DRAFT-5）をフェーズごとに敷設することで、FR-DRAFT-2/3 のトークンコスト・安定性を定量評価できる。
+- セキュリティ・リソース管理（NFR-3gjla）を満たすには、外部プロセス・パッケージ導入をサンドボックスとクォータ付きで漸進導入するのが現実的。
+- Observability（NFR-30zem）をフェーズごとに敷設することで、FR-cccz4/FR-2ff4z のトークンコスト・安定性を定量評価できる。
 
 ## Consequences
 
@@ -83,7 +83,7 @@ Claude Skills の実装難易度分類（レベル 1～4）を公式な導入フ
 
 ### Neutral
 
-- フェーズ分割により FR-DRAFT-2/3 のスコープを再分解する可能性がある（必要なら requirements で正式化）。
+- フェーズ分割により FR-cccz4/FR-2ff4z のスコープを再分解する可能性がある（必要なら requirements で正式化）。
 
 ## Implementation Notes
 
@@ -112,9 +112,9 @@ Claude Skills の実装難易度分類（レベル 1～4）を公式な導入フ
 
 ## Open Questions
 
-- [ ] レベル 3/4 のサンドボックスをどの技術（OS 制限 / コンテナ / seccomp）で実装するか → セキュリティ要件（NFR-DRAFT-3）を requirements で正式化の上、別 ADR で決定
+- [ ] レベル 3/4 のサンドボックスをどの技術（OS 制限 / コンテナ / seccomp）で実装するか → セキュリティ要件（NFR-3gjla）を requirements で正式化の上、別 ADR で決定
 - [ ] レベル 4 の npm install / Playwright ブラウザ取得をどのタイミングで行うか（キャッシュ戦略と CI 負荷） → ビルドパイプライン設計タスクで詰める
-- [ ] FR-DRAFT-2/3 の細分化が必要か（例：レベル 3.5 相当の段階を設けるか） → requirements フェーズで検討
+- [ ] FR-cccz4/FR-2ff4z の細分化が必要か（例：レベル 3.5 相当の段階を設けるか） → requirements フェーズで検討
 
 ## External References
 

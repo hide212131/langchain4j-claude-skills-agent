@@ -13,7 +13,7 @@
   - [ADR-3 Context Engineering 実装方針](ADR-mpiub-context-engineering-strategy.md)
   - [ADR-8 Observability 基盤の統合戦略](ADR-ij1ew-observability-integration.md)
 - Impacted Requirements:
-  - NFR-DRAFT-6（漸進的開発・評価サイクル）
+  - [NFR-mck7v 漸進的開発・評価サイクル支援](../requirements/NFR-mck7v-iterative-metrics-evaluation.md)
 
 ## Context
 

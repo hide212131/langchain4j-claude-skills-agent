@@ -13,9 +13,9 @@
   - [ADR-1 Agentic パターンの選択基準](ADR-q333d-agentic-pattern-selection.md)
   - [ADR-3 Context Engineering 実装方針](ADR-mpiub-context-engineering-strategy.md)
 - Impacted Requirements:
-  - FR-DRAFT-1（単一スキル実行）
-  - FR-DRAFT-2（複雑な手続きによるスキル実行）
-  - FR-DRAFT-3（複数スキル組み合わせ実行）
+  - [FR-mcncb 単一スキルの簡易実行](../requirements/FR-mcncb-single-skill-basic-execution.md)
+  - [FR-cccz4 単一スキルの複雑手続き実行](../requirements/FR-cccz4-single-skill-complex-execution.md)
+  - [FR-2ff4z 複数スキル連鎖実行](../requirements/FR-2ff4z-multi-skill-composition.md)
 
 ## Context
 

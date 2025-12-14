@@ -13,7 +13,9 @@
   - [ADR-q333d Agentic パターンの選択基準](ADR-q333d-agentic-pattern-selection.md)
   - [ADR-ehfcj スキル実行エンジン設計](ADR-ehfcj-skill-execution-engine.md)
 - Impacted Requirements:
-  - FR-DRAFT-1 ～ FR-DRAFT-3（全スキル実行要件）
+  - [FR-mcncb 単一スキルの簡易実行](../requirements/FR-mcncb-single-skill-basic-execution.md)
+  - [FR-cccz4 単一スキルの複雑手続き実行](../requirements/FR-cccz4-single-skill-complex-execution.md)
+  - [FR-2ff4z 複数スキル連鎖実行](../requirements/FR-2ff4z-multi-skill-composition.md)
 
 ## Context
 
@@ -33,7 +35,7 @@ LangChain4j v1.9.0 以降の Agentic AI API は、複数の実装パターン・
 
 ## Success Metrics
 
-- メトリック 1：`LangChain4j v1.9.0 以降の Agentic AI API が、プロジェクト要件（FR-DRAFT-1～4）に対応可能か確認される`
+- メトリック 1：`LangChain4j v1.9.0 以降の Agentic AI API が、プロジェクト要件（FR-hjz63/FR-mcncb/FR-cccz4/FR-2ff4z/FR-uu07e）に対応可能か確認される`
 - メトリック 2：`Workflow・Supervisor/SubAgents・Custom Agentic Patterns の各パターンが、技術的に実装可能か検証される`
 - メトリック 3：`LangChain4j のエラーハンドリング・リトライ機構が、プロジェクトのセキュリティ・信頼性要件に対応可能か確認される`
 - メトリック 4：`検証結果に基づき、[ADR-q333d Agentic パターンの選択基準](ADR-q333d-agentic-pattern-selection.md)・[ADR-ehfcj スキル実行エンジン設計](ADR-ehfcj-skill-execution-engine.md) の設計決定に反映される`
@@ -42,7 +44,7 @@ LangChain4j v1.9.0 以降の Agentic AI API は、複数の実装パターン・
 
 本 ADR では、LangChain4j v1.8 以降が提供する Agentic AI API（Workflow API, AgenticScope, Tool Execution Engine, Error Handling 等）を本プロジェクトの標準エージェント基盤として採用することを決定する。
 
-そのうえで、FR-DRAFT-1～3 および AN-f545x で定義された要求を満たせるかを PoC ベースで検証し、結果を [ADR-q333d Agentic パターンの選択基準](ADR-q333d-agentic-pattern-selection.md) および [ADR-ehfcj スキル実行エンジン設計](ADR-ehfcj-skill-execution-engine.md) に反映する。
+そのうえで、FR-mcncb/FR-cccz4/FR-2ff4z および AN-f545x で定義された要求を満たせるかを PoC ベースで検証し、結果を [ADR-q333d Agentic パターンの選択基準](ADR-q333d-agentic-pattern-selection.md) および [ADR-ehfcj スキル実行エンジン設計](ADR-ehfcj-skill-execution-engine.md) に反映する。
 
 ### Custom Agentic Patterns（新機能の焦点）
 
