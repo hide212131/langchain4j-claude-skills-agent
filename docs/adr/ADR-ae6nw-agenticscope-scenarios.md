@@ -25,6 +25,9 @@
   - [NFR-kc6k1 Context Engineering 最適化](../requirements/NFR-kc6k1-context-engineering-optimization.md)
   - [NFR-30zem Observability 統合](../requirements/NFR-30zem-observability-integration.md)
 
+- Related Tasks:
+  - [T-0mcn0 最小実行基盤タスク](../tasks/T-0mcn0-minimal-foundation/README.md)
+
 ## Context
 
 LangChain4j の `AgenticScope` は、エージェント間の情報共有（メモリ、コンテキスト、実行履歴）を管理するメカニズム。本プロジェクトでは以下の活用が必要：

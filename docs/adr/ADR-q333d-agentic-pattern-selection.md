@@ -19,6 +19,7 @@
   - [FR-2ff4z 複数スキル連鎖実行](../requirements/FR-2ff4z-multi-skill-composition.md)
   - [FR-uu07e Progressive Disclosure 実装](../requirements/FR-uu07e-progressive-disclosure.md)
 - Related Tasks:
+  - [T-0mcn0 最小実行基盤タスク](../tasks/T-0mcn0-minimal-foundation/README.md)
   - [T-7k08g プロンプト・エージェント可視化タスク](../tasks/T-7k08g-prompt-visibility/README.md)
 
 ## Context

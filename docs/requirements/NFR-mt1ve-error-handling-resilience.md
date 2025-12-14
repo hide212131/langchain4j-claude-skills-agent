@@ -13,7 +13,7 @@
 - Dependent Requirements:
   - N/A – 後続要件なし
 - Related Tasks:
-  - N/A – タスクは要件承認後に作成
+  - [T-0mcn0 最小実行基盤タスク](../tasks/T-0mcn0-minimal-foundation/README.md)
 
 ## Requirement Statement
 
