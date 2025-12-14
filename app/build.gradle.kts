@@ -18,9 +18,15 @@ repositories {
 }
 
 dependencies {
+    val langchain4jVersion = "1.9.1"
+    val langchain4jAgenticVersion = "1.9.1-beta17"
+
     implementation("org.yaml:snakeyaml:2.2")
     implementation("info.picocli:picocli:4.7.6")
     implementation("io.github.cdimascio:dotenv-java:3.2.0")
+    implementation("dev.langchain4j:langchain4j-core:$langchain4jVersion")
+    implementation("dev.langchain4j:langchain4j-agentic:$langchain4jAgenticVersion")
+    implementation("dev.langchain4j:langchain4j-open-ai-official:$langchain4jAgenticVersion")
 
     testImplementation(platform("org.junit:junit-bom:5.10.1"))
     testImplementation("org.junit.jupiter:junit-jupiter")
@@ -30,6 +36,15 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    // 実行時の .env/環境変数の影響を避け、テストは常にモック前提で動作させる
+    environment(
+        mapOf(
+            "LLM_PROVIDER" to "mock",
+            "OPENAI_API_KEY" to "",
+            "OPENAI_BASE_URL" to "",
+            "OPENAI_MODEL" to ""
+        )
+    )
 }
 
 application {

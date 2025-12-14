@@ -17,8 +17,8 @@ class LlmConfigurationLoaderTest {
     @Test
     @DisplayName("環境変数が空ならデフォルトで mock を選択する")
     void defaultIsMockWhenNoEnv() {
-        LlmConfigurationLoader loader =
-                new LlmConfigurationLoader(Map.of(), Dotenv.configure().ignoreIfMissing().ignoreIfMalformed().load());
+        Dotenv dotenv = emptyDotenv();
+        LlmConfigurationLoader loader = new LlmConfigurationLoader(Map.of(), dotenv);
 
         LlmConfiguration config = loader.load();
 
@@ -31,9 +31,9 @@ class LlmConfigurationLoaderTest {
     @Test
     @DisplayName("LLM_PROVIDER=openai でキーがなければ例外を返す")
     void errorWhenOpenAiKeyMissing() {
-        LlmConfigurationLoader loader = new LlmConfigurationLoader(
-                Map.of(LlmConfigurationLoader.ENV_LLM_PROVIDER, "openai"),
-                Dotenv.configure().ignoreIfMissing().ignoreIfMalformed().load());
+        Dotenv dotenv = emptyDotenv();
+        LlmConfigurationLoader loader =
+                new LlmConfigurationLoader(Map.of(LlmConfigurationLoader.ENV_LLM_PROVIDER, "openai"), dotenv);
 
         assertThatThrownBy(loader::load)
                 .isInstanceOf(IllegalStateException.class)
@@ -77,5 +77,18 @@ class LlmConfigurationLoaderTest {
         assertThat(config.openAiModel()).isEqualTo("gpt-env");
         Files.deleteIfExists(envFile);
         Files.deleteIfExists(tempDir);
+    }
+
+    private Dotenv emptyDotenv() {
+        try {
+            Path tempDir = Files.createTempDirectory("llm-config-empty");
+            return Dotenv.configure()
+                    .directory(tempDir.toString())
+                    .ignoreIfMissing()
+                    .ignoreIfMalformed()
+                    .load();
+        } catch (IOException e) {
+            throw new IllegalStateException("テスト用の空 dotenv を作成できませんでした", e);
+        }
     }
 }

@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Implementation Plan
-- Status: Phase 1 In Progress
+- Status: Phase 2 In Progress
   <!-- Draft: Planning complete, awaiting start | Phase X In Progress: Actively working | Cancelled: Work intentionally halted | Complete: All phases done and verified -->
 
 ## Links
@@ -57,7 +57,7 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 - [x] 環境変数読み込みとマスキング規則の定義（LLM_PROVIDER=mock|openai、OPENAI_API_KEY/OPENAI_BASE_URL/OPENAI_MODEL）
 - [x] `.env`（非コミット）+ `.envrc`（`dotenv_if_exists .env` のみ）+ `dotenv-java` フォールバック実装：環境変数を優先し、未設定なら `.env` を読み、`OPENAI_API_KEY` 未設定時は即エラー
 - [x] LLMClientFactory（仮称）の骨格実装（mock/openai の分岐のみ）
-- [ ] Agentic チュートリアル [agents.md](https://github.com/langchain4j/langchain4j/blob/main/docs/docs/tutorials/agents.md) と examples `_1b_Basic_Agent_Example_Structured` / `_2b_Sequential_Agent_Example_Typed` を参照し、AgenticScope/Workflow 初期化を組み込む（OpenAI 実行経路は Phase 2 で接続予定）
+- [x] Agentic チュートリアル [agents.md](https://github.com/langchain4j/langchain4j/blob/main/docs/docs/tutorials/agents.md) と examples `_1b_Basic_Agent_Example_Structured` / `_2b_Sequential_Agent_Example_Typed` を参照し、AgenticScope/Workflow 初期化を組み込む（OpenAI 実行経路は Phase 2 で接続予定）
 - [x] 既存ダミー経路との切替オプションを追加（デフォルトは mock）
 
 ### Deliverables
@@ -87,9 +87,9 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 
 ### Tasks
 
-- [ ] ChatModel/AgenticScope 生成時に Observability コールバックを注入し、T-7k08g イベントを発火
-- [ ] 実プロバイダ呼び出しの例外処理とマスキング済みログ（`OPENAI_API_KEY` マスク）
-- [ ] CLI/設定フラグで mock|openai を切替（実行時オプション対応）
+- [x] ChatModel/AgenticScope 生成時に Observability コールバックを注入し、T-7k08g イベントを発火
+- [x] 実プロバイダ呼び出しの例外処理とマスキング済みログ（`OPENAI_API_KEY` マスク）
+- [x] CLI/設定フラグで mock|openai を切替（実行時オプション対応）
 
 ### Deliverables
 

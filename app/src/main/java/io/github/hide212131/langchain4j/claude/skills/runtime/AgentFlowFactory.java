@@ -16,16 +16,7 @@ public final class AgentFlowFactory {
     public AgentFlow create() {
         return switch (configuration.provider()) {
             case MOCK -> new DummyAgentFlow();
-            case OPENAI -> new OpenAiAgentFlowPlaceholder();
+            case OPENAI -> new OpenAiAgentFlow(configuration);
         };
-    }
-
-    private static final class OpenAiAgentFlowPlaceholder implements AgentFlow {
-
-        @Override
-        public AgentFlowResult run(
-                SkillDocument document, String goal, VisibilityLog log, boolean basicLog, String runId) {
-            throw new IllegalStateException("OpenAI プロバイダの実行経路は Phase 2 で実装予定です");
-        }
     }
 }
