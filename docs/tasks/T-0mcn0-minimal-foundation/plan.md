@@ -113,11 +113,11 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 ### Phase 2 Tasks
 
 - [ ] **可視化プレースホルダ**
-  - [ ] Phase/skillId/runId を含むログ出力
+  - [ ] Phase/skillId/runId/step/message/inputSummary/outputSummary/error を含むログ出力（input/output はマスク前提）
   - [ ] レベル制御（basic/off）
 - [ ] **エラー枠組み**
-  - [ ] try-catch と 1 回リトライ
-  - [ ] 日本語ログと終了コード管理
+  - [ ] try-catch と 1 回リトライ（固定ディレイなし）
+  - [ ] 日本語ログと終了コード管理（info/warn/error の最小構成）
 
 ### Phase 2 Deliverables
 

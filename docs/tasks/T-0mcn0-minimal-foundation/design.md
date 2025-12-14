@@ -44,9 +44,20 @@ SKILL.md -> Parser -> SkillModel (POJO)
 ### Components
 
 - SkillParser (最小): YAML frontmatter + 本文を読み取り POJO 化。必須項目のみ。
-- DummyAgentFlow: ADR-q333d を参照し、Workflow/Pure のどちらか一方の簡易実装で Plan/Act/Reflect を順実行。LLM は固定文字列を返すダミー。
+- DummyAgentFlow: ADR-q333d を参照し、**Workflow 型**の簡易実装で Plan/Act/Reflect を順実行（明示制御で最小化）。LLM は固定文字列を返すダミー。
 - VisibilityPlaceholder: Phase/skillId/runId を含む簡易ログ出力。将来の T-7k08g で拡張。
 - ErrorGuard: try-catch と 1 回のリトライ枠組み、例外時の日本語ログ。
+
+#### 可視化プレースホルダのフィールド
+
+- phase（parse/plan/act/reflect/error）
+- skillId
+- runId
+- step（plan.prompt/act.call/reflect.eval など）
+- message（日本語の簡潔な説明）
+- inputSummary（任意・マスク済み）
+- outputSummary（任意・マスク済み）
+- error（任意・コード/メッセージ、日本語）
 
 ### Data Flow
 
@@ -76,7 +87,7 @@ Implementation Notes
 ### Data Models and Types
 
 - `SkillDocument`（id/title/description/body）。
-- `VisibilityEvent`（phase/skillId/runId/message）※プレースホルダ。
+- `VisibilityEvent`（phase/skillId/runId/step/message/inputSummary/outputSummary/error）※プレースホルダ。
 
 ### Error Handling
 
@@ -149,9 +160,9 @@ Decision Rationale
 
 ## Open Questions
 
-- [ ] Workflow 型と Pure Agent 型のどちらを最小実装とするか。
-- [ ] リトライの条件とログレベルのデフォルト設定。
-- [ ] 可視化プレースホルダのイベントフィールドをどこまで含めるか。
+- [x] Workflow 型と Pure Agent 型のどちらを最小実装とするか。→ Workflow 型を採用（明示制御でステップ順序を固定しやすく、最小構成に向くため）。
+- [x] リトライの条件とログレベルのデフォルト設定。→ 1 回リトライのみ、固定ディレイなし。ログレベルは info（通常）/warn（リトライ時）/error（失敗確定）。
+- [x] 可視化プレースホルダのイベントフィールドをどこまで含めるか。→ 上記フィールドセット（phase/skillId/runId/step/message/inputSummary/outputSummary/error）で実装。
 
 ---
 
