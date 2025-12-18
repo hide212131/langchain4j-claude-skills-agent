@@ -132,6 +132,27 @@ class SkillsCliAppTest {
     }
   }
 
+  @Test
+  @DisplayName("OpenAI 指定で API キーがなければ設定エラーで終了する")
+  void failWhenOpenAiApiKeyMissing() {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    ByteArrayOutputStream err = new ByteArrayOutputStream();
+
+    int exit =
+        SkillsCliApp.run(
+            new String[] {
+              "--skill", "src/test/resources/skills/sample/SKILL.md",
+              "--llm-provider", "openai",
+              "--visibility-level", "off"
+            },
+            new PrintStream(out, true, StandardCharsets.UTF_8),
+            new PrintStream(err, true, StandardCharsets.UTF_8));
+
+    assertThat(exit).isEqualTo(4);
+    assertThat(out.toString(StandardCharsets.UTF_8)).isBlank();
+    assertThat(err.toString(StandardCharsets.UTF_8)).contains("OPENAI_API_KEY");
+  }
+
   private Logger newLogger(ByteArrayOutputStream out) {
     Logger log = Logger.getLogger("test-log-" + UUID.randomUUID());
     log.setUseParentHandlers(false);

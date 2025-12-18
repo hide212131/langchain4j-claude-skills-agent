@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Implementation Plan
-- Status: Phase 2 In Progress
+- Status: Phase 3 In Progress
   <!-- Draft: Planning complete, awaiting start | Phase X In Progress: Actively working | Cancelled: Work intentionally halted | Complete: All phases done and verified -->
 
 ## Links
@@ -116,9 +116,9 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 
 ### Tasks
 
-- [ ] モック経路の e2e テストを追加し決定論的挙動を確認
-- [ ] 実プロバイダのレスポンス例をフィクスチャ化し、パース/マッピングのユニットテスト（External API Testing 方針）
-- [ ] API キー未設定時のエラー/フォールバック挙動テスト
+- [x] モック経路の e2e テストを追加し決定論的挙動を確認
+- [x] 実プロバイダのレスポンス例をフィクスチャ化し、パース/マッピングのユニットテスト（External API Testing 方針）
+- [x] API キー未設定時のエラー/フォールバック挙動テスト
 
 ### Deliverables
 
