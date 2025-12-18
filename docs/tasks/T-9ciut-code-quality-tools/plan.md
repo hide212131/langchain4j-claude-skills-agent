@@ -119,23 +119,22 @@ JavaプロジェクトにCheckstyle、PMD、SpotBugs、Spotlessの4つのコー�
 
 ### Phase 2 Tasks
 
-- [ ] **PMD設定**
-  - [ ] `build.gradle`にPMDプラグインを追加
-  - [ ] `config/pmd/ruleset.xml`を作成
-  - [ ] 基本的なルールセットを設定
-  - [ ] `./gradlew pmdMain pmdTest`で動作確認
-- [ ] **SpotBugs設定**
-  - [ ] `build.gradle`にSpotBugsプラグインを追加
-  - [ ] `config/spotbugs/exclude.xml`を作成（必要に応じて）
-  - [ ] レポート形式を設定（HTML推奨）
-  - [ ] `./gradlew spotbugsMain spotbugsTest`で動作確認
-- [ ] **Spotless設定**
-  - [ ] `build.gradle`にSpotlessプラグインを追加
-  - [ ] Java用のGoogle Java Formatを設定
-  - [ ] `./gradlew spotlessCheck`で動作確認
-  - [ ] `./gradlew spotlessApply`で自動フォーマット実行
-- [ ] **統合確認**
-  - [ ] `./gradlew check`で全ツールが実行されることを確認
+- [x] **PMD設定**
+  - [x] `build.gradle`にPMDプラグインを追加
+  - [x] `config/pmd/ruleset.xml`を作成
+  - [x] 基本的なルールセットを設定
+  - [x] `./gradlew pmdMain pmdTest`で動作確認
+- [x] **SpotBugs設定**
+  - [x] `build.gradle`にSpotBugsプラグインを追加
+  - [x] レポート形式を設定（HTML）
+  - [x] `./gradlew spotbugsMain spotbugsTest`で動作確認
+- [x] **Spotless設定**
+  - [x] `build.gradle`にSpotlessプラグインを追加
+  - [x] Java用のGoogle Java Formatを設定
+  - [x] `./gradlew spotlessCheck`で動作確認
+  - [x] `./gradlew spotlessApply`で自動フォーマット実行
+- [x] **統合確認**
+  - [x] `./gradlew check`で全ツールが実行されることを確認
 
 ### Phase 2 Deliverables
 
