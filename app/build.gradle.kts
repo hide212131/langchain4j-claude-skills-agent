@@ -1,6 +1,7 @@
 plugins {
     `java-library`
     application
+    checkstyle
 }
 
 java {
@@ -30,4 +31,12 @@ tasks.test {
 application {
     mainClass.set("io.github.hide212131.langchain4j.claude.skills.app.SkillsCliApp")
     applicationName = "skills"
+}
+
+checkstyle {
+    toolVersion = "10.12.5"
+    configFile = rootProject.file("config/checkstyle/checkstyle.xml")
+    // Allow warnings initially - can be tightened later as code is improved
+    maxWarnings = 50
+    isIgnoreFailures = false
 }

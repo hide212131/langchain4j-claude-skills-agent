@@ -67,17 +67,17 @@ JavaプロジェクトにCheckstyle、PMD、SpotBugs、Spotlessの4つのコー�
 
 ### Tasks
 
-- [ ] **Gradleプラグイン設定**
-  - [ ] `build.gradle`にCheckstyleプラグインを追加
-  - [ ] Checkstyleバージョンを指定
-  - [ ] `checkstyle`タスクを`check`タスクに依存させる
-- [ ] **Checkstyle設定ファイル作成**
-  - [ ] `config/checkstyle/checkstyle.xml`を作成
-  - [ ] 基本的なGoogle Java Style Guideベースのルールセットを設定
-  - [ ] プロジェクト固有の調整を適用
-- [ ] **初回実行と調整**
-  - [ ] `./gradlew checkstyleMain checkstyleTest`を実行
-  - [ ] 既存コードで問題が発生する場合、適切な除外設定を追加
+- [x] **Gradleプラグイン設定**
+  - [x] `build.gradle`にCheckstyleプラグインを追加
+  - [x] Checkstyleバージョンを指定
+  - [x] `checkstyle`タスクを`check`タスクに依存させる
+- [x] **Checkstyle設定ファイル作成**
+  - [x] `config/checkstyle/checkstyle.xml`を作成
+  - [x] 基本的なGoogle Java Style Guideベースのルールセットを設定
+  - [x] プロジェクト固有の調整を適用
+- [x] **初回実行と調整**
+  - [x] `./gradlew checkstyleMain checkstyleTest`を実行
+  - [x] 既存コードで問題が発生する場合、適切な除外設定を追加（maxWarningsを50に設定）
 
 ### Deliverables
 
