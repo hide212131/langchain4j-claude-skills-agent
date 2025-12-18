@@ -15,3 +15,34 @@ Picocli ベースの最小 CLI を Gradle から起動できます。
 - `--visibility-level` : 可視化ログレベル。`basic`（デフォルト）または `off`
 
 正常終了時は Plan/Act/Reflect のログと成果物が標準出力に表示されます。
+
+## 開発
+
+### コード品質チェック
+
+このプロジェクトでは以下のコード品質ツールを使用しています：
+
+- **Checkstyle**: コーディング規約のチェック
+- **PMD**: コード品質とバグパターンの検出
+- **SpotBugs**: バイトコードレベルのバグ検出
+- **Spotless**: コードフォーマットの自動化
+
+```bash
+# すべての品質チェックを実行
+./gradlew check
+
+# コードフォーマットの自動修正
+./gradlew spotlessApply
+
+# 個別のツールを実行
+./gradlew checkstyleMain checkstyleTest
+./gradlew pmdMain pmdTest
+./gradlew spotbugsMain spotbugsTest
+./gradlew spotlessCheck
+```
+
+### テストの実行
+
+```bash
+./gradlew test
+```

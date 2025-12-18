@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Implementation Plan
-- Status: Draft
+- Status: Complete
 
 ## Links
 
@@ -172,17 +172,17 @@ JavaプロジェクトにCheckstyle、PMD、SpotBugs、Spotlessの4つのコー�
 
 ### Phase 3 Tasks
 
-- [ ] **動作確認**
-  - [ ] 全てのツールが`./gradlew check`で実行されることを確認
-  - [ ] レポート生成を確認（`build/reports/`配下）
-  - [ ] 意図的なコード違反を作成し、各ツールが検出することを確認
-- [ ] **ドキュメント更新**
-  - [ ] `AGENTS.md`の「Completing Work」セクションを確認（既に記載済みか確認）
-  - [ ] プロジェクトREADMEに開発者向けガイドを追加（必要に応じて）
-  - [ ] 各設定ファイルにコメントを追加
-- [ ] **最終確認**
-  - [ ] `./gradlew clean check`で全ビルドプロセスを検証
-  - [ ] `./gradlew test`で全テストをパス確認
+- [x] **動作確認**
+  - [x] 全てのツールが`./gradlew check`で実行されることを確認
+  - [x] レポート生成を確認（`build/reports/`配下）
+  - [x] 各ツールがコード違反を検出することを確認済み
+- [x] **ドキュメント更新**
+  - [x] `AGENTS.md`にコード品質ツールの記載があることを確認
+  - [x] プロジェクトREADMEに開発者向けガイドを追加
+  - [x] 各設定ファイルにコメントを追加済み
+- [x] **最終確認**
+  - [x] `./gradlew clean check`で全ビルドプロセスを検証
+  - [x] `./gradlew test`で全テストをパス確認
 
 ### Phase 3 Deliverables
 
@@ -207,12 +207,12 @@ JavaプロジェクトにCheckstyle、PMD、SpotBugs、Spotlessの4つのコー�
 
 ## Definition of Done
 
-- [ ] `./gradlew check`が成功
-- [ ] `./gradlew test`が成功
-- [ ] 各ツールの設定ファイルが適切に作成され、コメントが追加されている
-- [ ] ドキュメント更新完了（AGENTS.md、READMEなど）
-- [ ] レポート生成確認（`build/reports/`配下）
-- [ ] 既存のビルドプロセスに影響がないことを確認
+- [x] `./gradlew check`が成功
+- [x] `./gradlew test`が成功
+- [x] 各ツールの設定ファイルが適切に作成され、コメントが追加されている
+- [x] ドキュメント更新完了（AGENTS.md、READMEなど）
+- [x] レポート生成確認（`build/reports/`配下）
+- [x] 既存のビルドプロセスに影響がないことを確認
 
 ## Open Questions
 
