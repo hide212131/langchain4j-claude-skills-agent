@@ -47,5 +47,4 @@
 
     <!-- Security -->
     <rule ref="category/java/security.xml"/>
-
 </ruleset>

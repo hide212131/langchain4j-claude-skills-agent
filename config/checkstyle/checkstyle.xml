@@ -104,7 +104,6 @@
     <!-- Make annotations available to suppress warnings -->
     <module name="SuppressWarningsHolder"/>
   </module>
-
   <!-- Support @SuppressWarnings annotation -->
   <module name="SuppressWarningsFilter"/>
 </module>
