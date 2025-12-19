@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<ruleset name="langchain4j-claude-skills-agent PMD Ruleset"
+    xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+        PMD ruleset for langchain4j-claude-skills-agent
+    </description>
+
+    <!-- Best Practices -->
+    <rule ref="category/java/bestpractices.xml">
+        <!-- Allow package-private fields for records and DTOs -->
+        <exclude name="AccessorMethodGeneration"/>
+    </rule>
+
+    <!-- Code Style -->
+    <rule ref="category/java/codestyle.xml">
+        <!-- Allow short variable names for common patterns -->
+        <exclude name="ShortVariable"/>
+        <!-- Allow longer method names that are descriptive -->
+        <exclude name="LongVariable"/>
+        <!-- Allow package-private fields (common in modern Java) -->
+        <exclude name="CommentDefaultAccessModifier"/>
+        <!-- Don't require this. prefix -->
+        <exclude name="LocalVariableCouldBeFinal"/>
+        <exclude name="MethodArgumentCouldBeFinal"/>
+        <exclude name="OnlyOneReturn"/>
+    </rule>
+
+    <!-- Design -->
+    <rule ref="category/java/design.xml">
+        <!-- Don't enforce Law of Demeter strictly -->
+        <exclude name="LawOfDemeter"/>
+        <!-- Allow more flexibility in complexity -->
+        <exclude name="CyclomaticComplexity"/>
+    </rule>
+
+    <!-- Error Prone -->
+    <rule ref="category/java/errorprone.xml">
+        <!-- Allow null checks that may seem unnecessary -->
+        <exclude name="NullAssignment"/>
+    </rule>
+
+    <!-- Performance -->
+    <rule ref="category/java/performance.xml"/>
+
+    <!-- Security -->
+    <rule ref="category/java/security.xml"/>
+</ruleset>

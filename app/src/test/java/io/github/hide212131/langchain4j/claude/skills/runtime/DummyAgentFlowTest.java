@@ -7,17 +7,17 @@ import org.junit.jupiter.api.Test;
 
 class DummyAgentFlowTest {
 
-    @Test
-    @DisplayName("Goal を含む固定レスポンスで Plan/Act/Reflect を返す")
-    void runDummyFlow() {
-        SkillDocument document = new SkillDocument("sample", "Sample", "Desc", "Body content");
-        DummyAgentFlow flow = new DummyAgentFlow();
+  @Test
+  @DisplayName("Goal を含む固定レスポンスで Plan/Act/Reflect を返す")
+  void runDummyFlow() {
+    SkillDocument document = new SkillDocument("sample", "Sample", "Desc", "Body content");
+    DummyAgentFlow flow = new DummyAgentFlow();
 
-        DummyAgentFlow.Result result = flow.run(document, "demo goal");
+    DummyAgentFlow.Result result = flow.run(document, "demo goal");
 
-        assertThat(result.planLog()).contains("demo goal");
-        assertThat(result.actLog()).contains("Sample");
-        assertThat(result.reflectLog()).contains("demo goal");
-        assertThat(result.artifactContent()).contains("Body content").contains("Goal: demo goal");
-    }
+    assertThat(result.planLog()).contains("demo goal");
+    assertThat(result.actLog()).contains("Sample");
+    assertThat(result.reflectLog()).contains("demo goal");
+    assertThat(result.artifactContent()).contains("Body content").contains("Goal: demo goal");
+  }
 }
