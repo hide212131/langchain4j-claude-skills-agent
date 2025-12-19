@@ -18,6 +18,8 @@
   - [NFR-3gjla セキュリティとリソース管理](../requirements/NFR-3gjla-security-resource-governance.md)
   - [NFR-yiown スキル検証・監査](../requirements/NFR-yiown-skill-verification-auditability.md)
   - [FR-2ff4z 複数スキル連鎖実行](../requirements/FR-2ff4z-multi-skill-composition.md)
+- Related Tasks:
+  - [T-9ciut コード品質ツールの統合](../tasks/T-9ciut-code-quality-tools/README.md)
 
 ---
 

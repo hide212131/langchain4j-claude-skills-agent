@@ -37,6 +37,7 @@
 - Related Tasks:
   - [T-0mcn0 最小実行基盤タスク](../tasks/T-0mcn0-minimal-foundation/README.md)
   - [T-7k08g プロンプト・エージェント可視化タスク](../tasks/T-7k08g-prompt-visibility/README.md)
+  - [T-9ciut コード品質ツールの統合](../tasks/T-9ciut-code-quality-tools/README.md)
   - [T-9t6cj 実LLM接続タスク](../tasks/T-9t6cj-llm-integration/README.md)
 
 ## Executive Summary

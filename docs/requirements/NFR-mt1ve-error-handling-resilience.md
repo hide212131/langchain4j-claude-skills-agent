@@ -14,6 +14,7 @@
   - N/A – 後続要件なし
 - Related Tasks:
   - [T-0mcn0 最小実行基盤タスク](../tasks/T-0mcn0-minimal-foundation/README.md)
+  - [T-9ciut コード品質ツールの統合](../tasks/T-9ciut-code-quality-tools/README.md)
 
 ## Requirement Statement
 

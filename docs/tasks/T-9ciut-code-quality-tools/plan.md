@@ -7,6 +7,14 @@
 
 ## Links
 
+- Related Analyses:
+  - [AN-f545x Claude Skills エージェント実装 | LangChain4j Agent 統合分析](../../analysis/AN-f545x-claude-skills-agent.md)
+- Related Requirements:
+  - [NFR-mt1ve エラーハンドリングと堅牢性](../../requirements/NFR-mt1ve-error-handling-resilience.md)
+  - [NFR-30zem Observability 統合](../../requirements/NFR-30zem-observability-integration.md)
+- Related ADRs:
+  - [ADR-ij1ew Observability 統合](../../adr/ADR-ij1ew-observability-integration.md)
+  - [ADR-38940 セキュリティ・リソース管理フレームワーク](../../adr/ADR-38940-security-resource-management.md)
 - Associated Design Document:
   - [T-9ciut-code-quality-tools-design](design.md)
 

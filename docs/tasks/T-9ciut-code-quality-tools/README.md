@@ -8,11 +8,13 @@
 ## Links
 
 - Related Analyses:
-  - N/A – 本タスクは既存のプロジェクト構造とベストプラクティスに基づいた直接的な実装タスクです
+  - [AN-f545x Claude Skills エージェント実装 | LangChain4j Agent 統合分析](../../analysis/AN-f545x-claude-skills-agent.md)
 - Related Requirements:
-  - N/A – 既存のコーディング標準とベストプラクティスの適用
+  - [NFR-mt1ve エラーハンドリングと堅牢性](../../requirements/NFR-mt1ve-error-handling-resilience.md)
+  - [NFR-30zem Observability 統合](../../requirements/NFR-30zem-observability-integration.md)
 - Related ADRs:
-  - N/A – 標準的なJavaプロジェクトツールの導入のため、ADRは不要
+  - [ADR-ij1ew Observability 統合](../../adr/ADR-ij1ew-observability-integration.md)
+  - [ADR-38940 セキュリティ・リソース管理フレームワーク](../../adr/ADR-38940-security-resource-management.md)
 - Associated Design Document:
   - [T-9ciut-code-quality-tools-design](design.md)
 - Associated Plan Document:
