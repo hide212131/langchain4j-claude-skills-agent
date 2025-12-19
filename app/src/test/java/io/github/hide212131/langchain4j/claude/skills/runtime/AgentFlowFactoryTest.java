@@ -14,13 +14,19 @@ import java.util.logging.StreamHandler;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("PMD.JUnitTestContainsTooManyAsserts")
 class AgentFlowFactoryTest {
+
+    @SuppressWarnings("PMD.UnnecessaryConstructor")
+    AgentFlowFactoryTest() {
+        // default
+    }
 
     @Test
     @DisplayName("LLM_PROVIDER=openai の場合は OpenAiAgentFlow を生成する")
     void createOpenAiFlow() {
-        LlmConfiguration config =
-                new LlmConfiguration(LlmProvider.OPENAI, "sk-test-12345678", "https://api.openai.example", "gpt-4o");
+        LlmConfiguration config = new LlmConfiguration(LlmProvider.OPENAI, "sk-test-12345678",
+                "https://api.openai.example", "gpt-4o");
 
         AgentFlow flow = new AgentFlowFactory(config).create();
 
@@ -43,12 +49,8 @@ class AgentFlowFactoryTest {
         assertThat(result.reflectLog()).contains("mock goal");
         assertThat(result.artifactContent()).contains("Goal: mock goal").contains("Skill: mock-skill");
         String logs = out.toString(StandardCharsets.UTF_8);
-        assertThat(logs)
-                .contains("phase=plan")
-                .contains("phase=act")
-                .contains("phase=reflect")
-                .contains("run=run-mock-1")
-                .contains("skill=mock-skill");
+        assertThat(logs).contains("phase=plan").contains("phase=act").contains("phase=reflect")
+                .contains("run=run-mock-1").contains("skill=mock-skill");
     }
 
     private Logger newLogger(ByteArrayOutputStream out) {

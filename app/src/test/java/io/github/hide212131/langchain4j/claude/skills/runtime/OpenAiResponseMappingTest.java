@@ -13,7 +13,13 @@ import java.lang.reflect.Method;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings({ "PMD.JUnitTestContainsTooManyAsserts", "PMD.AvoidAccessibilityAlteration" })
 class OpenAiResponseMappingTest {
+
+    @SuppressWarnings("PMD.UnnecessaryConstructor")
+    OpenAiResponseMappingTest() {
+        // default
+    }
 
     @Test
     @DisplayName("OpenAI Official SDK のレスポンス JSON を LangChain4j の AiMessage/FinishReason にマッピングできる")
@@ -52,21 +58,18 @@ class OpenAiResponseMappingTest {
         Class<?> helper = Class.forName("dev.langchain4j.model.openaiofficial.InternalOpenAiOfficialHelper");
         Method aiMessageFrom = helper.getDeclaredMethod("aiMessageFrom", ChatCompletion.class);
         aiMessageFrom.setAccessible(true);
-        Method finishReasonFrom =
-                helper.getDeclaredMethod("finishReasonFrom", ChatCompletion.Choice.FinishReason.class);
+        Method finishReasonFrom = helper.getDeclaredMethod("finishReasonFrom",
+                ChatCompletion.Choice.FinishReason.class);
         finishReasonFrom.setAccessible(true);
         Method tokenUsageFrom = helper.getDeclaredMethod("tokenUsageFrom", CompletionUsage.class);
         tokenUsageFrom.setAccessible(true);
 
         AiMessage message = (AiMessage) aiMessageFrom.invoke(null, completion);
-        FinishReason reason =
-                (FinishReason) finishReasonFrom.invoke(null, completion.choices().get(0).finishReason());
-        OpenAiOfficialTokenUsage usage =
-                (OpenAiOfficialTokenUsage) tokenUsageFrom.invoke(null, completion.usage().orElseThrow());
+        FinishReason reason = (FinishReason) finishReasonFrom.invoke(null, completion.choices().get(0).finishReason());
+        OpenAiOfficialTokenUsage usage = (OpenAiOfficialTokenUsage) tokenUsageFrom.invoke(null,
+                completion.usage().orElseThrow());
 
-        assertThat(message.text())
-                .contains("公式レスポンスのサンプル")
-                .contains("テスト用のテキスト");
+        assertThat(message.text()).contains("公式レスポンスのサンプル").contains("テスト用のテキスト");
         assertThat(reason).isEqualTo(FinishReason.STOP);
         assertThat(usage.inputTokenCount()).isEqualTo(12);
         assertThat(usage.outputTokenCount()).isEqualTo(18);

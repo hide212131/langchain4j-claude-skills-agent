@@ -6,19 +6,25 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.AgentFlow.AgentFlo
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("PMD.JUnitTestContainsTooManyAsserts")
 class DummyAgentFlowTest {
 
-  @Test
-  @DisplayName("Goal を含む固定レスポンスで Plan/Act/Reflect を返す")
-  void runDummyFlow() {
-    SkillDocument document = new SkillDocument("sample", "Sample", "Desc", "Body content");
-    DummyAgentFlow flow = new DummyAgentFlow();
+    @SuppressWarnings("PMD.UnnecessaryConstructor")
+    DummyAgentFlowTest() {
+        // default
+    }
 
-    AgentFlowResult result = flow.run(document, "demo goal");
+    @Test
+    @DisplayName("Goal を含む固定レスポンスで Plan/Act/Reflect を返す")
+    void runDummyFlow() {
+        SkillDocument document = new SkillDocument("sample", "Sample", "Desc", "Body content");
+        DummyAgentFlow flow = new DummyAgentFlow();
 
-    assertThat(result.planLog()).contains("demo goal");
-    assertThat(result.actLog()).contains("Sample");
-    assertThat(result.reflectLog()).contains("demo goal");
-    assertThat(result.artifactContent()).contains("Body content").contains("Goal: demo goal");
-  }
+        AgentFlowResult result = flow.run(document, "demo goal");
+
+        assertThat(result.planLog()).contains("demo goal");
+        assertThat(result.actLog()).contains("Sample");
+        assertThat(result.reflectLog()).contains("demo goal");
+        assertThat(result.artifactContent()).contains("Body content").contains("Goal: demo goal");
+    }
 }

@@ -6,9 +6,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * 環境変数を優先し、未設定の場合のみ .env をフォールバックして LLM 設定を解決する。
- */
+/** 環境変数を優先し、未設定の場合のみ .env をフォールバックして LLM 設定を解決する。 */
 public final class LlmConfigurationLoader {
 
     static final String ENV_LLM_PROVIDER = "LLM_PROVIDER";
@@ -68,19 +66,11 @@ public final class LlmConfigurationLoader {
     private static Dotenv loadDotenvWithFallback() {
         Path cwd = Path.of("").toAbsolutePath();
         if (Files.exists(cwd.resolve(".env"))) {
-            return Dotenv.configure()
-                    .directory(cwd.toString())
-                    .ignoreIfMalformed()
-                    .ignoreIfMissing()
-                    .load();
+            return Dotenv.configure().directory(cwd.toString()).ignoreIfMalformed().ignoreIfMissing().load();
         }
         Path parent = cwd.getParent();
         if (parent != null && Files.exists(parent.resolve(".env"))) {
-            return Dotenv.configure()
-                    .directory(parent.toString())
-                    .ignoreIfMalformed()
-                    .ignoreIfMissing()
-                    .load();
+            return Dotenv.configure().directory(parent.toString()).ignoreIfMalformed().ignoreIfMissing().load();
         }
         return Dotenv.configure().ignoreIfMalformed().ignoreIfMissing().load();
     }

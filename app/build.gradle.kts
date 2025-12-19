@@ -84,19 +84,6 @@ tasks.withType<com.github.spotbugs.snom.SpotBugsTask> {
 
 spotless {
     java {
-        // Use Google Java Format
-        googleJavaFormat("1.24.0")
-        
-        // Optionally apply import order
-        importOrder()
-        
-        // Remove unused imports
-        removeUnusedImports()
-        
-        // Trim trailing whitespace
-        trimTrailingWhitespace()
-        
-        // End files with newline
-        endWithNewline()
+        eclipse().configFile(rootProject.file(".vscode/java-formatter.xml"))
     }
 }

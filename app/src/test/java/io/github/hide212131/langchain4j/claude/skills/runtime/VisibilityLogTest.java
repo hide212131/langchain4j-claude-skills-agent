@@ -14,56 +14,55 @@ import java.util.logging.StreamHandler;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings({ "PMD.JUnitTestContainsTooManyAsserts", "PMD.GuardLogStatement" })
 class VisibilityLogTest {
 
-  @Test
-  @DisplayName("basic では phase/skill/run/step を含む INFO を出力する")
-  void logInfoWhenBasic() {
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
-    VisibilityLog log = new VisibilityLog(newLogger(out));
+    @SuppressWarnings("PMD.UnnecessaryConstructor")
+    VisibilityLogTest() {
+        // default
+    }
 
-    log.info(
-        true, "run-1", "skill-1", "plan", "plan.prompt", "Plan を生成しました", "goal=demo", "Plan: demo");
+    @Test
+    @DisplayName("basic では phase/skill/run/step を含む INFO を出力する")
+    void logInfoWhenBasic() {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        VisibilityLog log = new VisibilityLog(newLogger(out));
 
-    String text = out.toString(StandardCharsets.UTF_8);
-    assertThat(text)
-        .contains("[phase=plan]")
-        .contains("[skill=skill-1]")
-        .contains("[run=run-1]")
-        .contains("[step=plan.prompt]")
-        .contains("Plan を生成しました")
-        .contains("input=goal=demo")
-        .contains("output=Plan: demo");
-  }
+        log.info(true, "run-1", "skill-1", "plan", "plan.prompt", "Plan を生成しました", "goal=demo", "Plan: demo");
 
-  @Test
-  @DisplayName("off では INFO を抑止し WARN/SEVERE は出力する")
-  void suppressInfoWhenOff() {
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
-    VisibilityLog log = new VisibilityLog(newLogger(out));
+        String text = out.toString(StandardCharsets.UTF_8);
+        assertThat(text).contains("[phase=plan]").contains("[skill=skill-1]").contains("[run=run-1]")
+                .contains("[step=plan.prompt]").contains("Plan を生成しました").contains("input=goal=demo")
+                .contains("output=Plan: demo");
+    }
 
-    log.info(false, "run-2", "skill-2", "plan", "plan.prompt", "info", "", "");
-    log.warn("run-2", "skill-2", "error", "retry", "warn", "", "", null);
+    @Test
+    @DisplayName("off では INFO を抑止し WARN/SEVERE は出力する")
+    void suppressInfoWhenOff() {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        VisibilityLog log = new VisibilityLog(newLogger(out));
 
-    String text = out.toString(StandardCharsets.UTF_8);
-    assertThat(text).doesNotContain("info");
-    assertThat(text).contains("warn");
-  }
+        log.info(false, "run-2", "skill-2", "plan", "plan.prompt", "info", "", "");
+        log.warn("run-2", "skill-2", "error", "retry", "warn", "", "", null);
 
-  private Logger newLogger(ByteArrayOutputStream out) {
-    Logger log = Logger.getLogger("visibility-log-" + UUID.randomUUID());
-    log.setUseParentHandlers(false);
-    log.setLevel(Level.ALL);
-    Handler handler =
-        new StreamHandler(out, new SimpleFormatter()) {
-          @Override
-          public synchronized void publish(LogRecord record) {
-            super.publish(record);
-            flush();
-          }
+        String text = out.toString(StandardCharsets.UTF_8);
+        assertThat(text).doesNotContain("info");
+        assertThat(text).contains("warn");
+    }
+
+    private Logger newLogger(ByteArrayOutputStream out) {
+        Logger log = Logger.getLogger("visibility-log-" + UUID.randomUUID());
+        log.setUseParentHandlers(false);
+        log.setLevel(Level.ALL);
+        Handler handler = new StreamHandler(out, new SimpleFormatter()) {
+            @Override
+            public synchronized void publish(LogRecord record) {
+                super.publish(record);
+                flush();
+            }
         };
-    handler.setLevel(Level.ALL);
-    log.addHandler(handler);
-    return log;
-  }
+        handler.setLevel(Level.ALL);
+        log.addHandler(handler);
+        return log;
+    }
 }

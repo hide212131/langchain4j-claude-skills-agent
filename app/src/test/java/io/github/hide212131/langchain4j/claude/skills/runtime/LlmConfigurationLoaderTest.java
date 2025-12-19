@@ -12,7 +12,13 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("PMD.JUnitTestContainsTooManyAsserts")
 class LlmConfigurationLoaderTest {
+
+    @SuppressWarnings("PMD.UnnecessaryConstructor")
+    LlmConfigurationLoaderTest() {
+        // default
+    }
 
     @Test
     @DisplayName("環境変数が空ならデフォルトで mock を選択する")
@@ -32,11 +38,10 @@ class LlmConfigurationLoaderTest {
     @DisplayName("LLM_PROVIDER=openai でキーがなければ例外を返す")
     void errorWhenOpenAiKeyMissing() {
         Dotenv dotenv = emptyDotenv();
-        LlmConfigurationLoader loader =
-                new LlmConfigurationLoader(Map.of(LlmConfigurationLoader.ENV_LLM_PROVIDER, "openai"), dotenv);
+        LlmConfigurationLoader loader = new LlmConfigurationLoader(
+                Map.of(LlmConfigurationLoader.ENV_LLM_PROVIDER, "openai"), dotenv);
 
-        assertThatThrownBy(loader::load)
-                .isInstanceOf(IllegalStateException.class)
+        assertThatThrownBy(loader::load).isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("OPENAI_API_KEY");
     }
 
@@ -45,28 +50,18 @@ class LlmConfigurationLoaderTest {
     void preferEnvironmentOverDotenv() throws IOException {
         Path tempDir = Files.createTempDirectory("llm-config-test");
         Path envFile = tempDir.resolve(".env");
-        Files.writeString(
-                envFile,
-                """
+        Files.writeString(envFile, """
                 LLM_PROVIDER=openai
                 OPENAI_API_KEY=from-dotenv
                 OPENAI_BASE_URL=https://api.example.com
                 OPENAI_MODEL=gpt-dotenv
-                """,
-                StandardCharsets.UTF_8);
+                """, StandardCharsets.UTF_8);
 
-        Dotenv dotenv = Dotenv.configure()
-                .ignoreIfMalformed()
-                .ignoreIfMissing()
-                .directory(tempDir.toString())
-                .load();
+        Dotenv dotenv = Dotenv.configure().ignoreIfMalformed().ignoreIfMissing().directory(tempDir.toString()).load();
 
-        LlmConfigurationLoader loader = new LlmConfigurationLoader(
-                Map.of(
-                        LlmConfigurationLoader.ENV_LLM_PROVIDER, "mock",
-                        LlmConfigurationLoader.ENV_OPENAI_API_KEY, "from-env",
-                        LlmConfigurationLoader.ENV_OPENAI_BASE_URL, "",
-                        LlmConfigurationLoader.ENV_OPENAI_MODEL, "gpt-env"),
+        LlmConfigurationLoader loader = new LlmConfigurationLoader(Map.of(LlmConfigurationLoader.ENV_LLM_PROVIDER,
+                "mock", LlmConfigurationLoader.ENV_OPENAI_API_KEY, "from-env",
+                LlmConfigurationLoader.ENV_OPENAI_BASE_URL, "", LlmConfigurationLoader.ENV_OPENAI_MODEL, "gpt-env"),
                 dotenv);
 
         LlmConfiguration config = loader.load();
@@ -82,11 +77,7 @@ class LlmConfigurationLoaderTest {
     private Dotenv emptyDotenv() {
         try {
             Path tempDir = Files.createTempDirectory("llm-config-empty");
-            return Dotenv.configure()
-                    .directory(tempDir.toString())
-                    .ignoreIfMissing()
-                    .ignoreIfMalformed()
-                    .load();
+            return Dotenv.configure().directory(tempDir.toString()).ignoreIfMissing().ignoreIfMalformed().load();
         } catch (IOException e) {
             throw new IllegalStateException("テスト用の空 dotenv を作成できませんでした", e);
         }
