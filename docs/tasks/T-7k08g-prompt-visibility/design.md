@@ -66,6 +66,18 @@ Agentic Workflow (Plan/Act/Reflect) --+--> OTLP Export (LangFuse/Azure など)
 - AgenticScope の Plan/Act/Reflect それぞれを Span として表現し、VisibilityEvent の主要フィールドを gen_ai 属性にマッピングする。秘匿値はマスクした上で属性化する。
 - OTLP エンドポイントは `OTEL_EXPORTER_OTLP_ENDPOINT` で指定し、環境ごとに LangFuse / Azure Application Insights へ切り替えられる構成を維持する。LangFuse 固有属性は付与しない。
 
+### トレース/メトリクス取得（レポート）方針
+
+- 継続的な機能/非機能改善（トークン削減、レスポンスタイム改善）のため、LangFuse 上のトレースをコマンドから取得する簡易レポートを最終フェーズで提供する。
+- 実装形態: Gradle タスク（例: `langfuseReport`）。`LANGFUSE_HOST`/`LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` が設定されている場合のみ実行し、未設定時はスキップ。
+- 取得項目（例）: 直近 N 件または直近24hの `gen_ai.*` 属性を集計し、総/平均/中央値のトークン数、p95 レイテンシ、エラー率を標準出力に表示する。LangFuse API を直接叩き、外部送信は行わない。
+- レポートは開発者ローカル利用を想定し、本番観測（Azure Application Insights など）は後続フェーズで別途整備する。
+- プロンプト取得用 Gradle タスク（例: `langfusePrompt`）を用意し、最新または指定トレースから「プロンプト関連イベント」を抽出する。抽出条件の一例:
+  - VisibilityEvent 種別が `prompt` のイベント
+  - または `gen_ai.request.prompt`/`gen_ai.request.messages.*` が付与された Span/Log
+  - フィルタ結果を JSON あるいはテキストで標準出力に整形し、比較やレビューに利用できる形にする
+- 資格情報指定は環境変数 `LANGFUSE_HOST`/`LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` または Gradle プロパティ（`-Phost`/`-PpublicKey`/`-PsecretKey` など）で受け付け、未設定時は安全にスキップする。
+
 ### Data Flow
 
 - 入力: SKILL.md + 実行パラメータ。

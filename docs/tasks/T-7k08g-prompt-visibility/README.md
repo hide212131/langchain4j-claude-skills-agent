@@ -44,6 +44,10 @@ LangFuse をローカルで立ち上げる場合は公式 docker-compose を利�
 docker compose -f https://raw.githubusercontent.com/langfuse/langfuse/main/docker-compose.yml up -d
 ```
 
+トレース集計は `langfuseReport`（予定）で LangFuse API から直近トレースを取得し、gen_ai 指標（トークン数・レイテンシ・エラー率）を標準出力にまとめる。鍵が未設定の場合はスキップする。
+
+プロンプト取得は `langfusePrompt`（予定）で可視化スキーマに合わせたプロンプト属性を取得する（旧仕様の固定パスではなく、設計で定義した VisibilityEvent `prompt` や `gen_ai.request.*` を持つ Span/Log を対象）。環境変数または Gradle プロパティで資格情報を指定する。
+
 ---
 
 ## Template Usage

@@ -129,6 +129,8 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
   - [ ] エラー/リトライのロギング（NFR-mt1ve 連携）
   - [ ] OTLP のモック送信でフィールドマッピングを検証（LangFuse/Azure どちらでも同一スキーマ）
   - [ ] ローカル検証向けに LangFuse docker-compose 起動を簡略化する Gradle タスク（例: `langfuseUp`/`langfuseDown`）を追加し、README に手順を記載（インフラ構築は範囲外であることを明示）
+  - [ ] LangFuse トレースを取得する Gradle タスク（例: `langfuseReport`）を追加し、直近トレースの gen_ai 指標（トークン数/レイテンシ/エラー率）を標準出力に集計（キー未設定時はスキップ）
+  - [ ] プロンプト取得 Gradle タスク（例: `langfusePrompt`）を実装し、VisibilityEvent 種別 `prompt` や `gen_ai.request.*` を持つ Span/Log からプロンプト情報を抽出する。固定パスに依存せず、資格情報は環境変数/Gradle プロパティ両対応
 
 ### Phase 2 Deliverables
 
@@ -136,6 +138,8 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 - OTLP 送信の最小実装（LangFuse 宛ての検証は OTLP エンドポイントで実施）
 - OTLP (OpenTelemetry) 宛て送信の実装と gen_ai 属性マッピング例
 - ローカル LangFuse 起動手順（Gradle タスク経由の簡易起動と docker-compose 1 行）を README に記載
+- LangFuse トレース集計用 Gradle タスクと出力例（トークン数・p95 レイテンシ・エラー率）
+- LangFuse プロンプト取得タスク（`langfusePrompt`）の利用手順と資格情報指定方法（現行スキーマの属性に基づく）
 
 ### Phase 2 Verification
 
