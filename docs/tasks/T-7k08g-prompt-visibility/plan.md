@@ -130,8 +130,8 @@ Phase 1 を完了したため、Phase 2 に着手する。
   - [x] エラー/リトライのロギング（NFR-mt1ve 連携）
   - [x] OTLP のモック送信でフィールドマッピングを検証（LangFuse/Azure どちらでも同一スキーマ）
   - [x] ローカル検証向けに LangFuse docker-compose 起動を簡略化する Gradle タスク（例: `langfuseUp`/`langfuseDown`）を追加し、README に手順を記載（インフラ構築は範囲外であることを明示）
-  - [ ] LangFuse トレースを取得する Gradle タスク（例: `langfuseReport`）を追加し、直近トレースの gen_ai 指標（トークン数/レイテンシ/エラー率）を標準出力に集計（キー未設定時はスキップ）
-  - [ ] プロンプト取得 Gradle タスク（例: `langfusePrompt`）を実装し、VisibilityEvent 種別 `prompt` や `gen_ai.request.*` を持つ Span/Log からプロンプト情報を抽出する。固定パスに依存せず、資格情報は環境変数/Gradle プロパティ両対応
+  - [x] LangFuse トレースを取得する Gradle タスク（例: `langfuseReport`）を追加し、直近トレースの gen_ai 指標（トークン数/レイテンシ/エラー率）を標準出力に集計（キー未設定時はスキップ）
+  - [x] プロンプト取得 Gradle タスク（例: `langfusePrompt`）を実装し、VisibilityEvent 種別 `prompt` や `gen_ai.request.*` を持つ Span/Log からプロンプト情報を抽出する。固定パスに依存せず、資格情報は環境変数/Gradle プロパティ両対応
 
 ### Phase 2 Deliverables
 

@@ -21,6 +21,7 @@ dependencies {
     val langchain4jVersion = "1.9.1"
     val langchain4jAgenticVersion = "1.9.1-beta17"
     val otelVersion = "1.43.0"
+    val jacksonVersion = "2.17.2"
 
     implementation("org.yaml:snakeyaml:2.2")
     implementation("info.picocli:picocli:4.7.6")
@@ -31,6 +32,7 @@ dependencies {
     implementation("io.opentelemetry:opentelemetry-api:$otelVersion")
     implementation("io.opentelemetry:opentelemetry-sdk:$otelVersion")
     implementation("io.opentelemetry:opentelemetry-exporter-otlp:$otelVersion")
+    implementation("com.fasterxml.jackson.core:jackson-databind:$jacksonVersion")
 
     testImplementation(platform("org.junit:junit-bom:5.10.1"))
     testImplementation("org.junit.jupiter:junit-jupiter")
@@ -80,6 +82,27 @@ tasks.register<Exec>("langfuseDown") {
         "https://raw.githubusercontent.com/langfuse/langfuse/main/docker-compose.yml",
         "down"
     )
+}
+
+tasks.register<JavaExec>("langfuseReport") {
+    group = "observability"
+    description = "LangFuse API から直近トレースの gen_ai 指標を集計して表示します（鍵未設定時はスキップ）。"
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("io.github.hide212131.langchain4j.claude.skills.runtime.langfuse.LangfuseReportMain")
+    val limit = providers.gradleProperty("limit").orNull ?: "20"
+    args("--limit", limit)
+    providers.gradleProperty("traceId").orNull?.let { args("--trace-id", it) }
+    providers.gradleProperty("hours").orNull?.let { args("--hours", it) }
+}
+
+tasks.register<JavaExec>("langfusePrompt") {
+    group = "observability"
+    description = "LangFuse API から直近トレースのプロンプト関連情報を抽出して表示します（鍵未設定時はスキップ）。"
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("io.github.hide212131.langchain4j.claude.skills.runtime.langfuse.LangfusePromptMain")
+    providers.gradleProperty("traceId").orNull?.let { args("--trace-id", it) }
+    val limit = providers.gradleProperty("limit").orNull ?: "5"
+    args("--limit", limit)
 }
 
 checkstyle {

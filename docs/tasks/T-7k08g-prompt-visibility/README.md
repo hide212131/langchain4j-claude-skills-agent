@@ -56,6 +56,23 @@ Gradle タスク（推奨）:
 
 プロンプト取得は `langfusePrompt`（予定）で可視化スキーマに合わせたプロンプト属性を取得する（旧仕様の固定パスではなく、設計で定義した VisibilityEvent `prompt` や `gen_ai.request.*` を持つ Span/Log を対象）。環境変数または Gradle プロパティで資格情報を指定する。
 
+### LangFuse レポート/プロンプト取得（Gradle タスク）
+
+前提（環境変数）:
+
+- `LANGFUSE_HOST`
+- `LANGFUSE_PUBLIC_KEY`
+- `LANGFUSE_SECRET_KEY`
+
+実行例:
+
+```bash
+./gradlew :app:langfuseReport -Plimit=20
+./gradlew :app:langfuseReport -PtraceId=<traceId>
+./gradlew :app:langfusePrompt -Plimit=5
+./gradlew :app:langfusePrompt -PtraceId=<traceId>
+```
+
 ## OpenAI 実行の動作確認（CLI）
 
 `.env` に OpenAI と可視化の設定を入れた上で、CLI で `--llm-provider openai` を指定して実行する。
