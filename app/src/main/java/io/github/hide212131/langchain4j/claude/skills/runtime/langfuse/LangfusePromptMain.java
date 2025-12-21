@@ -1,6 +1,7 @@
 package io.github.hide212131.langchain4j.claude.skills.runtime.langfuse;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.ArrayList;
 import java.util.List;
 
 /** LangFuse からプロンプト関連情報を抽出する。 */
@@ -24,27 +25,53 @@ public final class LangfusePromptMain {
         }
 
         LangfuseApiClient client = new LangfuseApiClient(config);
-        JsonNode trace;
-        if (parsed.traceId() != null) {
-            trace = client.getTrace(parsed.traceId());
+        JsonNode trace = null;
+        String traceId = parsed.traceId();
+        List<String> checked = new ArrayList<>();
+        if (traceId != null) {
+            trace = client.getTrace(traceId);
         } else {
             JsonNode list = client.listTraces(parsed.limit());
             JsonNode data = list.get("data");
-            if (data == null || !data.isArray() || data.isEmpty() || data.get(0).get("id") == null) {
+            if (data == null || !data.isArray() || data.isEmpty()) {
                 System.out.println("トレースが見つかりません。");
                 return;
             }
-            trace = client.getTrace(data.get(0).get("id").asText());
+            for (JsonNode item : data) {
+                JsonNode idNode = item.get("id");
+                if (idNode == null || !idNode.isTextual()) {
+                    continue;
+                }
+                String id = idNode.asText();
+                checked.add(id);
+                JsonNode candidate = client.getTrace(id);
+                if (!LangfuseJsonScan.findValuesAnyOf(candidate, PROMPT_KEYS).isEmpty()) {
+                    trace = candidate;
+                    traceId = id;
+                    break;
+                }
+            }
+            if (trace == null) {
+                // フォールバック: 先頭のトレースだけは表示対象にする（デバッグ用途）
+                JsonNode idNode = data.get(0).get("id");
+                if (idNode != null && idNode.isTextual()) {
+                    traceId = idNode.asText();
+                    trace = client.getTrace(traceId);
+                }
+            }
         }
 
         List<LangfuseJsonScan.FoundValue> found = LangfuseJsonScan.findValuesAnyOf(trace, PROMPT_KEYS);
         System.out.println("=== LangFuse Prompt Extract ===");
-        if (parsed.traceId() != null) {
-            System.out.println("traceId=" + parsed.traceId());
+        if (traceId != null) {
+            System.out.println("traceId=" + traceId);
         }
         if (found.isEmpty()) {
             System.out.println("対象キーが見つかりません。");
             System.out.println("探索キー: " + PROMPT_KEYS);
+            if (!checked.isEmpty()) {
+                System.out.println("確認した traceId: " + checked);
+            }
             return;
         }
         for (LangfuseJsonScan.FoundValue item : found) {

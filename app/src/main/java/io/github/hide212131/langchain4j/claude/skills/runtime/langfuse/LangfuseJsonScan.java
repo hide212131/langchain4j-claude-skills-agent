@@ -30,6 +30,13 @@ public final class LangfuseJsonScan {
             return;
         }
         if (node.isObject()) {
+            JsonNode attributeKey = node.get("key");
+            if (attributeKey != null && attributeKey.isTextual() && key.equals(attributeKey.asText())) {
+                JsonNode value = node.get("value");
+                if (value != null) {
+                    out.add(new FoundValue(path + ".value", value));
+                }
+            }
             Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
             while (fields.hasNext()) {
                 Map.Entry<String, JsonNode> entry = fields.next();
@@ -52,6 +59,13 @@ public final class LangfuseJsonScan {
             return;
         }
         if (node.isObject()) {
+            JsonNode attributeKey = node.get("key");
+            if (attributeKey != null && attributeKey.isTextual() && keys.contains(attributeKey.asText())) {
+                JsonNode value = node.get("value");
+                if (value != null) {
+                    out.add(new FoundValue(path + ".value", value));
+                }
+            }
             Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
             while (fields.hasNext()) {
                 Map.Entry<String, JsonNode> entry = fields.next();

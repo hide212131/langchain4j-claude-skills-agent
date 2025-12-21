@@ -24,8 +24,10 @@ public final class LangfuseReportMain {
 
         LangfuseApiClient client = new LangfuseApiClient(config);
         List<JsonNode> traces = new ArrayList<>();
+        List<String> traceIds = new ArrayList<>();
         if (parsed.traceId() != null) {
             traces.add(client.getTrace(parsed.traceId()));
+            traceIds.add(parsed.traceId());
         } else {
             JsonNode list = client.listTraces(parsed.limit());
             JsonNode data = list.get("data");
@@ -33,7 +35,9 @@ public final class LangfuseReportMain {
                 for (JsonNode item : data) {
                     JsonNode idNode = item.get("id");
                     if (idNode != null && idNode.isTextual()) {
-                        traces.add(client.getTrace(idNode.asText()));
+                        String id = idNode.asText();
+                        traceIds.add(id);
+                        traces.add(client.getTrace(id));
                     }
                 }
             }
@@ -43,6 +47,7 @@ public final class LangfuseReportMain {
         long totalOutput = 0;
         List<Long> latencies = new ArrayList<>();
         int spanCount = 0;
+        int matchedTraces = 0;
 
         for (JsonNode trace : traces) {
             List<LangfuseJsonScan.FoundValue> inputTokens = LangfuseJsonScan.findValues(trace,
@@ -51,20 +56,26 @@ public final class LangfuseReportMain {
                     "gen_ai.usage.output_tokens");
             List<LangfuseJsonScan.FoundValue> latencyMs = LangfuseJsonScan.findValues(trace,
                     "visibility.metrics.latency_ms");
+            if (!inputTokens.isEmpty() || !outputTokens.isEmpty() || !latencyMs.isEmpty()) {
+                matchedTraces++;
+            }
             for (LangfuseJsonScan.FoundValue value : inputTokens) {
-                if (value.value().canConvertToLong()) {
-                    totalInput += value.value().asLong();
+                Long v = tryAsLong(value.value());
+                if (v != null) {
+                    totalInput += v;
                     spanCount++;
                 }
             }
             for (LangfuseJsonScan.FoundValue value : outputTokens) {
-                if (value.value().canConvertToLong()) {
-                    totalOutput += value.value().asLong();
+                Long v = tryAsLong(value.value());
+                if (v != null) {
+                    totalOutput += v;
                 }
             }
             for (LangfuseJsonScan.FoundValue value : latencyMs) {
-                if (value.value().canConvertToLong()) {
-                    latencies.add(value.value().asLong());
+                Long v = tryAsLong(value.value());
+                if (v != null) {
+                    latencies.add(v);
                 }
             }
         }
@@ -73,9 +84,13 @@ public final class LangfuseReportMain {
         Long p95 = percentile(latencies, 95);
         System.out.println("=== LangFuse Report ===");
         System.out.println("traces=" + traces.size());
+        System.out.println("matched_traces=" + matchedTraces);
         System.out.println("spans_with_usage=" + spanCount);
         System.out.println("total_input_tokens=" + totalInput);
         System.out.println("total_output_tokens=" + totalOutput);
+        if (!traceIds.isEmpty()) {
+            System.out.println("trace_ids=" + traceIds);
+        }
         if (p95 != null) {
             System.out.println("p95_latency_ms=" + p95);
         } else {
@@ -114,5 +129,36 @@ public final class LangfuseReportMain {
             idx = sorted.size() - 1;
         }
         return sorted.get(idx);
+    }
+
+    private static Long tryAsLong(JsonNode value) {
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        if (value.isNumber()) {
+            return value.asLong();
+        }
+        if (value.isTextual()) {
+            try {
+                return Long.parseLong(value.asText().trim());
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        if (value.isObject()) {
+            JsonNode intValue = value.get("intValue");
+            if (intValue != null) {
+                return tryAsLong(intValue);
+            }
+            JsonNode stringValue = value.get("stringValue");
+            if (stringValue != null) {
+                return tryAsLong(stringValue);
+            }
+            JsonNode valueNode = value.get("value");
+            if (valueNode != null) {
+                return tryAsLong(valueNode);
+            }
+        }
+        return null;
     }
 }

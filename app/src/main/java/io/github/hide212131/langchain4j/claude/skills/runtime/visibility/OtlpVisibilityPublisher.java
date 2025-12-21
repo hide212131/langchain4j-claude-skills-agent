@@ -8,6 +8,7 @@ import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
+import io.opentelemetry.exporter.otlp.http.trace.OtlpHttpSpanExporter;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.resources.Resource;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
@@ -114,6 +115,18 @@ public final class OtlpVisibilityPublisher implements VisibilityEventPublisher, 
     }
 
     private static SpanExporter buildExporter(String endpoint, Map<String, String> headers) {
+        if (shouldUseHttpExporter(endpoint)) {
+            io.opentelemetry.exporter.otlp.http.trace.OtlpHttpSpanExporterBuilder builder = OtlpHttpSpanExporter
+                    .builder();
+            if (endpoint != null && !endpoint.isBlank()) {
+                builder.setEndpoint(normalizeHttpEndpoint(endpoint));
+            }
+            if (headers != null) {
+                headers.forEach(builder::addHeader);
+            }
+            return builder.build();
+        }
+
         io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporterBuilder builder = OtlpGrpcSpanExporter.builder();
         if (endpoint != null && !endpoint.isBlank()) {
             builder.setEndpoint(endpoint);
@@ -122,6 +135,31 @@ public final class OtlpVisibilityPublisher implements VisibilityEventPublisher, 
             headers.forEach(builder::addHeader);
         }
         return builder.build();
+    }
+
+    private static boolean shouldUseHttpExporter(String endpoint) {
+        if (endpoint == null || endpoint.isBlank()) {
+            return false;
+        }
+        String value = endpoint.trim();
+        if (value.contains("/api/public/otel")) {
+            return true;
+        }
+        if (value.contains("/v1/traces")) {
+            return true;
+        }
+        return value.endsWith(":4318") || value.contains(":4318/");
+    }
+
+    private static String normalizeHttpEndpoint(String endpoint) {
+        String value = endpoint.trim();
+        if (value.contains("/v1/traces")) {
+            return value;
+        }
+        if (value.contains("/api/public/otel")) {
+            return value.endsWith("/api/public/otel") ? value + "/v1/traces" : value;
+        }
+        return value.endsWith("/") ? value + "v1/traces" : value + "/v1/traces";
     }
 
     private String safe(String value) {

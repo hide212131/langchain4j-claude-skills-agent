@@ -119,10 +119,13 @@ docker compose -p langfuse -f app/build/langfuse/docker-compose.yml down -v
 例:
 
 ```bash
-./app/build/install/app/bin/skills --skill path/to/SKILL.md --goal "demo" --llm-provider openai --exporter otlp
+app/build/install/skills/bin/skills --skill path/to/SKILL.md --goal "demo" --llm-provider openai --exporter otlp
 ```
 
 OTLP 送信先は `OTEL_EXPORTER_OTLP_ENDPOINT`（および必要なら `OTEL_EXPORTER_OTLP_HEADERS`）で指定する。`.env.example` を参照。
+
+LangFuse self-host に送る場合は、`OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:3000/api/public/otel` を推奨（OTLP/HTTP）。
+この場合 `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` が設定されていれば、`Authorization: Basic ...` ヘッダは自動付与される（`OTEL_EXPORTER_OTLP_HEADERS` を省略可）。
 
 ---
 
