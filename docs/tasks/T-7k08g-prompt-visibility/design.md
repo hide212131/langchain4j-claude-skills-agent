@@ -57,6 +57,7 @@ Agentic Workflow (Plan/Act/Reflect) --+--> OTLP Export (LangFuse/Azure など)
 - フェーズの優先順は「LangFuse を OTLP 送信先として検証」→「Azure Application Insights を後続フェーズで追加」。LangFuse 固有属性は実装せず、gen_ai 属性を中心に共通スキーマで送る。
 - OTLP エンドポイント/ヘッダは環境変数（例: `OTEL_EXPORTER_OTLP_ENDPOINT`/`OTEL_EXPORTER_OTLP_HEADERS`）で指定し、未設定時は送信を無効化できる構成にする。
 - マスキング済みの VisibilityEvent を Span/Log に変換し、`skillId`/`runId`/`phase` を Trace 属性に付与。ペイロード内の秘匿情報は送信前に除去する。
+- ローカル検証は LangFuse 公式 docker-compose（例: `docker compose -f https://raw.githubusercontent.com/langfuse/langfuse/main/docker-compose.yml up -d`）で立ち上げる前提。Gradle タスク（`langfuseUp`/`langfuseDown`）で compose をラップして簡易起動する。クラウド環境の構築は本タスクの範囲外。
 
 ### OTLP / OpenTelemetry 方針
 

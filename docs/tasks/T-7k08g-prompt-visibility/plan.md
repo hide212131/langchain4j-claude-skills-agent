@@ -128,12 +128,14 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
   - [ ] OTLP 出力の基本実装と設定切替（none|otlp）
   - [ ] エラー/リトライのロギング（NFR-mt1ve 連携）
   - [ ] OTLP のモック送信でフィールドマッピングを検証（LangFuse/Azure どちらでも同一スキーマ）
+  - [ ] ローカル検証向けに LangFuse docker-compose 起動を簡略化する Gradle タスク（例: `langfuseUp`/`langfuseDown`）を追加し、README に手順を記載（インフラ構築は範囲外であることを明示）
 
 ### Phase 2 Deliverables
 
 - AgenticScope 計装とエクスポート設定
 - OTLP 送信の最小実装（LangFuse 宛ての検証は OTLP エンドポイントで実施）
 - OTLP (OpenTelemetry) 宛て送信の実装と gen_ai 属性マッピング例
+- ローカル LangFuse 起動手順（Gradle タスク経由の簡易起動と docker-compose 1 行）を README に記載
 
 ### Phase 2 Verification
 

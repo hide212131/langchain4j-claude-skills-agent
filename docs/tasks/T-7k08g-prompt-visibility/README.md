@@ -27,14 +27,22 @@ SKILL.md パースからエージェントの Plan/Act/Reflect 実行、生成�
 
 ## Scope
 
-- In scope: SKILL パース結果の記録、LLM 送信プロンプトと応答の取得、AgenticScope コンテキスト/履歴の追跡、入出力パラメータとメトリクスの構造化ログ化、LangFuse/OTLP 連携の設計方針整理。
-- Out of scope: 複数スキル連鎖や複雑分岐の実装そのもの（FR-2ff4z/FR-cccz4 に委譲）、本番環境へのデプロイ手順詳細、UI ダッシュボード実装。
+- In scope: SKILL パース結果の記録、LLM 送信プロンプトと応答の取得、AgenticScope コンテキスト/履歴の追跡、入出力パラメータとメトリクスの構造化ログ化、OTLP 連携の設計方針整理（LangFuse/Azure いずれも OTLP 送信先として想定）。
+- Out of scope: 複数スキル連鎖や複雑分岐の実装そのもの（FR-2ff4z/FR-cccz4 に委譲）、本番環境へのデプロイ手順詳細（EKS/クラウド構築）、UI ダッシュボード実装。
 
 ## Success Metrics
 
 - プロンプトと AgenticScope 状態を工程別に追跡できるログ/トレースを出力し、FR-hjz63 受け入れ基準を満たす。
-- ローカル観測（LangFuse）とクラウド観測（OTLP/AI Insights）へ同一スキーマで送出できる設計を確立する。
+- ローカル観測（LangFuse、OTLP 宛て）とクラウド観測（OTLP/AI Insights）へ同一スキーマで送出できる設計を確立する。
 - エラー/マスキング要件を含む可視化の安全性を計画に盛り込み、NFR-30zem/NFR-mt1ve の観点を満たす。
+
+## ローカル検証環境（前提）
+
+LangFuse をローカルで立ち上げる場合は公式 docker-compose を利用する（開発者ローカルの前提手順。クラウド構築は別途）。Gradle から簡易起動できる `langfuseUp`/`langfuseDown`（docker compose ラッパー）を追加予定。
+
+```bash
+docker compose -f https://raw.githubusercontent.com/langfuse/langfuse/main/docker-compose.yml up -d
+```
 
 ---
 
