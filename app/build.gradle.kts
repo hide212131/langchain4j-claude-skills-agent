@@ -57,6 +57,31 @@ application {
     applicationName = "skills"
 }
 
+tasks.register<Exec>("langfuseUp") {
+    group = "observability"
+    description = "LangFuse をローカルで起動します（公式 docker-compose を使用）。"
+    commandLine(
+        "docker",
+        "compose",
+        "-f",
+        "https://raw.githubusercontent.com/langfuse/langfuse/main/docker-compose.yml",
+        "up",
+        "-d"
+    )
+}
+
+tasks.register<Exec>("langfuseDown") {
+    group = "observability"
+    description = "LangFuse を停止します（公式 docker-compose を使用）。"
+    commandLine(
+        "docker",
+        "compose",
+        "-f",
+        "https://raw.githubusercontent.com/langfuse/langfuse/main/docker-compose.yml",
+        "down"
+    )
+}
+
 checkstyle {
     toolVersion = "10.12.5"
     configFile = rootProject.file("config/checkstyle/checkstyle.xml")
