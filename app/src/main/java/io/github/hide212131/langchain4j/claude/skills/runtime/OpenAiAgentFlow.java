@@ -19,7 +19,10 @@ import dev.langchain4j.model.openaiofficial.OpenAiOfficialChatModel;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.AgentStatePayload;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.MetricsPayload;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.PromptPayload;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.TokenUsage;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.TokenUsageExtractor;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEvent;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventMetadata;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventPublisher;
@@ -91,6 +94,7 @@ final class OpenAiAgentFlow implements AgentFlow {
         Map<String, Object> inputs = Map.of("skillName", document.name(), "skillDescription", document.description(),
                 "skillBody", document.body(), KEY_GOAL, safeGoal);
 
+        long workflowStart = System.nanoTime();
         try {
             ResultWithAgenticScope<?> result = workflow.invokeWithAgenticScope(inputs);
             AgenticScope scope = result.agenticScope();
@@ -100,6 +104,7 @@ final class OpenAiAgentFlow implements AgentFlow {
             String reflectLog = stringOrFallback(scope.readState(KEY_REFLECT), "Reflect を取得できませんでした");
             String artifact = stringOrFallback(result.result(), "");
 
+            publishWorkflowMetrics(events, runId, document.id(), nanosToMillis(workflowStart));
             return new AgentFlowResult(planLog, actLog, reflectLog, artifact);
         } catch (RuntimeException ex) {
             log.error(runId, document.id(), "error", "openai.run",
@@ -153,9 +158,15 @@ final class OpenAiAgentFlow implements AgentFlow {
 
     private static void publishPrompt(VisibilityEventPublisher events, String runId, String skillId, String step,
             String prompt, String response, String model) {
+        publishPrompt(events, runId, skillId, step, prompt, response, model, null);
+    }
+
+    @SuppressWarnings("checkstyle:ParameterNumber")
+    private static void publishPrompt(VisibilityEventPublisher events, String runId, String skillId, String step,
+            String prompt, String response, String model, TokenUsage usage) {
         VisibilityEventMetadata metadata = new VisibilityEventMetadata(runId, skillId, "llm", step, null);
         events.publish(new VisibilityEvent(VisibilityEventType.PROMPT, metadata,
-                new PromptPayload(maskPreview(prompt), response, model, "assistant", null)));
+                new PromptPayload(maskPreview(prompt), response, model, "assistant", usage)));
     }
 
     private static String maskPreview(String value) {
@@ -167,6 +178,30 @@ final class OpenAiAgentFlow implements AgentFlow {
             return text;
         }
         return text.substring(0, PREVIEW_LIMIT) + "...(truncated)";
+    }
+
+    private static void publishWorkflowMetrics(VisibilityEventPublisher events, String runId, String skillId,
+            long latencyMillis) {
+        VisibilityEventMetadata metadata = new VisibilityEventMetadata(runId, skillId, "workflow", "workflow.done",
+                null);
+        events.publish(new VisibilityEvent(VisibilityEventType.METRICS, metadata,
+                new MetricsPayload(null, null, latencyMillis, null)));
+    }
+
+    private static void publishLlmMetrics(VisibilityEventPublisher events, String runId, String skillId,
+            TokenUsage usage, long latencyMillis) {
+        Long input = usage == null ? null : usage.inputTokens();
+        Long output = usage == null ? null : usage.outputTokens();
+        VisibilityEventMetadata metadata = new VisibilityEventMetadata(runId, skillId, "llm", "llm.metrics", null);
+        events.publish(new VisibilityEvent(VisibilityEventType.METRICS, metadata,
+                new MetricsPayload(input, output, latencyMillis, null)));
+    }
+
+    private static long nanosToMillis(long startNanos) {
+        if (startNanos <= 0L) {
+            return 0L;
+        }
+        return (System.nanoTime() - startNanos) / 1_000_000L;
     }
 
     private String stringOrFallback(Object value, String fallback) {
@@ -193,6 +228,7 @@ final class OpenAiAgentFlow implements AgentFlow {
         private final String skillId;
         private final VisibilityEventPublisher events;
         private final String model;
+        private long lastRequestStartNanos;
 
         VisibilityChatModelListener(VisibilityLog log, boolean basicLog, String runId, String skillId,
                 VisibilityEventPublisher events, String model) {
@@ -207,6 +243,7 @@ final class OpenAiAgentFlow implements AgentFlow {
         @Override
         public void onRequest(ChatModelRequestContext ctx) {
             String request = ctx.chatRequest() == null ? "(none)" : ctx.chatRequest().toString();
+            lastRequestStartNanos = System.nanoTime();
             log.info(basicLog, runId, skillId, "llm", "llm.request", "OpenAI へリクエストを送信します", "", request);
             publishPrompt(events, runId, skillId, "llm.request", request, null, model);
         }
@@ -216,7 +253,9 @@ final class OpenAiAgentFlow implements AgentFlow {
             ChatResponse response = ctx.chatResponse();
             String output = response != null && response.aiMessage() != null ? response.aiMessage().text() : "(empty)";
             log.info(basicLog, runId, skillId, "llm", "llm.response", "OpenAI から応答を受信しました", "", output);
-            publishPrompt(events, runId, skillId, "llm.response", "(llm-response)", output, model);
+            TokenUsage usage = TokenUsageExtractor.from(response);
+            publishPrompt(events, runId, skillId, "llm.response", "(llm-response)", output, model, usage);
+            publishLlmMetrics(events, runId, skillId, usage, nanosToMillis(lastRequestStartNanos));
         }
 
         @Override

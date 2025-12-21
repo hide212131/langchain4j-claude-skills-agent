@@ -49,6 +49,18 @@ docker compose -f https://raw.githubusercontent.com/langfuse/langfuse/main/docke
 
 プロンプト取得は `langfusePrompt`（予定）で可視化スキーマに合わせたプロンプト属性を取得する（旧仕様の固定パスではなく、設計で定義した VisibilityEvent `prompt` や `gen_ai.request.*` を持つ Span/Log を対象）。環境変数または Gradle プロパティで資格情報を指定する。
 
+## OpenAI 実行の動作確認（CLI）
+
+`.env` に OpenAI と可視化の設定を入れた上で、CLI で `--llm-provider openai` を指定して実行する。
+
+例:
+
+```bash
+./app/build/install/app/bin/skills --skill path/to/SKILL.md --goal "demo" --llm-provider openai --exporter otlp
+```
+
+OTLP 送信先は `OTEL_EXPORTER_OTLP_ENDPOINT`（および必要なら `OTEL_EXPORTER_OTLP_HEADERS`）で指定する。`.env.example` を参照。
+
 ---
 
 ## Template Usage

@@ -121,13 +121,13 @@ Phase 1 を完了したため、Phase 2 に着手する。
 
 - [ ] **Agentic フック**
   - [x] Plan/Act/Reflect でプロンプト/応答/決定をイベント化
-  - [ ] 入出力パラメータとメトリクス（トークン/レイテンシ）を付与
+  - [x] 入出力パラメータとメトリクス（トークン/レイテンシ）を付与
 - [ ] **エクスポーター**
   - [x] OTLP の接続設定を CLI/環境変数で切替（`--exporter none|otlp`、`OTEL_EXPORTER_OTLP_ENDPOINT`、`OTEL_EXPORTER_OTLP_HEADERS` など）
   - [x] OTLP は OpenTelemetry Java SDK を用い、ビジネスコードは OpenTelemetry API のみを呼ぶ形に整理（Exporter で宛先切替）
-  - [ ] Span/Log に gen_ai セマンティック属性をマッピング（`gen_ai.request.*`/`gen_ai.response.*`/`gen_ai.usage.*` など）し、Plan/Act/Reflect を Span として表現
+  - [x] Span/Log に gen_ai セマンティック属性をマッピング（`gen_ai.request.*`/`gen_ai.response.*`/`gen_ai.usage.*` など）し、Plan/Act/Reflect を Span として表現
   - [x] OTLP 出力の基本実装と設定切替（none|otlp）
-  - [ ] エラー/リトライのロギング（NFR-mt1ve 連携）
+  - [x] エラー/リトライのロギング（NFR-mt1ve 連携）
   - [x] OTLP のモック送信でフィールドマッピングを検証（LangFuse/Azure どちらでも同一スキーマ）
   - [ ] ローカル検証向けに LangFuse docker-compose 起動を簡略化する Gradle タスク（例: `langfuseUp`/`langfuseDown`）を追加し、README に手順を記載（インフラ構築は範囲外であることを明示）
   - [ ] LangFuse トレースを取得する Gradle タスク（例: `langfuseReport`）を追加し、直近トレースの gen_ai 指標（トークン数/レイテンシ/エラー率）を標準出力に集計（キー未設定時はスキップ）

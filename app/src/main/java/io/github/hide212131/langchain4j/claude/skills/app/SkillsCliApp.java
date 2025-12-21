@@ -11,9 +11,14 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.SkillDocumentParse
 import io.github.hide212131.langchain4j.claude.skills.runtime.VisibilityLevel;
 import io.github.hide212131.langchain4j.claude.skills.runtime.VisibilityLog;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ExporterType;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ErrorPayload;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.MetricsPayload;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ObservabilityConfiguration;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ObservabilityConfigurationLoader;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEvent;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventMetadata;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventPublisher;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventType;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityMasking;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityPublisherFactory;
 import java.io.PrintStream;
@@ -134,7 +139,7 @@ public final class SkillsCliApp implements Callable<Integer> {
                     closeablePublisher);
 
             try {
-                AgentFlowResult result = executeWithRetry(action, log, basic, runId, document.id());
+                AgentFlowResult result = executeWithRetry(action, log, basic, runId, document.id(), closeablePublisher);
                 spec.commandLine().getOut().println(result.formatted());
                 spec.commandLine().getOut().flush();
                 return CommandLine.ExitCode.OK;
@@ -148,22 +153,37 @@ public final class SkillsCliApp implements Callable<Integer> {
     }
 
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
-    static <T> T executeWithRetry(Supplier<T> action, VisibilityLog log, boolean basic, String runId, String skillId) {
+    static <T> T executeWithRetry(Supplier<T> action, VisibilityLog log, boolean basic, String runId, String skillId,
+            VisibilityEventPublisher publisher) {
         Objects.requireNonNull(action, "action");
         Objects.requireNonNull(log, "log");
         Objects.requireNonNull(skillId, "skillId");
+        Objects.requireNonNull(publisher, "publisher");
         try {
             return action.get();
         } catch (RuntimeException first) {
             log.warn(runId, skillId, LOG_TAG_ERROR, "run.retry", "エラーが発生したため再試行します", "", "", first);
+            publishRetryEvent(publisher, runId, skillId, first, 1);
             try {
                 return action.get();
             } catch (RuntimeException second) {
                 second.addSuppressed(first);
                 log.error(runId, skillId, LOG_TAG_ERROR, "run.failed", "再試行しても失敗しました", "", "", second);
+                publishRetryEvent(publisher, runId, skillId, second, 2);
                 throw second;
             }
         }
+    }
+
+    private static void publishRetryEvent(VisibilityEventPublisher publisher, String runId, String skillId,
+            Throwable error, int retryCount) {
+        VisibilityEventMetadata errorMetadata = new VisibilityEventMetadata(runId, skillId, "error", "run.retry", null);
+        publisher.publish(new VisibilityEvent(VisibilityEventType.ERROR, errorMetadata,
+                new ErrorPayload("エージェント実行でエラーが発生しました: " + error.getMessage(), error.getClass().getSimpleName())));
+        VisibilityEventMetadata metricsMetadata = new VisibilityEventMetadata(runId, skillId, "metrics", "run.retry",
+                null);
+        publisher.publish(new VisibilityEvent(VisibilityEventType.METRICS, metricsMetadata,
+                new MetricsPayload(null, null, null, retryCount)));
     }
 
     private static final class VisibilityLevelConverter implements ITypeConverter<VisibilityLevel> {
