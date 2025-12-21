@@ -37,9 +37,8 @@ FR-hjz63 に基づき、SKILL.md パースから AgenticScope の Plan/Act/Refle
 
 ```
 SKILL.md -> Parser -> SkillModel
-                     |                +--> LangFuse Export
-                     v                |
-Agentic Workflow (Plan/Act/Reflect) --+--> OTLP Export (traces/logs/metrics)
+                     v
+Agentic Workflow (Plan/Act/Reflect) --+--> OTLP Export (LangFuse/Azure など)
                      |                |
                      +--> Visibility Logger (structured events)
 ```
@@ -49,15 +48,29 @@ Agentic Workflow (Plan/Act/Reflect) --+--> OTLP Export (traces/logs/metrics)
 - VisibilityLogger（新設ユーティリティ、具体名後述）: SKILL パース結果、LLM プロンプト、AgenticScope 状態、入出力パラメータ、メトリクスを構造化イベントとして生成。マスキングフィルタを備える。
 - Parser Hook: SKILL.md 読み込み時に YAML frontmatter/Markdown 本文、JSON Schema 検証結果をイベント化。
 - Agentic Hooks: Plan/Act/Reflect の各ステップでプロンプト/応答と決定を記録。エラーハンドリング（NFR-mt1ve）用の例外情報/リトライ情報も併記。
-- Exporters: OTLP（トレース/ログ/メトリクス）、LangFuse（ローカル比較用）。共通イベントスキーマから変換。
+- Exporters: OTLP（トレース/ログ/メトリクス）のみ。共通イベントスキーマから変換し、送信先は設定で切り替える。
 - Minimal Execution Stub: ダミー LLM 応答と最小パース/実行スタブでイベント発火を先に実装し、テストファーストでスキーマとフックの契約を固める。
+
+### OTLP 送信先の想定
+
+- 送信は OpenTelemetry OTLP（HTTP/JSON）で行い、ビジネスコードは OpenTelemetry API のみを呼ぶ。送信先は Exporter の設定で切り替える（ADR-ij1ew の方針に従う）。
+- フェーズの優先順は「LangFuse を OTLP 送信先として検証」→「Azure Application Insights を後続フェーズで追加」。LangFuse 固有属性は実装せず、gen_ai 属性を中心に共通スキーマで送る。
+- OTLP エンドポイント/ヘッダは環境変数（例: `OTEL_EXPORTER_OTLP_ENDPOINT`/`OTEL_EXPORTER_OTLP_HEADERS`）で指定し、未設定時は送信を無効化できる構成にする。
+- マスキング済みの VisibilityEvent を Span/Log に変換し、`skillId`/`runId`/`phase` を Trace 属性に付与。ペイロード内の秘匿情報は送信前に除去する。
+
+### OTLP / OpenTelemetry 方針
+
+- OpenTelemetry Java SDK（<https://github.com/open-telemetry/opentelemetry-java>）を用いてトレース/ログ/メトリクスを生成・送信する。ビジネスコードからは OpenTelemetry API のみを呼び、Exporter で宛先を切り替える（ADR-ij1ew）。
+- 生成する Span/Log には OpenTelemetry Semantic Conventions の gen_ai 属性（例: `gen_ai.system`, `gen_ai.request.model`, `gen_ai.response.id`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` など）を付与し、LLM 呼び出しの文脈を明示する。
+- AgenticScope の Plan/Act/Reflect それぞれを Span として表現し、VisibilityEvent の主要フィールドを gen_ai 属性にマッピングする。秘匿値はマスクした上で属性化する。
+- OTLP エンドポイントは `OTEL_EXPORTER_OTLP_ENDPOINT` で指定し、環境ごとに LangFuse / Azure Application Insights へ切り替えられる構成を維持する。LangFuse 固有属性は付与しない。
 
 ### Data Flow
 
 - 入力: SKILL.md + 実行パラメータ。
 - パース: YAML frontmatter と本文を POJO 化し、スキーマ検証結果をイベントに記録。
 - 実行: AgenticScope の Plan/Act/Reflect それぞれでプロンプト/応答/決定/メトリクスをイベント化。
-- 出力: Visibility Logger が構造化イベントをキューイングし、同期/非同期に OTLP と LangFuse へ送出。
+- 出力: Visibility Logger が構造化イベントをキューイングし、同期/非同期に OTLP へ送出。
 
 ### Storage Layout and Paths (if applicable)
 
@@ -72,7 +85,7 @@ Usage
 java -jar agent.jar --skill path/to/SKILL.md --visibility-level debug
 ```
 
-- パラメータ例: `--visibility-level (off|errors|basic|debug)`, `--exporter (none|otlp|langfuse)`, `--masking-rules path`.
+- パラメータ例: `--visibility-level (off|errors|basic|debug)`, `--exporter (none|otlp)`, `--masking-rules path`.
 - Agent 内部 API: `VisibilityLogger.recordPrompt`, `recordAgentState`, `recordMetrics`（仮）を通じて統一スキーマで記録。
 
 Implementation Notes
@@ -145,11 +158,11 @@ Decision Rationale
 ### Integration Tests
 
 - テスト用 SKILL.md を用いた Plan/Act/Reflect e2e 実行でプロンプト・状態・メトリクスの記録を確認。
-- LangFuse/OTLP 送信をモック/ローカルエンドポイントで検証。
+- OTLP 送信をモック/ローカルエンドポイントで検証（LangFuse/Azure どちらでも同一スキーマ）。
 
 ### External API Parsing (if applicable)
 
-- LangFuse/OTLP への送信レスポンス例を fixture 化し、JSON パースとフィールドマッピングをテスト。
+- OTLP への送信レスポンス例を fixture 化し、JSON パースとフィールドマッピングをテスト。
 
 ### Performance & Benchmarks (if applicable)
 
@@ -168,7 +181,7 @@ Decision Rationale
 
 ## Open Questions
 
-- [ ] LangFuse/OTLP への同時送信をどの段階で行うか（同期 vs 非同期バッファ）。
+- [ ] OTLP のバッファ戦略（同期 vs 非同期バッファ）をどの段階で行うか。
 - [ ] マスキングルールの設定形式（YAML/JSON）とデフォルト項目。
 - [ ] LangChain4j AgenticScope のどのフックが最小で十分か（Plan/Act/Reflect 以外の補助フック有無）。
 
@@ -186,14 +199,18 @@ Decision Rationale
 ### Examples
 
 ```bash
-# ローカルで可視化レベル debug、LangFuse 送信なし
+# ローカルで可視化レベル debug、OTLP 送信なし
 java -jar agent.jar --skill examples/hello/SKILL.md --visibility-level debug --exporter none
+
+# OTLP 送信を有効化（LangFuse/Azure は OTLP エンドポイントの切替で対応）
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:3000/otlp \
+java -jar agent.jar --skill examples/hello/SKILL.md --visibility-level debug --exporter otlp
 ```
 
 ### Glossary
 
 - Visibility Event: 可視化対象の構造化イベント。
-- Exporter: LangFuse/OTLP など外部観測先への送信コンポーネント。
+- Exporter: OTLP など外部観測先への送信コンポーネント。
 
 ---
 
