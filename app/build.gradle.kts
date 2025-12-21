@@ -80,11 +80,18 @@ tasks.register<Exec>("langfuseUp") {
         }
     }
 
+    // docker compose の .env 読み込みは「project-directory」を基準に決まるため、
+    // Compose ファイルが build 配下にある場合でもリポジトリ直下の .env を参照できるようにする。
+    workingDir = rootProject.projectDir
     commandLine(
         "docker",
         "compose",
+        "-p",
+        "langfuse",
         "-f",
         composeFileProvider.get().asFile.absolutePath,
+        "--project-directory",
+        rootProject.projectDir.absolutePath,
         "up",
         "-d"
     )
@@ -96,11 +103,16 @@ tasks.register<Exec>("langfuseDown") {
 
     val composeFileProvider = layout.buildDirectory.file("langfuse/docker-compose.yml")
 
+    workingDir = rootProject.projectDir
     commandLine(
         "docker",
         "compose",
+        "-p",
+        "langfuse",
         "-f",
         composeFileProvider.get().asFile.absolutePath,
+        "--project-directory",
+        rootProject.projectDir.absolutePath,
         "down"
     )
 }
