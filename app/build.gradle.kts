@@ -97,6 +97,39 @@ tasks.register<Exec>("langfuseUp") {
     )
 }
 
+tasks.register<Exec>("langfuseUpForeground") {
+    group = "observability"
+    description = "LangFuse をローカルで起動します（フォアグラウンド。ログをそのまま表示）。"
+
+    val composeUrl = "https://raw.githubusercontent.com/langfuse/langfuse/main/docker-compose.yml"
+    val composeFileProvider = layout.buildDirectory.file("langfuse/docker-compose.yml")
+
+    doFirst {
+        val composeFile = composeFileProvider.get().asFile
+        composeFile.parentFile.mkdirs()
+        if (!composeFile.exists()) {
+            URL(composeUrl).openStream().use { input ->
+                Files.copy(input, composeFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        }
+    }
+
+    // docker compose の .env 読み込みは「project-directory」を基準に決まるため、
+    // Compose ファイルが build 配下にある場合でもリポジトリ直下の .env を参照できるようにする。
+    workingDir = rootProject.projectDir
+    commandLine(
+        "docker",
+        "compose",
+        "-p",
+        "langfuse",
+        "-f",
+        composeFileProvider.get().asFile.absolutePath,
+        "--project-directory",
+        rootProject.projectDir.absolutePath,
+        "up"
+    )
+}
+
 tasks.register<Exec>("langfuseDown") {
     group = "observability"
     description = "LangFuse を停止します（公式 docker-compose を使用）。"
@@ -115,6 +148,55 @@ tasks.register<Exec>("langfuseDown") {
         rootProject.projectDir.absolutePath,
         "down"
     )
+}
+
+tasks.register<Exec>("langfuseReset") {
+    group = "observability"
+    description = "LangFuse を停止し、ボリュームを削除して初期化します（注意: データ消えます）。"
+
+    val composeFileProvider = layout.buildDirectory.file("langfuse/docker-compose.yml")
+
+    workingDir = rootProject.projectDir
+    commandLine(
+        "docker",
+        "compose",
+        "-p",
+        "langfuse",
+        "-f",
+        composeFileProvider.get().asFile.absolutePath,
+        "--project-directory",
+        rootProject.projectDir.absolutePath,
+        "down",
+        "-v"
+    )
+}
+
+tasks.register<Exec>("langfuseLogs") {
+    group = "observability"
+    description = "LangFuse のログを追跡します（例: -Pservice=langfuse-web / 省略時は全サービス）。"
+
+    val composeFileProvider = layout.buildDirectory.file("langfuse/docker-compose.yml")
+    val service = providers.gradleProperty("service").orNull
+
+    workingDir = rootProject.projectDir
+
+    val baseArgs = mutableListOf(
+        "docker",
+        "compose",
+        "-p",
+        "langfuse",
+        "-f",
+        composeFileProvider.get().asFile.absolutePath,
+        "--project-directory",
+        rootProject.projectDir.absolutePath,
+        "logs",
+        "-f",
+        "--tail=200"
+    )
+    if (!service.isNullOrBlank()) {
+        baseArgs.add(service)
+    }
+    commandLine(baseArgs)
 }
 
 tasks.register<JavaExec>("langfuseReport") {

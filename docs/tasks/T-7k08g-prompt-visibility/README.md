@@ -49,7 +49,10 @@ Gradle タスク（推奨）:
 
 ```bash
 ./gradlew :app:langfuseUp
+./gradlew :app:langfuseUpForeground
 ./gradlew :app:langfuseDown
+./gradlew :app:langfuseReset
+./gradlew :app:langfuseLogs
 ```
 
 ### Self-host 初期化（LANGFUSE_INIT\_\*）
@@ -73,7 +76,7 @@ LANGFUSE_INIT_PROJECT_NAME=Demo
 LANGFUSE_INIT_PROJECT_PUBLIC_KEY=pk-lf-demo
 LANGFUSE_INIT_PROJECT_SECRET_KEY=sk-lf-demo
 LANGFUSE_INIT_USER_EMAIL=local@example.com
-LANGFUSE_INIT_USER_NAME=Local User
+LANGFUSE_INIT_USER_NAME=LocalUser
 LANGFUSE_INIT_USER_PASSWORD=local-password
 ```
 
@@ -87,8 +90,26 @@ LANGFUSE_INIT_USER_PASSWORD=local-password
 ボリューム削除してやり直す場合（注意: データ消えます）:
 
 ```bash
-docker compose -p langfuse -f app/build/langfuse/docker-compose.yml down -v
+./gradlew :app:langfuseReset
 ./gradlew :app:langfuseUp
+```
+
+デバッグ（ブラウザ操作しながらログを見たい）:
+
+ターミナルを 2 つ使います。
+
+ターミナル 1（フォアグラウンドで起動。Ctrl+C で停止）:
+
+```bash
+./gradlew :app:langfuseUpForeground
+```
+
+ターミナル 2（ログ追跡。特定サービスに絞る場合は `-Pservice=...`）:
+
+```bash
+./gradlew :app:langfuseLogs
+./gradlew :app:langfuseLogs -Pservice=langfuse-web
+./gradlew :app:langfuseLogs -Pservice=langfuse-worker
 ```
 
 トレース集計は `langfuseReport`（予定）で LangFuse API から直近トレースを取得し、gen_ai 指標（トークン数・レイテンシ・エラー率）を標準出力にまとめる。鍵が未設定の場合はスキップする。

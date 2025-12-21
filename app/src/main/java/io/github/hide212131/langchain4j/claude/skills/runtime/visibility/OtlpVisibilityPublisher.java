@@ -4,9 +4,11 @@ import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanContext;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Context;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 import io.opentelemetry.exporter.otlp.http.trace.OtlpHttpSpanExporter;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
@@ -16,6 +18,7 @@ import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /** OTLP へ可視化イベントを送信するパブリッシャ。 */
@@ -23,10 +26,15 @@ import java.util.concurrent.TimeUnit;
 public final class OtlpVisibilityPublisher implements VisibilityEventPublisher, AutoCloseable {
 
     private static final String INSTRUMENTATION_NAME = "langchain4j-claude-skills-visibility";
+    private static final String LANGFUSE_PUBLIC_OTEL_PATH = "/api/public/otel";
+    private static final String OTLP_V1_TRACES_PATH = "/v1/traces";
 
     private final OpenTelemetry openTelemetry;
     private final Tracer tracer;
     private final SdkTracerProvider tracerProvider;
+
+    /** runId ごとの root span context（1 run 1 trace 用）。 */
+    private final Map<String, SpanContext> rootSpanContexts = new ConcurrentHashMap<>();
 
     public OtlpVisibilityPublisher(String endpoint, Map<String, String> headers) {
         this(buildExporter(endpoint, headers));
@@ -46,7 +54,9 @@ public final class OtlpVisibilityPublisher implements VisibilityEventPublisher, 
     public void publish(VisibilityEvent event) {
         Objects.requireNonNull(event, "event");
         VisibilityEventMetadata metadata = event.metadata();
-        Span span = tracer.spanBuilder(metadata.step()).setSpanKind(SpanKind.INTERNAL)
+        SpanContext root = rootSpanContextFor(metadata);
+        Context parent = Context.current().with(Span.wrap(root));
+        Span span = tracer.spanBuilder(metadata.step()).setSpanKind(SpanKind.INTERNAL).setParent(parent)
                 .setAttribute("visibility.type", event.type().name()).setAttribute("visibility.phase", metadata.phase())
                 .setAttribute("visibility.skill_id", safe(metadata.skillId()))
                 .setAttribute("visibility.run_id", safe(metadata.runId())).startSpan();
@@ -66,10 +76,25 @@ public final class OtlpVisibilityPublisher implements VisibilityEventPublisher, 
 
     @Override
     public void close() {
-        tracerProvider.close();
-        if (openTelemetry instanceof OpenTelemetrySdk sdk) {
-            sdk.getSdkTracerProvider().shutdown().join(5, TimeUnit.SECONDS);
-        }
+        // root span は生成時に end 済み（export順序の安定化のため）。
+        rootSpanContexts.clear();
+        tracerProvider.shutdown().join(5, TimeUnit.SECONDS);
+    }
+
+    private SpanContext rootSpanContextFor(VisibilityEventMetadata metadata) {
+        String runId = safe(metadata.runId());
+        return rootSpanContexts.computeIfAbsent(runId, id -> {
+            Span root = tracer.spanBuilder("skills.run").setSpanKind(SpanKind.INTERNAL)
+                    .setAttribute("visibility.run_id", id).startSpan();
+
+            if (metadata.skillId() != null && !metadata.skillId().isBlank()) {
+                root.setAttribute("visibility.skill_id", metadata.skillId().trim());
+            }
+
+            // Langfuse 側で親spanの到着が後になると結合されない可能性があるため、rootを先にexportする。
+            root.end();
+            return root.getSpanContext();
+        });
     }
 
     private void addPayloadAttributes(Span span, VisibilityEvent event) {
@@ -142,10 +167,10 @@ public final class OtlpVisibilityPublisher implements VisibilityEventPublisher, 
             return false;
         }
         String value = endpoint.trim();
-        if (value.contains("/api/public/otel")) {
+        if (value.contains(LANGFUSE_PUBLIC_OTEL_PATH)) {
             return true;
         }
-        if (value.contains("/v1/traces")) {
+        if (value.contains(OTLP_V1_TRACES_PATH)) {
             return true;
         }
         return value.endsWith(":4318") || value.contains(":4318/");
@@ -153,13 +178,13 @@ public final class OtlpVisibilityPublisher implements VisibilityEventPublisher, 
 
     private static String normalizeHttpEndpoint(String endpoint) {
         String value = endpoint.trim();
-        if (value.contains("/v1/traces")) {
+        if (value.contains(OTLP_V1_TRACES_PATH)) {
             return value;
         }
-        if (value.contains("/api/public/otel")) {
-            return value.endsWith("/api/public/otel") ? value + "/v1/traces" : value;
+        if (value.contains(LANGFUSE_PUBLIC_OTEL_PATH)) {
+            return value.endsWith(LANGFUSE_PUBLIC_OTEL_PATH) ? value + OTLP_V1_TRACES_PATH : value;
         }
-        return value.endsWith("/") ? value + "v1/traces" : value + "/v1/traces";
+        return value.endsWith("/") ? value + "v1/traces" : value + OTLP_V1_TRACES_PATH;
     }
 
     private String safe(String value) {
