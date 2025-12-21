@@ -18,13 +18,19 @@ import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.openaiofficial.OpenAiOfficialChatModel;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.AgentStatePayload;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.PromptPayload;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEvent;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventMetadata;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventPublisher;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventType;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 /** OpenAI Official SDK を用いた Plan/Act/Reflect 実行フロー。 */
 @SuppressWarnings({ "PMD.AvoidDuplicateLiterals", "PMD.GuardLogStatement", "PMD.CouplingBetweenObjects",
-        "PMD.UseObjectForClearerAPI" })
+        "PMD.UseObjectForClearerAPI", "PMD.TooManyMethods" })
 final class OpenAiAgentFlow implements AgentFlow {
 
     private static final int PREVIEW_LIMIT = 400;
@@ -42,31 +48,44 @@ final class OpenAiAgentFlow implements AgentFlow {
     @Override
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
     public AgentFlowResult run(SkillDocument document, String goal, VisibilityLog log, boolean basicLog, String runId) {
+        return run(document, goal, log, basicLog, runId, VisibilityEventPublisher.noop());
+    }
+
+    @Override
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    public AgentFlowResult run(SkillDocument document, String goal, VisibilityLog log, boolean basicLog, String runId,
+            VisibilityEventPublisher events) {
         Objects.requireNonNull(document, "document");
         Objects.requireNonNull(log, "log");
         Objects.requireNonNull(runId, "runId");
+        Objects.requireNonNull(events, "events");
 
         String safeGoal = goal == null ? "" : goal.trim();
-        ChatModel chatModel = buildChatModel(log, basicLog, runId, document.id());
+        ChatModel chatModel = buildChatModel(log, basicLog, runId, document.id(), events);
 
         PlannerAgent planner = AgenticServices.agentBuilder(PlannerAgent.class).chatModel(chatModel).outputKey(KEY_PLAN)
-                .beforeAgentInvocation(req -> logAgentStart(log, basicLog, runId, document.id(), KEY_PLAN, req))
-                .afterAgentInvocation(res -> logAgentDone(log, basicLog, runId, document.id(), KEY_PLAN, res)).build();
+                .beforeAgentInvocation(req -> logAgentStart(log, basicLog, runId, document.id(), KEY_PLAN, req, events))
+                .afterAgentInvocation(res -> logAgentDone(log, basicLog, runId, document.id(), KEY_PLAN, res, events))
+                .build();
 
         ActorAgent actor = AgenticServices.agentBuilder(ActorAgent.class).chatModel(chatModel).outputKey(KEY_ARTIFACT)
-                .beforeAgentInvocation(req -> logAgentStart(log, basicLog, runId, document.id(), "act", req))
-                .afterAgentInvocation(res -> logAgentDone(log, basicLog, runId, document.id(), "act", res)).build();
+                .beforeAgentInvocation(req -> logAgentStart(log, basicLog, runId, document.id(), "act", req, events))
+                .afterAgentInvocation(res -> logAgentDone(log, basicLog, runId, document.id(), "act", res, events))
+                .build();
 
         ReflectAgent reflect = AgenticServices.agentBuilder(ReflectAgent.class).chatModel(chatModel)
                 .outputKey(KEY_REFLECT)
-                .beforeAgentInvocation(req -> logAgentStart(log, basicLog, runId, document.id(), KEY_REFLECT, req))
-                .afterAgentInvocation(res -> logAgentDone(log, basicLog, runId, document.id(), KEY_REFLECT, res))
+                .beforeAgentInvocation(
+                        req -> logAgentStart(log, basicLog, runId, document.id(), KEY_REFLECT, req, events))
+                .afterAgentInvocation(
+                        res -> logAgentDone(log, basicLog, runId, document.id(), KEY_REFLECT, res, events))
                 .build();
 
         UntypedAgent workflow = AgenticServices.sequenceBuilder().subAgents(planner, actor, reflect)
                 .outputKey(KEY_ARTIFACT)
-                .beforeAgentInvocation(req -> logAgentStart(log, basicLog, runId, document.id(), "workflow", req))
-                .afterAgentInvocation(res -> logAgentDone(log, basicLog, runId, document.id(), "workflow", res))
+                .beforeAgentInvocation(
+                        req -> logAgentStart(log, basicLog, runId, document.id(), "workflow", req, events))
+                .afterAgentInvocation(res -> logAgentDone(log, basicLog, runId, document.id(), "workflow", res, events))
                 .errorHandler(ctx -> handleError(log, runId, document.id(), ctx)).build();
 
         Map<String, Object> inputs = Map.of("skillName", document.name(), "skillDescription", document.description(),
@@ -89,9 +108,11 @@ final class OpenAiAgentFlow implements AgentFlow {
         }
     }
 
-    private ChatModel buildChatModel(VisibilityLog log, boolean basicLog, String runId, String skillId) {
+    private ChatModel buildChatModel(VisibilityLog log, boolean basicLog, String runId, String skillId,
+            VisibilityEventPublisher events) {
         OpenAiOfficialChatModel.Builder builder = OpenAiOfficialChatModel.builder().apiKey(configuration.openAiApiKey())
-                .listeners(List.of(new VisibilityChatModelListener(log, basicLog, runId, skillId)));
+                .listeners(List.of(new VisibilityChatModelListener(log, basicLog, runId, skillId, events,
+                        configuration.openAiModel())));
         if (configuration.openAiBaseUrl() != null) {
             builder.baseUrl(configuration.openAiBaseUrl());
         }
@@ -102,21 +123,50 @@ final class OpenAiAgentFlow implements AgentFlow {
     }
 
     private void logAgentStart(VisibilityLog log, boolean basicLog, String runId, String skillId, String phase,
-            AgentRequest request) {
+            AgentRequest request, VisibilityEventPublisher events) {
+        String inputPreview = preview(request.inputs());
         log.info(basicLog, runId, skillId, phase, "agent.start", "エージェントを呼び出します: " + request.agentName(),
-                "inputs=" + preview(request.inputs()), "");
+                "inputs=" + inputPreview, "");
+        publishAgentState(events, runId, skillId, phase, "agent.start", inputPreview, "start");
     }
 
     private void logAgentDone(VisibilityLog log, boolean basicLog, String runId, String skillId, String phase,
-            AgentResponse response) {
+            AgentResponse response, VisibilityEventPublisher events) {
+        String outputPreview = preview(response.output());
         log.info(basicLog, runId, skillId, phase, "agent.done", "エージェントが完了しました: " + response.agentName(), "",
-                "output=" + preview(response.output()));
+                "output=" + outputPreview);
+        publishAgentState(events, runId, skillId, phase, "agent.done", outputPreview, "done");
     }
 
     private ErrorRecoveryResult handleError(VisibilityLog log, String runId, String skillId, ErrorContext context) {
         log.warn(runId, skillId, "error", "agent.error", "エージェント実行で例外が発生しました", preview(context.agenticScope().state()),
                 "", context.exception());
         return ErrorRecoveryResult.throwException();
+    }
+
+    private static void publishAgentState(VisibilityEventPublisher events, String runId, String skillId, String phase,
+            String step, String decision, String summary) {
+        VisibilityEventMetadata metadata = new VisibilityEventMetadata(runId, skillId, phase, step, null);
+        events.publish(new VisibilityEvent(VisibilityEventType.AGENT_STATE, metadata,
+                new AgentStatePayload(summary, decision, summary)));
+    }
+
+    private static void publishPrompt(VisibilityEventPublisher events, String runId, String skillId, String step,
+            String prompt, String response, String model) {
+        VisibilityEventMetadata metadata = new VisibilityEventMetadata(runId, skillId, "llm", step, null);
+        events.publish(new VisibilityEvent(VisibilityEventType.PROMPT, metadata,
+                new PromptPayload(maskPreview(prompt), response, model, "assistant", null)));
+    }
+
+    private static String maskPreview(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        String text = value.trim();
+        if (text.length() <= PREVIEW_LIMIT) {
+            return text;
+        }
+        return text.substring(0, PREVIEW_LIMIT) + "...(truncated)";
     }
 
     private String stringOrFallback(Object value, String fallback) {
@@ -132,10 +182,7 @@ final class OpenAiAgentFlow implements AgentFlow {
             return "";
         }
         String text = String.valueOf(value);
-        if (text.length() <= PREVIEW_LIMIT) {
-            return text;
-        }
-        return text.substring(0, PREVIEW_LIMIT) + "...(truncated)";
+        return maskPreview(text);
     }
 
     private static final class VisibilityChatModelListener implements ChatModelListener {
@@ -144,18 +191,24 @@ final class OpenAiAgentFlow implements AgentFlow {
         private final boolean basicLog;
         private final String runId;
         private final String skillId;
+        private final VisibilityEventPublisher events;
+        private final String model;
 
-        VisibilityChatModelListener(VisibilityLog log, boolean basicLog, String runId, String skillId) {
+        VisibilityChatModelListener(VisibilityLog log, boolean basicLog, String runId, String skillId,
+                VisibilityEventPublisher events, String model) {
             this.log = Objects.requireNonNull(log, "log");
             this.basicLog = basicLog;
             this.runId = Objects.requireNonNull(runId, "runId");
             this.skillId = Objects.requireNonNull(skillId, "skillId");
+            this.events = Objects.requireNonNull(events, "events");
+            this.model = model;
         }
 
         @Override
         public void onRequest(ChatModelRequestContext ctx) {
             String request = ctx.chatRequest() == null ? "(none)" : ctx.chatRequest().toString();
             log.info(basicLog, runId, skillId, "llm", "llm.request", "OpenAI へリクエストを送信します", "", request);
+            publishPrompt(events, runId, skillId, "llm.request", request, null, model);
         }
 
         @Override
@@ -163,6 +216,7 @@ final class OpenAiAgentFlow implements AgentFlow {
             ChatResponse response = ctx.chatResponse();
             String output = response != null && response.aiMessage() != null ? response.aiMessage().text() : "(empty)";
             log.info(basicLog, runId, skillId, "llm", "llm.response", "OpenAI から応答を受信しました", "", output);
+            publishPrompt(events, runId, skillId, "llm.response", "(llm-response)", output, model);
         }
 
         @Override
