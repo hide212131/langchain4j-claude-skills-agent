@@ -7,6 +7,10 @@ plugins {
     id("com.diffplug.spotless") version "7.0.3"
 }
 
+import java.net.URL
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(21))
@@ -62,11 +66,25 @@ application {
 tasks.register<Exec>("langfuseUp") {
     group = "observability"
     description = "LangFuse をローカルで起動します（公式 docker-compose を使用）。"
+
+    val composeUrl = "https://raw.githubusercontent.com/langfuse/langfuse/main/docker-compose.yml"
+    val composeFileProvider = layout.buildDirectory.file("langfuse/docker-compose.yml")
+
+    doFirst {
+        val composeFile = composeFileProvider.get().asFile
+        composeFile.parentFile.mkdirs()
+        if (!composeFile.exists()) {
+            URL(composeUrl).openStream().use { input ->
+                Files.copy(input, composeFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        }
+    }
+
     commandLine(
         "docker",
         "compose",
         "-f",
-        "https://raw.githubusercontent.com/langfuse/langfuse/main/docker-compose.yml",
+        composeFileProvider.get().asFile.absolutePath,
         "up",
         "-d"
     )
@@ -75,11 +93,14 @@ tasks.register<Exec>("langfuseUp") {
 tasks.register<Exec>("langfuseDown") {
     group = "observability"
     description = "LangFuse を停止します（公式 docker-compose を使用）。"
+
+    val composeFileProvider = layout.buildDirectory.file("langfuse/docker-compose.yml")
+
     commandLine(
         "docker",
         "compose",
         "-f",
-        "https://raw.githubusercontent.com/langfuse/langfuse/main/docker-compose.yml",
+        composeFileProvider.get().asFile.absolutePath,
         "down"
     )
 }
