@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Task
-- Status: Draft
+- Status: In Progress
   <!-- Draft: Under discussion | In Progress: Actively working | Complete: Code complete | Cancelled: Work intentionally halted -->
 
 ## Links
@@ -24,6 +24,7 @@
 ## Summary
 
 SKILL.md パースからエージェントの Plan/Act/Reflect 実行、生成物出力までに発生するプロンプト・内部状態・メトリクスを可視化する仕組みを設計・実装する。
+Phase 2 では可視化イベントを OTLP(LangFuse など) に送れるよう `--exporter`/`--otlp-endpoint`/`--otlp-headers` を受け付け、送信先切替を実装する。
 
 ## Scope
 

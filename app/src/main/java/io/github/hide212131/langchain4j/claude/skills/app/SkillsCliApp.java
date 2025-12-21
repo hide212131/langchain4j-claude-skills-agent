@@ -10,6 +10,12 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.SkillDocument;
 import io.github.hide212131.langchain4j.claude.skills.runtime.SkillDocumentParser;
 import io.github.hide212131.langchain4j.claude.skills.runtime.VisibilityLevel;
 import io.github.hide212131.langchain4j.claude.skills.runtime.VisibilityLog;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ExporterType;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ObservabilityConfiguration;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ObservabilityConfigurationLoader;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventPublisher;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityMasking;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityPublisherFactory;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
@@ -29,7 +35,7 @@ import picocli.CommandLine.Spec;
 /** 最小構成の CLI。SKILL.md をパースし、Plan/Act/Reflect フローを実行する。 */
 // @formatter:off
 @Command(name = "skills", description = "SKILL.md を読み込み Plan/Act/Reflect を実行します。", mixinStandardHelpOptions = true)
-@SuppressWarnings({ "PMD.GuardLogStatement", "checkstyle:LineLength" })
+@SuppressWarnings({ "PMD.GuardLogStatement", "PMD.ExcessiveImports", "checkstyle:LineLength" })
 public final class SkillsCliApp implements Callable<Integer> {
 
     private static final int EXIT_PARSE_ERROR = 2;
@@ -56,6 +62,15 @@ public final class SkillsCliApp implements Callable<Integer> {
 
     @Option(names = "--llm-provider", paramLabel = "PROVIDER", description = "LLM プロバイダ (mock|openai)。未指定時は環境変数/ .env を参照します。", converter = LlmProviderConverter.class)
     private LlmProvider llmProvider;
+
+    @Option(names = "--exporter", paramLabel = "TYPE", description = "可視化エクスポーター (none|otlp)", converter = ExporterTypeConverter.class)
+    private ExporterType exporter;
+
+    @Option(names = "--otlp-endpoint", paramLabel = "URL", description = "OTLP エンドポイント（未指定時は OTEL_EXPORTER_OTLP_ENDPOINT）")
+    private String otlpEndpoint;
+
+    @Option(names = "--otlp-headers", paramLabel = "KEY=VAL,...", description = "OTLP 追加ヘッダ（未指定時は OTEL_EXPORTER_OTLP_HEADERS）")
+    private String otlpHeaders;
     // CHECKSTYLE:ON
     // @formatter:on
 
@@ -84,45 +99,51 @@ public final class SkillsCliApp implements Callable<Integer> {
         String runId = UUID.randomUUID().toString();
         boolean basic = visibilityLevel == VisibilityLevel.BASIC;
         VisibilityLog log = new VisibilityLog(Logger.getLogger(SkillsCliApp.class.getName()));
-        SkillDocumentParser parser = new SkillDocumentParser();
+        ObservabilityConfiguration observability = new ObservabilityConfigurationLoader().load(exporter, otlpEndpoint,
+                otlpHeaders);
+        VisibilityEventPublisher publisher = VisibilityPublisherFactory.create(observability);
+        try (VisibilityEventPublisher closeablePublisher = publisher) {
+            SkillDocumentParser parser = new SkillDocumentParser(closeablePublisher, VisibilityMasking.defaultRules());
 
-        log.info(basic, runId, "-", "parse", "parse.skill", "SKILL.md を読み込みます", "path=" + skillPath, "");
+            log.info(basic, runId, "-", "parse", "parse.skill", "SKILL.md を読み込みます", "path=" + skillPath, "");
 
-        SkillDocument document;
-        try {
-            document = parser.parse(skillPath, skillId);
-        } catch (RuntimeException ex) {
-            String fallbackSkillId = skillId == null ? "(不明)" : skillId;
-            log.error(runId, fallbackSkillId, LOG_TAG_ERROR, "parse", "SKILL.md のパースに失敗しました", "", "", ex);
-            spec.commandLine().getErr().println("SKILL.md のパースに失敗しました: " + ex.getMessage());
-            spec.commandLine().getErr().flush();
-            return EXIT_PARSE_ERROR;
-        }
+            SkillDocument document;
+            try {
+                document = parser.parse(skillPath, skillId, runId);
+            } catch (RuntimeException ex) {
+                String fallbackSkillId = skillId == null ? "(不明)" : skillId;
+                log.error(runId, fallbackSkillId, LOG_TAG_ERROR, "parse", "SKILL.md のパースに失敗しました", "", "", ex);
+                spec.commandLine().getErr().println("SKILL.md のパースに失敗しました: " + ex.getMessage());
+                spec.commandLine().getErr().flush();
+                return EXIT_PARSE_ERROR;
+            }
 
-        LlmConfiguration configuration;
-        try {
-            configuration = new LlmConfigurationLoader().load(llmProvider);
-        } catch (RuntimeException ex) {
-            log.error(runId, document.id(), LOG_TAG_ERROR, "config.load", "LLM 設定の読み込みに失敗しました", "", "", ex);
-            spec.commandLine().getErr().println("LLM 設定の読み込みに失敗しました: " + ex.getMessage());
-            spec.commandLine().getErr().flush();
-            return EXIT_CONFIGURATION_ERROR;
-        }
+            LlmConfiguration configuration;
+            try {
+                configuration = new LlmConfigurationLoader().load(llmProvider);
+            } catch (RuntimeException ex) {
+                log.error(runId, document.id(), LOG_TAG_ERROR, "config.load", "LLM 設定の読み込みに失敗しました", "", "", ex);
+                spec.commandLine().getErr().println("LLM 設定の読み込みに失敗しました: " + ex.getMessage());
+                spec.commandLine().getErr().flush();
+                return EXIT_CONFIGURATION_ERROR;
+            }
 
-        AgentFlowFactory factory = new AgentFlowFactory(configuration);
-        AgentFlow flow = factory.create();
-        Supplier<AgentFlowResult> action = () -> flow.run(document, goal == null ? "" : goal, log, basic, runId);
+            AgentFlowFactory factory = new AgentFlowFactory(configuration);
+            AgentFlow flow = factory.create();
+            Supplier<AgentFlowResult> action = () -> flow.run(document, goal == null ? "" : goal, log, basic, runId,
+                    closeablePublisher);
 
-        try {
-            AgentFlowResult result = executeWithRetry(action, log, basic, runId, document.id());
-            spec.commandLine().getOut().println(result.formatted());
-            spec.commandLine().getOut().flush();
-            return CommandLine.ExitCode.OK;
-        } catch (RuntimeException ex) {
-            log.error(runId, document.id(), LOG_TAG_ERROR, "run.failed", "エージェント実行が失敗しました", "", "", ex);
-            spec.commandLine().getErr().println("エージェント実行が失敗しました: " + ex.getMessage());
-            spec.commandLine().getErr().flush();
-            return EXIT_EXECUTION_ERROR;
+            try {
+                AgentFlowResult result = executeWithRetry(action, log, basic, runId, document.id());
+                spec.commandLine().getOut().println(result.formatted());
+                spec.commandLine().getOut().flush();
+                return CommandLine.ExitCode.OK;
+            } catch (RuntimeException ex) {
+                log.error(runId, document.id(), LOG_TAG_ERROR, "run.failed", "エージェント実行が失敗しました", "", "", ex);
+                spec.commandLine().getErr().println("エージェント実行が失敗しました: " + ex.getMessage());
+                spec.commandLine().getErr().flush();
+                return EXIT_EXECUTION_ERROR;
+            }
         }
     }
 
@@ -158,6 +179,14 @@ public final class SkillsCliApp implements Callable<Integer> {
         @Override
         public LlmProvider convert(String value) {
             return LlmProvider.from(value);
+        }
+    }
+
+    private static final class ExporterTypeConverter implements ITypeConverter<ExporterType> {
+
+        @Override
+        public ExporterType convert(String value) {
+            return ExporterType.parse(value);
         }
     }
 }

@@ -20,6 +20,7 @@ repositories {
 dependencies {
     val langchain4jVersion = "1.9.1"
     val langchain4jAgenticVersion = "1.9.1-beta17"
+    val otelVersion = "1.43.0"
 
     implementation("org.yaml:snakeyaml:2.2")
     implementation("info.picocli:picocli:4.7.6")
@@ -27,11 +28,15 @@ dependencies {
     implementation("dev.langchain4j:langchain4j-core:$langchain4jVersion")
     implementation("dev.langchain4j:langchain4j-agentic:$langchain4jAgenticVersion")
     implementation("dev.langchain4j:langchain4j-open-ai-official:$langchain4jAgenticVersion")
+    implementation("io.opentelemetry:opentelemetry-api:$otelVersion")
+    implementation("io.opentelemetry:opentelemetry-sdk:$otelVersion")
+    implementation("io.opentelemetry:opentelemetry-exporter-otlp:$otelVersion")
 
     testImplementation(platform("org.junit:junit-bom:5.10.1"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("org.assertj:assertj-core:3.25.3")
+    testImplementation("io.opentelemetry:opentelemetry-sdk-testing:$otelVersion")
 }
 
 tasks.test {

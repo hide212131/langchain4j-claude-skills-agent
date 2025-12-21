@@ -4,6 +4,13 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ErrorPayload;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ParsePayload;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEvent;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventMetadata;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventPublisher;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventType;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityMasking;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -11,6 +18,7 @@ import java.util.regex.Pattern;
 import org.yaml.snakeyaml.Yaml;
 
 /** SKILL.md の frontmatter（YAML）と本文を読み取り、必須項目のみを POJO 化するパーサ。 */
+@SuppressWarnings({ "PMD.GodClass", "PMD.TooManyMethods" })
 public final class SkillDocumentParser {
 
     private static final Set<String> REQUIRED_KEYS = Set.of("name", "description");
@@ -19,22 +27,35 @@ public final class SkillDocumentParser {
     private static final Pattern LEADING_NEWLINES = Pattern.compile("^(\\r?\\n)+");
 
     private final Yaml yaml = new Yaml();
+    private final VisibilityEventPublisher events;
+    private final VisibilityMasking masking;
 
     @SuppressWarnings("PMD.UnnecessaryConstructor")
     public SkillDocumentParser() {
-        // default
+        this(VisibilityEventPublisher.noop(), VisibilityMasking.defaultRules());
+    }
+
+    public SkillDocumentParser(VisibilityEventPublisher events, VisibilityMasking masking) {
+        this.events = Objects.requireNonNull(events, "events");
+        this.masking = Objects.requireNonNull(masking, "masking");
     }
 
     public SkillDocument parse(Path skillMdPath) {
-        return parse(skillMdPath, null, null);
+        return parse(skillMdPath, null, null, "-");
     }
 
     public SkillDocument parse(Path skillMdPath, String fallbackId) {
-        return parse(skillMdPath, null, fallbackId);
+        return parse(skillMdPath, null, fallbackId, "-");
     }
 
-    SkillDocument parse(Path skillMdPath, String rawContent, String fallbackId) {
+    public SkillDocument parse(Path skillMdPath, String fallbackId, String runId) {
+        return parse(skillMdPath, null, fallbackId, runId);
+    }
+
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    SkillDocument parse(Path skillMdPath, String rawContent, String fallbackId, String runId) {
         Objects.requireNonNull(skillMdPath, "skillMdPath");
+        String normalizedRunId = normalizeRunId(runId);
         String content = rawContent;
         if (content == null) {
             content = readContent(skillMdPath);
@@ -43,17 +64,51 @@ public final class SkillDocumentParser {
             throw new IllegalArgumentException("SKILL.md の内容が空です: " + skillMdPath);
         }
 
-        FrontMatter frontMatter = extractFrontMatter(skillMdPath, content);
-        Map<String, Object> yamlMap = loadYaml(skillMdPath, frontMatter.yamlSection());
+        publishParseEvent("parse.start", normalizedRunId, fallbackId, skillMdPath.toString(), Map.of(), "");
 
-        validateKeys(skillMdPath, yamlMap);
+        String skillIdForEvent = fallbackId;
+        try {
+            FrontMatter frontMatter = extractFrontMatter(skillMdPath, content);
+            Map<String, Object> yamlMap = loadYaml(skillMdPath, frontMatter.yamlSection());
 
-        String name = requireString(skillMdPath, yamlMap, "name");
-        String description = requireString(skillMdPath, yamlMap, "description");
-        String id = resolveId(skillMdPath, yamlMap, fallbackId);
+            validateKeys(skillMdPath, yamlMap);
 
-        String body = extractBody(frontMatter);
-        return new SkillDocument(id, name, description, body);
+            String name = requireString(skillMdPath, yamlMap, "name");
+            String description = requireString(skillMdPath, yamlMap, "description");
+            String id = resolveId(skillMdPath, yamlMap, fallbackId);
+            skillIdForEvent = id;
+
+            String body = extractBody(frontMatter);
+            publishParseEvent("parse.frontmatter", normalizedRunId, id, skillMdPath.toString(),
+                    masking.maskFrontMatter(yamlMap), "");
+            publishParseEvent("parse.body", normalizedRunId, id, skillMdPath.toString(), Map.of(),
+                    masking.maskPreview(body));
+            return new SkillDocument(id, name, description, body);
+        } catch (RuntimeException ex) {
+            publishErrorEvent(normalizedRunId, skillIdForEvent, skillMdPath.toString(), ex);
+            throw ex;
+        }
+    }
+
+    private String normalizeRunId(String runId) {
+        if (runId == null || runId.isBlank()) {
+            return "-";
+        }
+        return runId.trim();
+    }
+
+    private void publishParseEvent(String step, String runId, String skillId, String path,
+            Map<String, Object> frontMatter, String preview) {
+        VisibilityEventMetadata metadata = new VisibilityEventMetadata(runId, skillId, "parse", step, null);
+        ParsePayload payload = new ParsePayload(path, frontMatter, preview, true);
+        events.publish(new VisibilityEvent(VisibilityEventType.PARSE, metadata, payload));
+    }
+
+    private void publishErrorEvent(String runId, String skillId, String path, RuntimeException ex) {
+        VisibilityEventMetadata metadata = new VisibilityEventMetadata(runId, skillId, "parse", "parse.error", null);
+        ErrorPayload payload = new ErrorPayload(path + " のパースに失敗しました: " + ex.getMessage(),
+                ex.getClass().getSimpleName());
+        events.publish(new VisibilityEvent(VisibilityEventType.ERROR, metadata, payload));
     }
 
     private String readContent(Path skillMdPath) {

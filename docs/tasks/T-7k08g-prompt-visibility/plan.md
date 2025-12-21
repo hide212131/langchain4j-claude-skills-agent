@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Implementation Plan
-- Status: Draft
+- Status: Phase 2 In Progress
   <!-- Draft: Planning complete, awaiting start | Phase X In Progress: Actively working | Cancelled: Work intentionally halted before completion | Complete: All phases done and verified -->
 
 ## Links
@@ -45,6 +45,7 @@ FR-hjz63 の受け入れ基準を満たす可視化基盤を実装するため�
 ### Phase Status Tracking
 
 Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an item is intentionally skipped or deferred, annotate it (e.g., strike-through with a brief note) instead of leaving it unchecked.
+Phase 1 を完了したため、Phase 2 に着手する。
 
 ---
 
@@ -69,14 +70,14 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 ### Tasks
 
 - [ ] **イベントスキーマ定義**
-  - [ ] VisibilityEvent/PromptPayload/AgentStatePayload/MetricsPayload を定義
-  - [ ] マスキングルールと共通メタデータ（skillId/runId/phase）を決定
+  - [x] VisibilityEvent/PromptPayload/AgentStatePayload/MetricsPayload を定義
+  - [x] マスキングルールと共通メタデータ（skillId/runId/phase）を決定
 - [ ] **SKILL パース計装**
-  - [ ] YAML frontmatter/Markdown 本文のパース結果をイベント化
-  - [ ] JSON Schema 検証結果と例外をイベント化
+  - [x] YAML frontmatter/Markdown 本文のパース結果をイベント化
+  - [x] JSON Schema 検証結果と例外をイベント化
 - [ ] **最小実行スタブと赤テスト**
-  - [ ] ダミー LLM 応答とパース/実行スタブを用意し、イベントが出る赤テストを追加
-  - [ ] Plan/Act/Reflect で期待イベントのフィールドをアサート
+  - [x] ダミー LLM 応答とパース/実行スタブを用意し、イベントが出る赤テストを追加
+  - [x] Plan/Act/Reflect で期待イベントのフィールドをアサート
 
 ### Deliverables
 
