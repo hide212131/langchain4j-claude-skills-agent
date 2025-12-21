@@ -120,15 +120,15 @@ Phase 1 を完了したため、Phase 2 に着手する。
 ### Phase 2 Tasks
 
 - [ ] **Agentic フック**
-  - [ ] Plan/Act/Reflect でプロンプト/応答/決定をイベント化
+  - [x] Plan/Act/Reflect でプロンプト/応答/決定をイベント化
   - [ ] 入出力パラメータとメトリクス（トークン/レイテンシ）を付与
 - [ ] **エクスポーター**
-  - [ ] OTLP の接続設定を CLI/環境変数で切替（`--exporter none|otlp`、`OTEL_EXPORTER_OTLP_ENDPOINT`、`OTEL_EXPORTER_OTLP_HEADERS` など）
-  - [ ] OTLP は OpenTelemetry Java SDK を用い、ビジネスコードは OpenTelemetry API のみを呼ぶ形に整理（Exporter で宛先切替）
+  - [x] OTLP の接続設定を CLI/環境変数で切替（`--exporter none|otlp`、`OTEL_EXPORTER_OTLP_ENDPOINT`、`OTEL_EXPORTER_OTLP_HEADERS` など）
+  - [x] OTLP は OpenTelemetry Java SDK を用い、ビジネスコードは OpenTelemetry API のみを呼ぶ形に整理（Exporter で宛先切替）
   - [ ] Span/Log に gen_ai セマンティック属性をマッピング（`gen_ai.request.*`/`gen_ai.response.*`/`gen_ai.usage.*` など）し、Plan/Act/Reflect を Span として表現
-  - [ ] OTLP 出力の基本実装と設定切替（none|otlp）
+  - [x] OTLP 出力の基本実装と設定切替（none|otlp）
   - [ ] エラー/リトライのロギング（NFR-mt1ve 連携）
-  - [ ] OTLP のモック送信でフィールドマッピングを検証（LangFuse/Azure どちらでも同一スキーマ）
+  - [x] OTLP のモック送信でフィールドマッピングを検証（LangFuse/Azure どちらでも同一スキーマ）
   - [ ] ローカル検証向けに LangFuse docker-compose 起動を簡略化する Gradle タスク（例: `langfuseUp`/`langfuseDown`）を追加し、README に手順を記載（インフラ構築は範囲外であることを明示）
   - [ ] LangFuse トレースを取得する Gradle タスク（例: `langfuseReport`）を追加し、直近トレースの gen_ai 指標（トークン数/レイテンシ/エラー率）を標準出力に集計（キー未設定時はスキップ）
   - [ ] プロンプト取得 Gradle タスク（例: `langfusePrompt`）を実装し、VisibilityEvent 種別 `prompt` や `gen_ai.request.*` を持つ Span/Log からプロンプト情報を抽出する。固定パスに依存せず、資格情報は環境変数/Gradle プロパティ両対応
