@@ -122,8 +122,12 @@ public final class OtlpVisibilityPublisher implements VisibilityEventPublisher, 
         } else if (payload instanceof MetricsPayload metrics) {
             span.setAttribute("visibility.metrics.latency_ms", safeLong(metrics.latencyMillis()));
             span.setAttribute("visibility.metrics.retry_count", safeLong(metrics.retryCount()));
-            span.setAttribute("gen_ai.usage.input_tokens", safeLong(metrics.inputTokens()));
-            span.setAttribute("gen_ai.usage.output_tokens", safeLong(metrics.outputTokens()));
+            if (metrics.inputTokens() != null) {
+                span.setAttribute("gen_ai.usage.input_tokens", metrics.inputTokens());
+            }
+            if (metrics.outputTokens() != null) {
+                span.setAttribute("gen_ai.usage.output_tokens", metrics.outputTokens());
+            }
         } else if (payload instanceof ErrorPayload error) {
             span.setStatus(StatusCode.ERROR, error.message());
             span.setAttribute("visibility.error.message", error.message());
