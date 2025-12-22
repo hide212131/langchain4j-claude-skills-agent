@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Implementation Plan
-- Status: Phase 2 In Progress
+- Status: Phase 3 In Progress
   <!-- Draft: Planning complete, awaiting start | Phase X In Progress: Actively working | Cancelled: Work intentionally halted before completion | Complete: All phases done and verified -->
 
 ## Links
@@ -45,7 +45,7 @@ FR-hjz63 の受け入れ基準を満たす可視化基盤を実装するため�
 ### Phase Status Tracking
 
 Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an item is intentionally skipped or deferred, annotate it (e.g., strike-through with a brief note) instead of leaving it unchecked.
-Phase 1 を完了したため、Phase 2 に着手する。
+Phase 1/2 を完了したため、Phase 3 に着手する。
 
 ---
 
@@ -168,10 +168,10 @@ Phase 1 を完了したため、Phase 2 に着手する。
 
 ### Phase 3 Tasks
 
-- [ ] テスト用 SKILL.md を用いた e2e テスト追加（Plan/Act/Reflect のイベント確認）
-- [ ] OTLP モック送信テストでフィールドマッピングを検証
-- [ ] エラー/リトライ/フォールバックのイベント記録テスト（NFR-mt1ve）
-- [ ] 性能オーバーヘッドの簡易測定と調整
+- [x] テスト用 SKILL.md を用いた e2e テスト追加（Plan/Act/Reflect のイベント確認）
+- [x] OTLP モック送信テストでフィールドマッピングを検証
+- [x] エラー/リトライ/フォールバックのイベント記録テスト（NFR-mt1ve）
+- [x] 性能オーバーヘッドの簡易測定と調整
 
 ### Phase 3 Deliverables
 
@@ -194,8 +194,8 @@ Phase 1 を完了したため、Phase 2 に着手する。
 
 ## Definition of Done
 
-- [ ] `./gradlew check`
-- [ ] `./gradlew test`
+- [x] `./gradlew check`
+- [x] `./gradlew test`
 - [ ] 観測サンプル（OTLP 相当）を取得し、ドキュメントに反映
 - [ ] 新規エラーメッセージが日本語で、マスキング仕様に従う
 - [ ] 関連ドキュメント/README を更新し、タスクリンクを traceability に反映

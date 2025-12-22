@@ -42,24 +42,25 @@ class DummyAgentFlowTest {
     void runEmitsVisibilityEvents() {
         SkillDocument document = new SkillDocument("sample", "Sample", "Desc", "Body content");
         DummyAgentFlow flow = new DummyAgentFlow();
-        VisibilityEventCollector collector = new VisibilityEventCollector();
-        VisibilityLog log = new VisibilityLog(Logger.getLogger(DummyAgentFlow.class.getName()));
+        try (VisibilityEventCollector collector = new VisibilityEventCollector()) {
+            VisibilityLog log = new VisibilityLog(Logger.getLogger(DummyAgentFlow.class.getName()));
 
-        flow.run(document, DEMO_GOAL, log, true, "run-1", collector);
+            flow.run(document, DEMO_GOAL, log, true, "run-1", collector);
 
-        List<VisibilityEvent> events = collector.events();
-        assertThat(events).hasSizeGreaterThanOrEqualTo(3);
-        assertThat(events).extracting(VisibilityEvent::type).contains(VisibilityEventType.PROMPT,
-                VisibilityEventType.AGENT_STATE);
+            List<VisibilityEvent> events = collector.events();
+            assertThat(events).hasSizeGreaterThanOrEqualTo(3);
+            assertThat(events).extracting(VisibilityEvent::type).contains(VisibilityEventType.PROMPT,
+                    VisibilityEventType.AGENT_STATE);
 
-        VisibilityEvent planEvent = events.stream().filter(event -> "plan.prompt".equals(event.metadata().step()))
-                .findFirst().orElseThrow();
-        assertThat(((PromptPayload) planEvent.payload()).prompt()).contains(DEMO_GOAL);
-        assertThat(planEvent.metadata().runId()).isEqualTo("run-1");
+            VisibilityEvent planEvent = events.stream().filter(event -> "plan.prompt".equals(event.metadata().step()))
+                    .findFirst().orElseThrow();
+            assertThat(((PromptPayload) planEvent.payload()).prompt()).contains(DEMO_GOAL);
+            assertThat(planEvent.metadata().runId()).isEqualTo("run-1");
 
-        VisibilityEvent actEvent = events.stream().filter(event -> "act.call".equals(event.metadata().step()))
-                .findFirst().orElseThrow();
-        assertThat(((AgentStatePayload) actEvent.payload()).decision()).contains("Act:");
-        assertThat(actEvent.metadata().skillId()).isEqualTo("sample");
+            VisibilityEvent actEvent = events.stream().filter(event -> "act.call".equals(event.metadata().step()))
+                    .findFirst().orElseThrow();
+            assertThat(((AgentStatePayload) actEvent.payload()).decision()).contains("Act:");
+            assertThat(actEvent.metadata().skillId()).isEqualTo("sample");
+        }
     }
 }
