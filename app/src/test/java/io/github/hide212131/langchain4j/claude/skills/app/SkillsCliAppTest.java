@@ -4,7 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.hide212131.langchain4j.claude.skills.runtime.VisibilityLog;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ErrorPayload;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.MetricsPayload;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEvent;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventCollector;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventPublisher;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventType;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
@@ -26,6 +31,7 @@ import picocli.CommandLine;
 class SkillsCliAppTest {
 
     private static final Logger APP_LOGGER = Logger.getLogger(SkillsCliApp.class.getName());
+    private static final String RUN_RETRY = "run-retry";
 
     @SuppressWarnings("PMD.UnnecessaryConstructor")
     SkillsCliAppTest() {
@@ -45,7 +51,7 @@ class SkillsCliAppTest {
         ByteArrayOutputStream logs = new ByteArrayOutputStream();
         VisibilityLog log = new VisibilityLog(newLogger(logs));
 
-        String result = SkillsCliApp.executeWithRetry(action, log, true, "run-retry", "skill-x",
+        String result = SkillsCliApp.executeWithRetry(action, log, true, RUN_RETRY, "skill-x",
                 VisibilityEventPublisher.noop());
 
         assertThat(result).isEqualTo("ok");
@@ -60,8 +66,42 @@ class SkillsCliAppTest {
         };
         VisibilityLog log = new VisibilityLog(newLogger(new ByteArrayOutputStream()));
 
-        assertThatThrownBy(() -> SkillsCliApp.executeWithRetry(action, log, true, "run-retry", "skill-x",
+        assertThatThrownBy(() -> SkillsCliApp.executeWithRetry(action, log, true, RUN_RETRY, "skill-x",
                 VisibilityEventPublisher.noop())).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("リトライ時にエラーとメトリクスの可視化イベントを出力する")
+    void publishRetryEvents() {
+        AtomicInteger counter = new AtomicInteger();
+        Supplier<String> action = () -> {
+            if (counter.getAndIncrement() == 0) {
+                throw new IllegalStateException("first");
+            }
+            return "ok";
+        };
+        try (VisibilityEventCollector collector = new VisibilityEventCollector()) {
+            VisibilityLog log = new VisibilityLog(newLogger(new ByteArrayOutputStream()));
+
+            String result = SkillsCliApp.executeWithRetry(action, log, true, RUN_RETRY, "skill-event", collector);
+
+            assertThat(result).isEqualTo("ok");
+            assertThat(collector.events()).hasSize(2).extracting(VisibilityEvent::type)
+                    .containsExactly(VisibilityEventType.ERROR, VisibilityEventType.METRICS);
+
+            VisibilityEvent errorEvent = collector.events().get(0);
+            assertThat(errorEvent.metadata().runId()).isEqualTo(RUN_RETRY);
+            assertThat(errorEvent.metadata().skillId()).isEqualTo("skill-event");
+            assertThat(errorEvent.metadata().step()).isEqualTo("run.retry");
+            assertThat(errorEvent.metadata().phase()).isEqualTo("error");
+            assertThat(errorEvent.payload()).isInstanceOfSatisfying(ErrorPayload.class,
+                    payload -> assertThat(payload.message()).contains("first"));
+
+            VisibilityEvent metricsEvent = collector.events().get(1);
+            assertThat(metricsEvent.metadata().phase()).isEqualTo("metrics");
+            assertThat(metricsEvent.payload()).isInstanceOfSatisfying(MetricsPayload.class,
+                    payload -> assertThat(payload.retryCount()).isEqualTo(1));
+        }
     }
 
     @Test

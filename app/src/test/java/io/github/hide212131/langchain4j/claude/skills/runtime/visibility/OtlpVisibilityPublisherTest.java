@@ -3,6 +3,7 @@ package io.github.hide212131.langchain4j.claude.skills.runtime.visibility;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter;
 import io.opentelemetry.sdk.trace.data.SpanData;
 import java.time.Instant;
@@ -74,5 +75,43 @@ class OtlpVisibilityPublisherTest {
         assertThat(spansCopy).hasSize(3);
         assertThat(spansCopy.stream().map(SpanData::getTraceId).distinct()).hasSize(1);
         assertThat(spansCopy.stream().filter(s -> SKILLS_RUN.equals(s.getName())).count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("メトリクスとエラーのペイロードを OTLP 属性とステータスに変換する")
+    void publishMetricsAndErrorAttributes() {
+        List<SpanData> spansCopy;
+        try (InMemorySpanExporter exporter = InMemorySpanExporter.create();
+                OtlpVisibilityPublisher publisher = new OtlpVisibilityPublisher(exporter)) {
+            VisibilityEventMetadata metrics = new VisibilityEventMetadata(RUN_ID, SKILL_ID, "metrics", "workflow.done",
+                    Instant.ofEpochMilli(2));
+            publisher.publish(
+                    new VisibilityEvent(VisibilityEventType.METRICS, metrics, new MetricsPayload(5L, 3L, 42L, 1)));
+
+            VisibilityEventMetadata error = new VisibilityEventMetadata(RUN_ID, SKILL_ID, "error", "run.failed",
+                    Instant.ofEpochMilli(3));
+            publisher.publish(new VisibilityEvent(VisibilityEventType.ERROR, error,
+                    new ErrorPayload("失敗しました", "IllegalStateException")));
+
+            spansCopy = List.copyOf(exporter.getFinishedSpanItems());
+        }
+
+        SpanData metricsSpan = spansCopy.stream().filter(span -> "workflow.done".equals(span.getName())).findFirst()
+                .orElseThrow();
+        assertThat(metricsSpan.getAttributes().get(AttributeKey.longKey("visibility.metrics.latency_ms")))
+                .isEqualTo(42L);
+        assertThat(metricsSpan.getAttributes().get(AttributeKey.longKey("visibility.metrics.retry_count")))
+                .isEqualTo(1L);
+        assertThat(metricsSpan.getAttributes().get(AttributeKey.longKey("gen_ai.usage.input_tokens"))).isEqualTo(5L);
+        assertThat(metricsSpan.getAttributes().get(AttributeKey.longKey("gen_ai.usage.output_tokens"))).isEqualTo(3L);
+
+        SpanData errorSpan = spansCopy.stream().filter(span -> "run.failed".equals(span.getName())).findFirst()
+                .orElseThrow();
+        assertThat(errorSpan.getStatus().getStatusCode()).isEqualTo(StatusCode.ERROR);
+        assertThat(errorSpan.getAttributes().get(AttributeKey.stringKey("visibility.error.message")))
+                .contains("失敗しました");
+        assertThat(errorSpan.getAttributes().get(AttributeKey.stringKey("visibility.error.type")))
+                .isEqualTo("IllegalStateException");
+        assertThat(spansCopy.stream().map(SpanData::getTraceId).distinct()).hasSize(1);
     }
 }

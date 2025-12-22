@@ -59,30 +59,31 @@ class SkillDocumentParserTest {
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }
-        VisibilityEventCollector collector = new VisibilityEventCollector();
-        SkillDocumentParser instrumented = new SkillDocumentParser(collector, VisibilityMasking.defaultRules());
+        try (VisibilityEventCollector collector = new VisibilityEventCollector()) {
+            SkillDocumentParser instrumented = new SkillDocumentParser(collector, VisibilityMasking.defaultRules());
 
-        SkillDocument document = instrumented.parse(temp, "visibility", "run-visibility");
+            SkillDocument document = instrumented.parse(temp, "visibility", "run-visibility");
 
-        assertThat(document.id()).isEqualTo("visibility");
-        List<VisibilityEvent> events = collector.events();
-        assertThat(events).hasSizeGreaterThanOrEqualTo(2);
-        Map<VisibilityEventType, List<VisibilityEvent>> grouped = events.stream()
-                .collect(Collectors.groupingBy(VisibilityEvent::type));
-        assertThat(grouped.get(VisibilityEventType.PARSE)).isNotNull();
+            assertThat(document.id()).isEqualTo("visibility");
+            List<VisibilityEvent> events = collector.events();
+            assertThat(events).hasSizeGreaterThanOrEqualTo(2);
+            Map<VisibilityEventType, List<VisibilityEvent>> grouped = events.stream()
+                    .collect(Collectors.groupingBy(VisibilityEvent::type));
+            assertThat(grouped.get(VisibilityEventType.PARSE)).isNotNull();
 
-        VisibilityEvent frontMatterEvent = grouped.get(VisibilityEventType.PARSE).stream()
-                .filter(event -> "parse.frontmatter".equals(event.metadata().step())).findFirst().orElseThrow();
-        ParsePayload frontMatterPayload = (ParsePayload) frontMatterEvent.payload();
-        Map<String, Object> maskedInputs = (Map<String, Object>) frontMatterPayload.frontMatter().get("inputs");
-        assertThat(maskedInputs.get("api_key")).isEqualTo("****");
-        assertThat(frontMatterEvent.metadata().runId()).isEqualTo("run-visibility");
-        assertThat(frontMatterEvent.metadata().skillId()).isEqualTo("visibility");
+            VisibilityEvent frontMatterEvent = grouped.get(VisibilityEventType.PARSE).stream()
+                    .filter(event -> "parse.frontmatter".equals(event.metadata().step())).findFirst().orElseThrow();
+            ParsePayload frontMatterPayload = (ParsePayload) frontMatterEvent.payload();
+            Map<String, Object> maskedInputs = (Map<String, Object>) frontMatterPayload.frontMatter().get("inputs");
+            assertThat(maskedInputs.get("api_key")).isEqualTo("****");
+            assertThat(frontMatterEvent.metadata().runId()).isEqualTo("run-visibility");
+            assertThat(frontMatterEvent.metadata().skillId()).isEqualTo("visibility");
 
-        VisibilityEvent bodyEvent = grouped.get(VisibilityEventType.PARSE).stream()
-                .filter(event -> "parse.body".equals(event.metadata().step())).findFirst().orElseThrow();
-        ParsePayload bodyPayload = (ParsePayload) bodyEvent.payload();
-        assertThat(bodyPayload.bodyPreview()).contains("Body with token");
+            VisibilityEvent bodyEvent = grouped.get(VisibilityEventType.PARSE).stream()
+                    .filter(event -> "parse.body".equals(event.metadata().step())).findFirst().orElseThrow();
+            ParsePayload bodyPayload = (ParsePayload) bodyEvent.payload();
+            assertThat(bodyPayload.bodyPreview()).contains("Body with token");
+        }
     }
 
     @Test
