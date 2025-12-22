@@ -105,18 +105,12 @@ public final class OtlpVisibilityPublisher implements VisibilityEventPublisher, 
             span.setAttribute("visibility.parse.validated", parse.validated());
             span.setAttribute("visibility.parse.front_matter", parse.frontMatter().toString());
         } else if (payload instanceof PromptPayload prompt) {
-            span.setAttribute("visibility.prompt.content", prompt.prompt());
-            span.setAttribute("visibility.prompt.response", safe(prompt.response()));
-            span.setAttribute("visibility.prompt.model", safe(prompt.model()));
             span.setAttribute("visibility.prompt.role", prompt.role());
             span.setAttribute("gen_ai.request.model", safe(prompt.model()));
             span.setAttribute("gen_ai.request.prompt", prompt.prompt());
             span.setAttribute("gen_ai.response.text", safe(prompt.response()));
             TokenUsage usage = prompt.usage();
             if (usage != null) {
-                span.setAttribute("visibility.usage.input_tokens", safeLong(usage.inputTokens()));
-                span.setAttribute("visibility.usage.output_tokens", safeLong(usage.outputTokens()));
-                span.setAttribute("visibility.usage.total_tokens", safeLong(usage.totalTokens()));
                 span.setAttribute("gen_ai.usage.input_tokens", safeLong(usage.inputTokens()));
                 span.setAttribute("gen_ai.usage.output_tokens", safeLong(usage.outputTokens()));
                 span.setAttribute("gen_ai.usage.total_tokens", safeLong(usage.totalTokens()));
@@ -126,8 +120,6 @@ public final class OtlpVisibilityPublisher implements VisibilityEventPublisher, 
             span.setAttribute("visibility.agent.decision", state.decision());
             span.setAttribute("visibility.agent.state", safe(state.stateSummary()));
         } else if (payload instanceof MetricsPayload metrics) {
-            span.setAttribute("visibility.metrics.input_tokens", safeLong(metrics.inputTokens()));
-            span.setAttribute("visibility.metrics.output_tokens", safeLong(metrics.outputTokens()));
             span.setAttribute("visibility.metrics.latency_ms", safeLong(metrics.latencyMillis()));
             span.setAttribute("visibility.metrics.retry_count", safeLong(metrics.retryCount()));
             span.setAttribute("gen_ai.usage.input_tokens", safeLong(metrics.inputTokens()));

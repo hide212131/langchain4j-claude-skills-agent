@@ -8,8 +8,8 @@ import java.util.List;
 @SuppressWarnings({ "PMD.SystemPrintln", "PMD.CognitiveComplexity", "PMD.NPathComplexity" })
 public final class LangfusePromptMain {
 
-    private static final List<String> PROMPT_KEYS = List.of("gen_ai.request.prompt", "visibility.prompt.content",
-            "gen_ai.request.messages", "gen_ai.request.system", "gen_ai.request.user");
+    private static final List<String> PROMPT_KEYS = List.of("gen_ai.request.prompt", "gen_ai.request.messages",
+            "gen_ai.request.system", "gen_ai.request.user");
 
     private LangfusePromptMain() {
     }

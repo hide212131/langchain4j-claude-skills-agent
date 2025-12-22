@@ -41,10 +41,13 @@ class OtlpVisibilityPublisherTest {
         assertThat(spansCopy).hasSize(2);
         SpanData span = spansCopy.stream().filter(s -> PLAN_PROMPT.equals(s.getName())).findFirst().orElseThrow();
         assertThat(span.getName()).isEqualTo(PLAN_PROMPT);
-        assertThat(span.getAttributes().get(AttributeKey.stringKey("visibility.prompt.content")))
-                .isEqualTo("prompt-text");
-        assertThat(span.getAttributes().get(AttributeKey.longKey("visibility.usage.total_tokens"))).isEqualTo(15L);
         assertThat(span.getAttributes().get(AttributeKey.stringKey("visibility.run_id"))).isEqualTo(RUN_ID);
+        assertThat(span.getAttributes().get(AttributeKey.stringKey("visibility.prompt.role"))).isEqualTo("assistant");
+        assertThat(span.getAttributes().get(AttributeKey.stringKey("gen_ai.request.prompt"))).isEqualTo("prompt-text");
+        assertThat(span.getAttributes().get(AttributeKey.stringKey("gen_ai.response.text"))).isEqualTo("resp");
+        assertThat(span.getAttributes().get(AttributeKey.longKey("gen_ai.usage.total_tokens"))).isEqualTo(15L);
+        assertThat(span.getAttributes().get(AttributeKey.stringKey("visibility.prompt.content"))).isNull();
+        assertThat(span.getAttributes().get(AttributeKey.longKey("visibility.usage.total_tokens"))).isNull();
     }
 
     @Test
