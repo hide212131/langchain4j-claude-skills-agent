@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Design
-- Status: Draft
+- Status: Approved
   <!-- Draft: Work in progress | Approved: Ready for implementation | Rejected: Not moving forward with this design -->
 
 ## Links
@@ -19,9 +19,9 @@ FR-mcncb の最小成立と後続可視化/Observability を支えるため、SK
 
 ## Success Metrics
 
-- [ ] SKILL.md を POJO 化し、固定応答の Agentic フローが完走する。
-- [ ] Plan/Act/Reflect 各ステップで可視化プレースホルダイベントを出力する。
-- [ ] Gradle ビルド・テストが成功し、依存が揃う。
+- [x] SKILL.md を POJO 化し、固定応答の Agentic フローが完走する。
+- [x] Plan/Act/Reflect 各ステップで可視化プレースホルダイベントを出力する。
+- [x] Gradle ビルド・テストが成功し、依存が揃う。
 
 ## Background and Current State
 

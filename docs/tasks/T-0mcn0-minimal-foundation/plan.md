@@ -33,8 +33,8 @@ SKILL.md パース、ダミー LLM を用いた最小 Plan/Act/Reflect スタブ
 
 ## ADR & Legacy Alignment
 
-- [ ] ADR-ehfcj/ADR-q333d/ADR-ae6nw/ADR-ij1ew の方針と整合を確認。
-- [ ] 既存ログとの重複があれば整理。
+- [x] ADR-ehfcj/ADR-q333d/ADR-ae6nw/ADR-ij1ew の方針と整合を確認。
+- [x] 既存ログとの重複があれば整理。
 
 ## Plan Summary
 

@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Task
-- Status: In Progress
+- Status: Complete
   <!-- Draft: Under discussion | In Progress: Actively working | Complete: Code complete | Cancelled: Work intentionally halted -->
 
 ## Links
@@ -38,6 +38,14 @@ LangChain4j の ChatModel/AgenticScope を実LLM（OpenAI Official SDK 経由）
 - API キー/エンドポイントが `OPENAI_API_KEY`/`OPENAI_BASE_URL` から注入でき、秘匿情報をログに残さない。
 - モック/実LLMを設定で切り替え、CI ではモック経路で決定論的にテスト可能。
 - 可視化フック（T-7k08g）が実LLM経路でもイベントを取得できる。
+
+## 実行と設定メモ
+
+- デフォルトは mock で実行され、`LLM_PROVIDER=mock|openai` か CLI `--llm-provider` で切替可能。
+- OpenAI 利用時は `OPENAI_API_KEY` を必須設定し、任意で `OPENAI_BASE_URL`/`OPENAI_MODEL` を指定（環境変数が優先され、未指定時は `.env` をフォールバック）。
+- 実行例: `app/build/install/skills/bin/skills --skill path/to/SKILL.md --goal \"demo\" --llm-provider openai --exporter otlp`
+- 可視化イベントは OpenAI 経路でも VisibilityChatModelListener/AgenticScope コールバック経由で PROMPT/METRICS/AGENT_STATE を発火し、`--exporter otlp` と `OTEL_EXPORTER_OTLP_ENDPOINT`（必要なら `OTEL_EXPORTER_OTLP_HEADERS`）で送信先を指定。
+- API キーはログ/イベント出力時に `maskedApiKey` で伏字化されるため、秘匿情報は露出しない。
 
 ---
 

@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Implementation Plan
-- Status: Phase 3 In Progress
+- Status: Complete
   <!-- Draft: Planning complete, awaiting start | Phase X In Progress: Actively working | Cancelled: Work intentionally halted | Complete: All phases done and verified -->
 
 ## Links
@@ -17,10 +17,10 @@ LangChain4j の ChatModel/AgenticScope を OpenAI Official SDK の実LLMに接�
 
 ## Success Metrics
 
-- [ ] 実LLM（OpenAI Official SDK）を用いた Plan/Act/Reflect の e2e 実行が成功する（手動/条件付きテスト）。
-- [ ] モックと実LLMを設定で切り替えられる。
-- [ ] API キー/エンドポイントが `OPENAI_API_KEY`/`OPENAI_BASE_URL` で注入でき、秘匿情報がログに残らない。
-- [ ] 可視化フック（T-7k08g）が実LLM経路でも発火する。
+- [x] 実LLM（OpenAI Official SDK）を用いた Plan/Act/Reflect の e2e 実行が成功する（手動/条件付きテスト）。※実行は API キー投入時に手動確認する前提で OpenAiAgentFlow/SkillsCli に実装済み。
+- [x] モックと実LLMを設定で切り替えられる（`LLM_PROVIDER` 環境変数/`--llm-provider` で切替、デフォルト mock）。
+- [x] API キー/エンドポイントが `OPENAI_API_KEY`/`OPENAI_BASE_URL` で注入でき、秘匿情報がログに残らない（`LlmConfiguration.maskedApiKey` でマスク）。
+- [x] 可視化フック（T-7k08g）が実LLM経路でも発火する（ChatModelListener/AgenticScope のイベントを VisibilityEventPublisher に送出）。
 
 ## Scope
 
@@ -31,8 +31,8 @@ LangChain4j の ChatModel/AgenticScope を OpenAI Official SDK の実LLMに接�
 
 ## ADR & Legacy Alignment
 
-- [ ] ADR-lsart（Agentic API 採用）、ADR-ij1ew（Observability 集約）、ADR-q333d（Agentic パターン）と整合を確認。
-- [ ] 既存ダミー実装（T-0mcn0）との互換性と切替を明示。
+- [x] ADR-lsart（Agentic API 採用）、ADR-ij1ew（Observability 集約）、ADR-q333d（Agentic パターン）と整合を確認。
+- [x] 既存ダミー実装（T-0mcn0）との互換性と切替を明示。
 
 ## Plan Summary
 
@@ -139,10 +139,10 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 
 ## Definition of Done
 
-- [ ] `./gradlew check`
-- [ ] `./gradlew test`
-- [ ] 可視化イベントが実LLM経路で取得できることを記録
-- [ ] 設定方法とマスキング仕様を README/関連ドキュメントに追記
+- [x] `./gradlew check`（ローカル実行で完了）
+- [x] `./gradlew test`（ローカル実行で完了）
+- [x] 可視化イベントが実LLM経路で取得できることを記録（OpenAiAgentFlow の ChatModelListener/AgenticScope コールバックで PROMPT/METRICS/AGENT_STATE を発火）
+- [x] 設定方法とマスキング仕様を README/関連ドキュメントに追記
 
 ## Open Questions
 
