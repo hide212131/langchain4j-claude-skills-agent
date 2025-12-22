@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Implementation Plan
-- Status: Phase 3 In Progress
+- Status: Complete
   <!-- Draft: Planning complete, awaiting start | Phase X In Progress: Actively working | Cancelled: Work intentionally halted before completion | Complete: All phases done and verified -->
 
 ## Links
@@ -45,7 +45,7 @@ FR-hjz63 の受け入れ基準を満たす可視化基盤を実装するため�
 ### Phase Status Tracking
 
 Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an item is intentionally skipped or deferred, annotate it (e.g., strike-through with a brief note) instead of leaving it unchecked.
-Phase 1/2 を完了したため、Phase 3 に着手する。
+Phase 1/2 を完了し、Phase 3 も完了した。
 
 ---
 
@@ -173,6 +173,54 @@ Phase 1/2 を完了したため、Phase 3 に着手する。
 - [x] エラー/リトライ/フォールバックのイベント記録テスト（NFR-mt1ve）
 - [x] 性能オーバーヘッドの簡易測定と調整
 
+### 観測サンプル（OTLP 相当）
+
+`OtlpVisibilityPublisher` を InMemorySpanExporter で観測した例。
+
+```json
+[
+  {
+    "name": "plan.prompt",
+    "attributes": {
+      "visibility.type": "PROMPT",
+      "visibility.phase": "plan",
+      "visibility.skill_id": "skill-1",
+      "visibility.run_id": "run-1",
+      "gen_ai.request.prompt": "prompt-text",
+      "gen_ai.response.text": "resp",
+      "gen_ai.usage.input_tokens": 10,
+      "gen_ai.usage.output_tokens": 5,
+      "gen_ai.usage.total_tokens": 15
+    }
+  },
+  {
+    "name": "workflow.done",
+    "attributes": {
+      "visibility.type": "METRICS",
+      "visibility.phase": "metrics",
+      "visibility.skill_id": "skill-1",
+      "visibility.run_id": "run-1",
+      "visibility.metrics.latency_ms": 42,
+      "visibility.metrics.retry_count": 1,
+      "gen_ai.usage.input_tokens": 5,
+      "gen_ai.usage.output_tokens": 3
+    }
+  },
+  {
+    "name": "run.failed",
+    "status": "ERROR",
+    "attributes": {
+      "visibility.type": "ERROR",
+      "visibility.phase": "error",
+      "visibility.skill_id": "skill-1",
+      "visibility.run_id": "run-1",
+      "visibility.error.message": "失敗しました",
+      "visibility.error.type": "IllegalStateException"
+    }
+  }
+]
+```
+
 ### Phase 3 Deliverables
 
 - 自動テストと観測サンプルログ/トレース
@@ -196,9 +244,9 @@ Phase 1/2 を完了したため、Phase 3 に着手する。
 
 - [x] `./gradlew check`
 - [x] `./gradlew test`
-- [ ] 観測サンプル（OTLP 相当）を取得し、ドキュメントに反映
-- [ ] 新規エラーメッセージが日本語で、マスキング仕様に従う
-- [ ] 関連ドキュメント/README を更新し、タスクリンクを traceability に反映
+- [x] 観測サンプル（OTLP 相当）を取得し、ドキュメントに反映
+- [x] 新規エラーメッセージが日本語で、マスキング仕様に従う
+- [x] 関連ドキュメント/README を更新し、タスクリンクを traceability に反映
 
 ## Open Questions
 
