@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.hide212131.langchain4j.claude.skills.runtime.VisibilityLog;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventPublisher;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
@@ -44,7 +45,8 @@ class SkillsCliAppTest {
         ByteArrayOutputStream logs = new ByteArrayOutputStream();
         VisibilityLog log = new VisibilityLog(newLogger(logs));
 
-        String result = SkillsCliApp.executeWithRetry(action, log, true, "run-retry", "skill-x");
+        String result = SkillsCliApp.executeWithRetry(action, log, true, "run-retry", "skill-x",
+                VisibilityEventPublisher.noop());
 
         assertThat(result).isEqualTo("ok");
         assertThat(logs.toString(StandardCharsets.UTF_8)).contains("再試行します");
@@ -58,8 +60,8 @@ class SkillsCliAppTest {
         };
         VisibilityLog log = new VisibilityLog(newLogger(new ByteArrayOutputStream()));
 
-        assertThatThrownBy(() -> SkillsCliApp.executeWithRetry(action, log, true, "run-retry", "skill-x"))
-                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> SkillsCliApp.executeWithRetry(action, log, true, "run-retry", "skill-x",
+                VisibilityEventPublisher.noop())).isInstanceOf(IllegalStateException.class);
     }
 
     @Test

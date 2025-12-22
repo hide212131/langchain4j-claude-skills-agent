@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Task
-- Status: Draft
+- Status: In Progress
   <!-- Draft: Under discussion | In Progress: Actively working | Complete: Code complete | Cancelled: Work intentionally halted -->
 
 ## Links
@@ -24,6 +24,7 @@
 ## Summary
 
 SKILL.md パースからエージェントの Plan/Act/Reflect 実行、生成物出力までに発生するプロンプト・内部状態・メトリクスを可視化する仕組みを設計・実装する。
+Phase 2 では可視化イベントを OTLP(LangFuse など) に送れるよう `--exporter`/`--otlp-endpoint`/`--otlp-headers` を受け付け、送信先切替を実装する。
 
 ## Scope
 
@@ -44,9 +45,108 @@ LangFuse をローカルで立ち上げる場合は公式 docker-compose を利�
 docker compose -f https://raw.githubusercontent.com/langfuse/langfuse/main/docker-compose.yml up -d
 ```
 
+Gradle タスク（推奨）:
+
+```bash
+./gradlew :app:langfuseUp
+./gradlew :app:langfuseUpForeground
+./gradlew :app:langfuseDown
+./gradlew :app:langfuseReset
+./gradlew :app:langfuseLogs
+```
+
+### Self-host 初期化（LANGFUSE_INIT\_\*）
+
+self-host の場合、最初は画面で「組織・プロジェクト・キー」を作る必要がありますが、代わりに `LANGFUSE_INIT_*` を設定して起動すると、起動時に自動作成できます（公式 docker-compose の機能）。
+
+ポイント:
+
+- `./gradlew :app:langfuseUp` はリポジトリ直下の `.env` を参照するため、`.env` に `LANGFUSE_INIT_*` を書いておけば OK です。
+- 固定キー運用にしたい場合は、`LANGFUSE_INIT_PROJECT_PUBLIC_KEY`/`LANGFUSE_INIT_PROJECT_SECRET_KEY` と、`LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` を同じ値にしてください（`langfuseReport`/`langfusePrompt` がその値で API を呼びます）。
+- 初期化は「初回起動（または未作成状態）」前提です。すでに UI で作成済みの場合は、初期化が反映されないことがあります。
+  - その場合は UI で手動作成するか、ローカル用途で問題ないならボリュームごと削除してやり直してください（データ消えます）。
+
+例（`.env`）:
+
+```bash
+LANGFUSE_INIT_ORG_ID=local
+LANGFUSE_INIT_ORG_NAME=Local
+LANGFUSE_INIT_PROJECT_ID=demo
+LANGFUSE_INIT_PROJECT_NAME=Demo
+LANGFUSE_INIT_PROJECT_PUBLIC_KEY=pk-lf-demo
+LANGFUSE_INIT_PROJECT_SECRET_KEY=sk-lf-demo
+LANGFUSE_INIT_USER_EMAIL=local@example.com
+LANGFUSE_INIT_USER_NAME=LocalUser
+LANGFUSE_INIT_USER_PASSWORD=local-password
+```
+
+反映手順:
+
+```bash
+./gradlew :app:langfuseDown
+./gradlew :app:langfuseUp
+```
+
+ボリューム削除してやり直す場合（注意: データ消えます）:
+
+```bash
+./gradlew :app:langfuseReset
+./gradlew :app:langfuseUp
+```
+
+デバッグ（ブラウザ操作しながらログを見たい）:
+
+ターミナルを 2 つ使います。
+
+ターミナル 1（フォアグラウンドで起動。Ctrl+C で停止）:
+
+```bash
+./gradlew :app:langfuseUpForeground
+```
+
+ターミナル 2（ログ追跡。特定サービスに絞る場合は `-Pservice=...`）:
+
+```bash
+./gradlew :app:langfuseLogs
+./gradlew :app:langfuseLogs -Pservice=langfuse-web
+./gradlew :app:langfuseLogs -Pservice=langfuse-worker
+```
+
 トレース集計は `langfuseReport`（予定）で LangFuse API から直近トレースを取得し、gen_ai 指標（トークン数・レイテンシ・エラー率）を標準出力にまとめる。鍵が未設定の場合はスキップする。
 
 プロンプト取得は `langfusePrompt`（予定）で可視化スキーマに合わせたプロンプト属性を取得する（旧仕様の固定パスではなく、設計で定義した VisibilityEvent `prompt` や `gen_ai.request.*` を持つ Span/Log を対象）。環境変数または Gradle プロパティで資格情報を指定する。
+
+### LangFuse レポート/プロンプト取得（Gradle タスク）
+
+前提（環境変数）:
+
+- `LANGFUSE_HOST`
+- `LANGFUSE_PUBLIC_KEY`
+- `LANGFUSE_SECRET_KEY`
+
+実行例:
+
+```bash
+./gradlew :app:langfuseReport -Plimit=20
+./gradlew :app:langfuseReport -PtraceId=<traceId>
+./gradlew :app:langfusePrompt -Plimit=5
+./gradlew :app:langfusePrompt -PtraceId=<traceId>
+```
+
+## OpenAI 実行の動作確認（CLI）
+
+`.env` に OpenAI と可視化の設定を入れた上で、CLI で `--llm-provider openai` を指定して実行する。
+
+例:
+
+```bash
+app/build/install/skills/bin/skills --skill path/to/SKILL.md --goal "demo" --llm-provider openai --exporter otlp
+```
+
+OTLP 送信先は `OTEL_EXPORTER_OTLP_ENDPOINT`（および必要なら `OTEL_EXPORTER_OTLP_HEADERS`）で指定する。`.env.example` を参照。
+
+LangFuse self-host に送る場合は、`OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:3000/api/public/otel` を推奨（OTLP/HTTP）。
+この場合 `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` が設定されていれば、`Authorization: Basic ...` ヘッダは自動付与される（`OTEL_EXPORTER_OTLP_HEADERS` を省略可）。
 
 ---
 
