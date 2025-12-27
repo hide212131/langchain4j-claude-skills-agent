@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Functional Requirement
-- Status: Draft
+- Status: Approved
   <!-- Draft: Under discussion | Approved: Ready for implementation | Rejected: Decision made not to pursue this requirement -->
 
 ## Links
@@ -33,12 +33,12 @@ As a Java エージェント利用者, I want 条件分岐や外部リソース�
 
 ## Acceptance Criteria
 
-- [ ] 条件分岐や参照リソースを含む Markdown 本文をパースできること。
-- [ ] LLM が条件を判定し、異なる処理フローを選択できること。
-- [ ] スキル実行時に外部ファイルやスクリプトを動的ロードできること。
-- [ ] Python/Bash などのスクリプト実行を統合し、結果を取得できること。
-- [ ] バイナリ生成物（例: pptx, pdf）を出力できること。
-- [ ] スクリプト実行の全トレーシングが FR-hjz63 の可視化で確認できること。
+- [ ] 条件分岐や参照リソースを含む SKILL.md（例: Anthropics `skills/pptx`）をパースし、フロントマター・本文・参照ファイル（`html2pptx.md`、`ooxml.md` など）を必要時のみロードできること。
+- [ ] LLM が SKILL.md 内の分岐条件に従って実行経路を選択し、必要なスクリプト・リソースを段階的に取得できること。
+- [ ] Python/Bash 等のスクリプトをエージェント経由で実行し、標準出力・エラー・終了コードを取得できること。
+- [ ] `skills/pptx` の「テンプレートなしで新規作成」ワークフロー（`html2pptx` → `html2pptx.js` → `scripts/thumbnail.py`）をエンドツーエンドで実行し、pptx 本体とサムネイル画像が生成されることを確認すること。
+- [ ] `skills/pptx` の「既存 PPTX 編集」ワークフロー（`ooxml/scripts/unpack.py` → 編集 → `validate.py` → `pack.py`）を実行し、バリデーション成功まで到達すること。
+- [ ] スクリプト実行やリソース取得の全ステップが FR-hjz63 の可視化フレームワークに追跡されること。
 
 ## Technical Details (if applicable)
 
