@@ -7,9 +7,9 @@
 
 ## Checklist
 
-- [ ] Phase 1: スキル収集（skillport）
-  - [ ] skillport CLI モードで SKILL.md をまとめて取得し、取得元コミットハッシュで pin する手順を確立
-  - [ ] .skillportrc の `skills_dir` を `.skillport/skills` に設定し、gitignore 管理にする
+- [ ] Phase 1: スキル収集（Java SkillDownloader）
+  - [ ] skill-sources.yaml の URL リストから SKILL.md をまとめて取得し、取得元コミットハッシュで pin する手順を確立
+  - [ ] 取得した SKILL を `.skills/` に展開し、gitignore 管理にする
 - [ ] Phase 2: 依存抽出とプロファイル自動生成
   - [ ] SKILL.md 依存宣言の抽出仕様を決める（言語/パッケージ/ツールの正規化ルール、LLM 併用。外部 API 利用を許可する前提）
   - [ ] 抽出結果から Dockerfile 生成の入力となるプロファイル YAML を自動生成し、`build/profiles.generated.yaml` に出力
@@ -25,3 +25,4 @@
 ## Notes
 
 - 依存未充足の場合は実行前に拒否し、実行時インストールは行わない（ADR-38940）。
+- 本タスクの Java 実装は `io.github.hide212131.langchain4j.claude.skills.bundle` に配置する。

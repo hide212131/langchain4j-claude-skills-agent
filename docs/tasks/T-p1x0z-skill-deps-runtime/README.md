@@ -20,6 +20,7 @@
 ## Summary
 
 FR-cccz4 に必要な複雑スキル（例: skills/pptx）の依存を、実行時インストールなしで扱うための「事前ビルド（依存バンドルイメージ）」を設計・実装する。SKILL.md の依存宣言をパースし、汎用プロファイルにマッピングしてベースイメージを選択・検証する。ランタイム統合は別タスクで実施する。
+Java 実装は `io.github.hide212131.langchain4j.claude.skills.bundle` に配置する。
 
 ## Status
 

@@ -34,6 +34,7 @@
 
 ### コンポーネント
 
+- Java 実装パッケージ: `io.github.hide212131.langchain4j.claude.skills.bundle`（ビルド系実装）。SKILL.md パース/LLM は既存の `...skills.runtime` を再利用。
 - DependencyDeclarationParser: SKILL.md の依存宣言（言語/パッケージ/ツール）を抽出・正規化。
 - ProfileGenerator: 抽出した依存セットからプロファイル YAML（Dockerfile 生成の入力）を自動生成する。
 - DockerfileGenerator: プロファイル YAML から Dockerfile を生成する。
@@ -60,10 +61,9 @@
 project-root
 ├─ skill-sources.yaml.example    # 取得元URLのサンプル（タグ/ハッシュでpin）
 ├─ skill-sources.yaml            # 環境ごとに用意（gitignore想定）
-├─ src/main/java/.../skills/
-│  ├─ parser/                   # SKILL.mdパーサ（依存抽出含む）※ランタイム共通
-│  ├─ llm/                      # 依存抽出にLLMを使う場合の呼び出し※ランタイム共通
-│  └─ profile/                  # ProfileResolver, ImageCatalog
+├─ app/src/main/java/.../skills/
+│  ├─ runtime/                  # 既存の実装配置（SkillDocumentParser/LlmProvider など）
+│  └─ bundle/                   # ビルド系実装（SkillDownloader/プロファイル生成/Dockerfile生成）
 ├─ scripts/                     # SKILL ダウンロード・検証スクリプト（CI/CDや手元実行用）
 ├─ .skills                      # SKILL を展開するディレクトリ（.gitignore 管理）
 │  └─ anthropics/
