@@ -110,22 +110,34 @@ sources:
 
 ```yaml
 profiles:
-  node-playwright-sharp:
-    includes:
-      base_image: node:20-bookworm
-      npm_packages:
-        - pptxgenjs@^3
-        - sharp@^0.33
-        - playwright@latest
-  python-pptx-markitdown:
+  pptx-skill:
     includes:
       base_image: python:3.11-slim
-      pip_packages:
-        - "markitdown[pptx]==0.0.1"
-        - defusedxml>=0.7
+      install_commands:
+        - 'pip install "markitdown[pptx]"'
+        - "pip install defusedxml"
+        - "npm install -g pptxgenjs"
+        - "npm install -g playwright"
+        - "npm install -g react-icons react react-dom"
+        - "npm install -g sharp"
+        - "apt-get update && apt-get install -y libreoffice poppler-utils"
+      normalized_packages:
+        npm:
+          - pptxgenjs
+          - playwright
+          - react-icons
+          - react
+          - react-dom
+          - sharp
+        pip:
+          - "markitdown[pptx]"
+          - defusedxml
+        apt:
+          - libreoffice
+          - poppler-utils
 ```
 
-生成後のイメージタグは CI のビルド成果物として管理し、プロファイル YAML には書かない。
+`install_commands` を主要入力とし、`normalized_packages` は任意の補助情報とする。生成後のイメージタグは CI のビルド成果物として管理し、プロファイル YAML には書かない。
 
 ### セキュリティ・制約（ビルド時）
 
