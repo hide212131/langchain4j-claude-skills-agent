@@ -44,6 +44,7 @@
 - メトリック 2：`複数スキル連鎖実行（A → B）が正常に動作し、前のステップの出力が次のステップの入力として使用される`
 - メトリック 3：`スキル実行エラー（外部 API 呼び出し失敗、タイムアウトなど）が自動検出・ログされ、自動リトライが機能する`
 - メトリック 4：`複数スキル環境（5～10 スキル）での検索・マッチング・実行が正常に動作する`
+- メトリック 5：`FR-cccz4 受け入れ基準の skills/pptx ワークフロー（新規生成・既存編集）が end-to-end で成功し、生成物とトレースが揃う`
 
 ## Decision
 
@@ -92,7 +93,7 @@
 
 ## Implementation Notes
 
-- **ロード/検証**：SKILL.md から「許可オペレーション種別（例: `fs-temp` 作業ディレクトリ内読み書き、`fs-project` ワークスペース書き込み、`process-single` 許可ツール単発実行、`process-chain` 複数ステップ実行、`browser-automation` Playwright 等）」と「必要ツール（python-pptx, ffmpeg, playwright, libreoffice 等）」「入力スキーマ/必須パラメータ」を読み込み、実行前に検証する。
+- **ロード/検証**：SKILL.md から「許可オペレーション種別（例: `fs-temp` 作業ディレクトリ内読み書き、`fs-project` ワークスペース書き込み、`process-single` 許可ツール単発実行、`process-chain` 複数ステップ実行、`browser-automation` Playwright 等）」と「必要ツール（python-pptx, ffmpeg, playwright, libreoffice 等）」「入力スキーマ/必須パラメータ」を読み込み、実行前に検証する。依存充足チェックとベースイメージ選択は ADR-38940「依存宣言パースと事前バンドル方針」に従い、実行時インストールは禁止。
 - **補助ドキュメント読取**：SKILL.md 以外の手順/参考Markdown（例: html2pptx.md, ooxml.md, README, examples/\*.md 等）を必読し、参照パスとハッシュをトレースに記録する。
 - **コード生成の明示**：実行前に必要な生成物（スライド HTML、呼び出し用 JS/TS、コマンド列）をエージェントが作成し、それらも成果物カタログに含める。
 - **依存ツール検証**：宣言されたツール（Playwright ブラウザ同梱、sharp、pptxgenjs、markitdown、Pillow/LibreOffice/Poppler など）の存在確認と不足時のエラー/フォールバック方針を実装する。
@@ -108,12 +109,19 @@
 - **セキュリティ/リソース**：許可リスト型のコマンド/バイナリ、パス制約、ネットワーク利用の可否、リソース上限をオペレーション単位で適用。
 - **観測性**：実行ログと成果物サマリを Observability に送信し、スキル連鎖時にはチェーン全体のトレースを構築。
 - **カスタム拡張点**：特殊スキル向けに、ツールチェインの前後や中間に挿入できるフック（例: brand-guidelines 用のフォント検証）を用意するが、基本は共通枠で完結させる。
-- **具体例（document-skills/pptx の新規生成）**：
+- **具体例（skills/pptx の新規生成）**：
   1. SKILL.md と `html2pptx.md` を全文読了し、参照パス/ハッシュをトレースに記録。
   2. 依存チェック：Playwright（ブラウザ同梱）、sharp、pptxgenjs、Node、Python+thumbnail.py 依存（Pillow 等）を確認。不足時はエラー。
   3. コード生成：各スライドの HTML（720×405pt、placeholder付き、画像は事前PNG化）と `scripts/html2pptx.js` を呼び出すラッパJSを生成。生成物は成果物カタログに含める。
   4. ツールチェイン実行（fs-temp + process-chain + browser-automation）：ラッパJSを Node で実行して `output.pptx` を生成し、続けて `python scripts/thumbnail.py output.pptx` でサムネイル作成。cmd/exit/stdout/stderr/elapsed を記録。
   5. 成果物カタログ：`output.pptx`、サムネPNG、生成HTML/JS、実行ログを登録。失敗時はどのステップで落ちたかと部分成果物の扱いを記録。
+- **具体例（skills/pptx の既存編集）**：
+  1. SKILL.md と `ooxml.md` を全文読了。参照パス/ハッシュをトレースに記録。
+  2. 依存チェック：Python、`ooxml/scripts/unpack.py`/`validate.py`/`pack.py`、`defusedxml` の存在を確認。
+  3. ツールチェイン実行（fs-temp + process-chain）：`unpack.py` で展開 → 変更内容適用（LLM が生成した置換 JSON 等） → `validate.py` でバリデーション → `pack.py` で再パック。各ステップで cmd/exit/stdout/stderr/elapsed を記録。
+  4. 成果物カタログ：更新後の pptx、差分が分かるログ、適用した JSON/スクリプトを登録。バリデーション失敗時は失敗点を記録し、中間成果物の扱いを明示。
+
+※ いずれのワークフローも、pptx ファイル名・パス・スライド構成はリクエスト/スキル入力で決まり、固定サンプルやハードコードに依存しないことを原則とする。
 
 ## Platform Considerations
 

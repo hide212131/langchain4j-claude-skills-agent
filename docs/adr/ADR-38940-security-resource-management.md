@@ -15,6 +15,7 @@
   - [ADR-ae6nw AgenticScope の活用シナリオ](ADR-ae6nw-agenticscope-scenarios.md)
   - [ADR-q333d Agentic パターンの選択基準](ADR-q333d-agentic-pattern-selection.md)
 - Impacted Requirements:
+  - [FR-cccz4 単一スキルの複雑手続き実行](../requirements/FR-cccz4-single-skill-complex-execution.md)
   - [NFR-3gjla セキュリティとリソース管理](../requirements/NFR-3gjla-security-resource-governance.md)
   - [NFR-yiown スキル検証・監査](../requirements/NFR-yiown-skill-verification-auditability.md)
   - [FR-2ff4z 複数スキル連鎖実行](../requirements/FR-2ff4z-multi-skill-composition.md)
@@ -79,6 +80,7 @@ Claude Skills は「任意の CLI コマンド実行」「Python/Node.js など�
 4. **スキル成果物（pptx 等）が「共通サンドボックスファイルシステム」で安全にやりとりできる**
    - 複数 Skill 間でファイルパス（または Artifact ID）を渡すことで成果物を連携可能
    - ファイル I/O はサンドボックス FS に制限され、ホスト FS や他テナントの領域にはアクセスできない
+   - FR-cccz4 の pptx ワークフローでは、入力に応じたファイルパスのみを使用し、固定サンプルやハードコードに依存しないことを保証する
 
 5. **環境別フェーズ移行がスムーズに行える**
    - Phase 1: ローカル／テスト環境で Docker ベースサンドボックスを利用開始
@@ -224,6 +226,7 @@ Code Execution Engines 自体は有用な機能だが、本プロジェクトに
 - セキュリティ
   - コンテナに割り当てる CPU / メモリ上限を Docker 側で設定
   - コンテナ内ユーザを非特権ユーザに限定
+  - 外部ネットワークはデフォルト遮断（ブラウザ自動化が必要な場合もローカルファイル入力に限定）
 - リソース監視
   - コンテナ起動／終了ログ、実行時間、メモリ使用量などをメトリクスとして収集
 
@@ -232,6 +235,18 @@ Code Execution Engines 自体は有用な機能だが、本プロジェクトに
 - ACADS のセッションごとにコンテナを起動し、`/workspace` に Azure Files / Blob をマウントする。
 - Docker と同様に、`/workspace/{tenantId}/{sessionId}/{skillId}` 構造を維持する。
 - LangChain4j からは、ACADS の REST API を叩くクライアントコンポーネントを実装し、Docker サンドボックスと同等の抽象インターフェースで利用できるようにする（セッション作成 / コード送信 / 実行完了待機など）。
+- ネットワークは原則遮断（例外は明示許可した外部 API のみ）。ブラウザ自動化が必要な場合もローカルファイルに限定し、外部サイトへのアクセスは禁止。
+
+#### 依存宣言のパースと事前バンドル方針
+
+- SKILL.md に記載された依存（言語/パッケージ/ツール）をパースし、「依存セット → ベースイメージタグ」をマッピングする。特定スキルをハードコーディングせず、宣言に基づく汎用マッピングとする。
+- ベースイメージは少数のプロファイルで共通化し、例として:
+  - `node-playwright-sharp`（pptxgenjs/Sharp/Playwright を含む）
+  - `python-pptx-markitdown`（markitdown\[pptx], defusedxml を含む）
+  - 必要に応じて追加の OS ツールを持つ派生（libreoffice/poppler 等）
+- CI で依存検証ジョブを実行し、イメージタグごとに `node --version`、`playwright --version`、`python -c "import markitdown"` など存在チェックを行い、満たさない場合はビルド失敗とする。
+- ランタイムは実行前に「SKILL.md 依存セット」と「利用するイメージタグ」を突き合わせ、未充足なら実行を拒否してエラーを返す。実行時の `pip/npm install` は行わない。
+- 依存取得が必要な場合は、ビルドパイプラインで社内ミラーなど信頼済みソースを用いて取得し、イメージに焼き込む。実行環境は外部ネットワークを遮断したままとする。
 
 #### 信頼度レベルと実行ポリシー
 
@@ -252,6 +267,24 @@ public enum SkillTrustLevel {
 - `UNVERIFIED`：
   - 常に ACADS サンドボックスで実行
   - 実行前に管理者承認や静的解析フローを挟むことも検討
+
+#### スキル種別ごとのポリシー例（FR-cccz4 / skills/pptx）
+
+- 許可コマンド（Phase 1/2 共通）:
+  - Node: `node scripts/html2pptx.js`（ラッパを含む）、必要な npm グローバル依存（pptxgenjs, sharp, playwright）
+  - Python: `python scripts/thumbnail.py`, `python ooxml/scripts/unpack.py`, `python ooxml/scripts/validate.py`, `python ooxml/scripts/pack.py`
+  - Unix 基本ツール: `ls`, `cat`, `find`, `tar`, `zip/unzip` など read-only/圧縮用途に限定
+- 禁止/制限:
+  - 外部ネットワークアクセスは禁止（フォント/アイコン等も同梱リソースのみ使用）
+  - 任意の `pip install` / `npm install` は禁止。依存はサンドボックスイメージに事前焼き込み。
+  - 作業ディレクトリ外（`/workspace/{tenant}/{session}/...` 以外）への書き込み禁止。
+  - 固定サンプルファイルに依存する実装は禁止。入力で指定されたファイルパス・テンプレートのみ利用する。
+- リソース上限（初期値の目安、環境で調整可能）:
+  - Node/Python プロセス: CPU 1-2 vCPU, メモリ 1-2 GiB, タイムアウト 120 秒/ステップ
+  - ブラウザ自動化（Playwright）: 追加で 512 MiB、タイムアウト 180 秒/ステップ
+- 成果物取り扱い:
+  - 生成物（pptx, サムネイル, 生成した HTML/JS, 実行ログ）は成果物カタログに登録し、FR-hjz63 の可視化トレースに載せる。
+  - 失敗時は中間生成物の保持/削除ポリシーを明示し、ログに記録する。
 
 #### Code Execution Engines の利用ガイドライン（Phase 2 以降）
 
