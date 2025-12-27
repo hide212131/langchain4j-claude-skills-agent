@@ -1,9 +1,9 @@
-# T-p1x0z 依存バンドル・実行分離プラン
+# T-p1x0z 依存依存バンドルプラン
 
 ## Metadata
 
 - Type: Plan
-- Status: Draft
+- Status: Approved
 
 ## Checklist
 
