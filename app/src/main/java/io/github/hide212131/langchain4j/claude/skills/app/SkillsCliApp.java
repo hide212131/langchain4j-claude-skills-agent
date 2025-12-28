@@ -1,5 +1,8 @@
 package io.github.hide212131.langchain4j.claude.skills.app;
 
+import io.github.hide212131.langchain4j.claude.skills.bundle.DockerfileGeneratorCli;
+import io.github.hide212131.langchain4j.claude.skills.bundle.SkillDepsGeneratorCli;
+import io.github.hide212131.langchain4j.claude.skills.bundle.SkillDownloaderCli;
 import io.github.hide212131.langchain4j.claude.skills.runtime.AgentFlow;
 import io.github.hide212131.langchain4j.claude.skills.runtime.AgentFlow.AgentFlowResult;
 import io.github.hide212131.langchain4j.claude.skills.runtime.AgentFlowFactory;
@@ -39,7 +42,8 @@ import picocli.CommandLine.Spec;
 
 /** 最小構成の CLI。SKILL.md をパースし、Plan/Act/Reflect フローを実行する。 */
 // @formatter:off
-@Command(name = "skills", description = "SKILL.md を読み込み Plan/Act/Reflect を実行します。", mixinStandardHelpOptions = true)
+@Command(name = "skills", description = "SKILL.md を読み込み Plan/Act/Reflect を実行します。", mixinStandardHelpOptions = true, subcommands = {
+        SkillDownloaderCli.class, SkillDepsGeneratorCli.class, DockerfileGeneratorCli.class })
 @SuppressWarnings({ "PMD.GuardLogStatement", "PMD.ExcessiveImports", "checkstyle:LineLength" })
 public final class SkillsCliApp implements Callable<Integer> {
 

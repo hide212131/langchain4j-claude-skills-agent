@@ -1,0 +1,53 @@
+name: スキル依存バンドル検証
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "run-env/skill-sources.yaml.example"
+      - "docs/tasks/T-p1x0z-skill-deps-runtime/**"
+      - "app/src/main/java/io/github/hide212131/langchain4j/claude/skills/bundle/**"
+      - "run-env/scripts/verify-docker-deps.sh"
+      - ".github/workflows/skill-deps-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "run-env/skill-sources.yaml.example"
+      - "docs/tasks/T-p1x0z-skill-deps-runtime/**"
+      - "app/src/main/java/io/github/hide212131/langchain4j/claude/skills/bundle/**"
+      - "run-env/scripts/verify-docker-deps.sh"
+      - ".github/workflows/skill-deps-ci.yml"
+
+jobs:
+  verify-skill-deps:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ソースを取得
+        uses: actions/checkout@v4
+
+      - name: JDK 21 を準備
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: スキル取得元を準備
+        run: |
+          cp run-env/skill-sources.yaml.example run-env/skill-sources.yaml
+
+      - name: SKILL.md を取得
+        run: |
+          ./gradlew :app:run --args="download-skills --config run-env/skill-sources.yaml --output build/skills"
+
+      - name: skill-deps.yaml を生成
+        run: |
+          ./gradlew :app:run --args="generate-skill-deps --skills-root build/skills"
+
+      - name: Dockerfile を生成
+        run: |
+          ./gradlew :app:run --args="generate-dockerfiles --skills-root build/skills --template run-env/template/Dockerfile"
+
+      - name: 依存存在チェック
+        run: |
+          bash run-env/scripts/verify-docker-deps.sh build/skills

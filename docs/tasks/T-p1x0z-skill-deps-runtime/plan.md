@@ -7,19 +7,19 @@
 
 ## Checklist
 
-- [ ] Phase 1: スキル収集（Java SkillDownloader）
-  - [ ] skill-sources.yaml の URL リストから SKILL.md をまとめて取得し、取得元コミットハッシュで pin する手順を確立
-  - [ ] 取得した SKILL を `.skills/` に展開し、gitignore 管理にする
-- [ ] Phase 2: 依存抽出とプロファイル自動生成
-  - [ ] SKILL.md 依存宣言の抽出仕様を決める（言語/パッケージ/ツールの正規化ルール、LLM 併用。外部 API 利用を許可する前提）
-  - [ ] 抽出結果から Dockerfile 生成の入力となるプロファイル YAML を自動生成し、`build/profiles.generated.yaml` に出力
-- [ ] Phase 3: Dockerfile 自動生成と CI 検証
-  - [ ] プロファイル YAML（入力）から `build/docker/{profile}/Dockerfile` を生成
-  - [ ] CI で生成された Dockerfile/イメージに対し依存存在チェックを行うジョブを作成
+- [x] Phase 1: スキル収集（Java SkillDownloader）
+  - [x] skill-sources.yaml の URL リストから SKILL.md をまとめて取得し、取得元コミットハッシュで pin する手順を確立
+  - [x] 取得した SKILL を `build/skills/` に展開し、gitignore 管理にする
+- [x] Phase 2: 依存抽出と skill-deps.yaml 自動生成
+  - [x] SKILL.md 依存宣言の抽出仕様を決める（言語/パッケージ/ツールの正規化ルール、LLM 併用。外部 API 利用を許可する前提）
+  - [x] 抽出結果から Dockerfile 生成の入力となる `skill-deps.yaml` を自動生成し、`build/skills/<skillPath>/.skill-runtime/` に出力
+- [x] Phase 3: Dockerfile 自動生成と CI 検証
+  - [x] `skill-deps.yaml`（入力）から `.skill-runtime/Dockerfile` を生成
+  - [x] CI で生成された Dockerfile/イメージに対し依存存在チェックを行うジョブを作成
 
 ## Risks / Mitigations
 
-- プロファイル粒度が細かすぎるとイメージ爆発 → 初期は大括りプロファイルで開始し、必要に応じて分割。
+- スキル単位の依存抽出が不正確だとビルド失敗や不足が起きる → LLM 抽出 + ルールベースの補助で検出し、CI で検証する。
 - ACADS へのイメージ配布手順が未確定 → レジストリ運用は別途タスク化し、ここではカタログと検証ジョブに留める。
 
 ## Notes

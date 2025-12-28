@@ -55,6 +55,9 @@ docs/reference/external-materials/
 # Local export of anthropics/skills (managed via `./gradlew updateSkills`)
 /skills/
 
+# スキル取得用のローカル設定
+run-env/skill-sources.yaml
+
 # Local runtime environments
 /env/
 

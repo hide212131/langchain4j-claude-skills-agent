@@ -19,7 +19,7 @@
 
 ## Summary
 
-FR-cccz4 に必要な複雑スキル（例: skills/pptx）の依存を、実行時インストールなしで扱うための「事前ビルド（依存バンドルイメージ）」を設計・実装する。SKILL.md の依存宣言をパースし、汎用プロファイルにマッピングしてベースイメージを選択・検証する。ランタイム統合は別タスクで実施する。
+FR-cccz4 に必要な複雑スキル（例: skills/pptx）の依存を、実行時インストールなしで扱うための「事前ビルド（依存バンドルイメージ）」を設計・実装する。SKILL.md の依存宣言をパースして `skill-deps.yaml` を生成し、汎用テンプレート Dockerfile にコマンドを差し込んで検証する。ランタイム統合は別タスクで実施する。
 Java 実装は `io.github.hide212131.langchain4j.claude.skills.bundle` に配置する。
 
 ## Status
@@ -29,6 +29,6 @@ Java 実装は `io.github.hide212131.langchain4j.claude.skills.bundle` に配置
 
 ## Outcomes
 
-- SKILL.md 依存パーサとプロファイルマッピングの仕様・実装
-- 事前ビルドされたベースイメージ（ローカル/Docker, 本番/ACADS）選択の仕組み
+- SKILL.md 依存パーサと `skill-deps.yaml` 生成の仕様・実装
+- テンプレート Dockerfile へのコマンド差し込みと生成物の検証
 - CI 依存検証ジョブで未充足を検知し、実行前に拒否できること

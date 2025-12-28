@@ -1,5 +1,0 @@
-sources:
-  # 代表的なスキルリポジトリ。必ずタグやコミットハッシュで pin すること。
-  - https://github.com/anthropics/skills.git#refs/tags/v1.0.0
-  # 例: 自前のスキル集（必要に応じて差し替え）
-  - https://github.com/gotalab/skill-samples.git#refs/heads/main

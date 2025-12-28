@@ -1,0 +1,6 @@
+sources:
+  # 形式: <repo>#<ref>:<path>:<dest>
+  # ref はタグまたはコミットハッシュで pin すること。
+  - https://github.com/anthropics/skills.git#refs/tags/v1.0.0:skills:anthropics/skills
+  # 例: 自前のスキル集（必要に応じて差し替え）
+  - https://github.com/gotalab/skill-samples.git#refs/heads/main:skills:gotalab/skills

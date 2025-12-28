@@ -23,7 +23,7 @@ public final class SkillDocumentParser {
 
     private static final Set<String> REQUIRED_KEYS = Set.of("name", "description");
     private static final Set<String> ALLOWED_KEYS = Set.of("id", "name", "description", "version", "inputs", "outputs",
-            "keywords", "stages", "license");
+            "keywords", "stages", "license", "dependencies");
     private static final Pattern LEADING_NEWLINES = Pattern.compile("^(\\r?\\n)+");
 
     private final Yaml yaml = new Yaml();
