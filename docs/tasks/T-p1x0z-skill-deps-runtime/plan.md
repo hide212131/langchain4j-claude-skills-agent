@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Plan
-- Status: Approved
+- Status: Complete
 
 ## Checklist
 

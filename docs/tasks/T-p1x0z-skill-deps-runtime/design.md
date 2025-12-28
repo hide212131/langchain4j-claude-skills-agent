@@ -21,9 +21,9 @@
 
 ## Success Metrics
 
-- [ ] SKILL.md の依存宣言から依存セットを抽出し、`skill-deps.yaml`（Dockerfile 生成の入力）を自動生成できる。
-- [ ] CI で依存検証ジョブが動作し、足りない場合はビルドで検知して失敗させられる。
-- [ ] ランタイムでの `pip/npm install` なしに FR-cccz4 の acceptance である pptx ワークフローを開始できる状態（依存を含むイメージが準備済み）を整える。
+- [x] SKILL.md の依存宣言から依存セットを抽出し、`skill-deps.yaml`（Dockerfile 生成の入力）を自動生成できる。
+- [x] CI で依存検証ジョブが動作し、足りない場合はビルドで検知して失敗させられる。
+- [x] ランタイムでの `pip/npm install` なしに FR-cccz4 の acceptance である pptx ワークフローを開始できる状態（依存を含むイメージが準備済み）を整える。
 
 ## Design Details
 
