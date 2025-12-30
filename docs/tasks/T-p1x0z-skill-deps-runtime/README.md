@@ -3,8 +3,8 @@
 ## Metadata
 
 - Type: Task
-- Status: Approved
-  <!-- Draft: Work in progress | Approved: Ready for implementation | Rejected: Not moving forward with this task -->
+- Status: Complete
+  <!-- Draft: Work in progress | Approved: Ready for implementation | Rejected: Not moving forward with this task | Complete: Implementation finished -->
 
 ## Links
 
@@ -25,7 +25,7 @@ Java 実装は `io.github.hide212131.langchain4j.claude.skills.bundle` に配置
 ## Status
 
 - Design: Approved
-- Plan: Approved
+- Plan: Complete
 
 ## Outcomes
 

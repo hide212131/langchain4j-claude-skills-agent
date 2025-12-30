@@ -220,6 +220,17 @@ tasks.register<JavaExec>("langfusePrompt") {
     args("--limit", limit)
 }
 
+tasks.register<JavaExec>("buildSkillImages") {
+    group = "skills"
+    description = "生成された Dockerfile をビルドし、規約ベースのタグを付与します。"
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("io.github.hide212131.langchain4j.claude.skills.bundle.SkillImageBuilderCli")
+    workingDir = rootProject.projectDir
+    providers.gradleProperty("skillPath").orNull?.let { args("--skill-path", it) }
+    providers.gradleProperty("skillsRoot").orNull?.let { args("--skills-root", it) }
+    providers.gradleProperty("projectRoot").orNull?.let { args("--project-root", it) }
+}
+
 checkstyle {
     toolVersion = "10.12.5"
     configFile = rootProject.file("config/checkstyle/checkstyle.xml")
