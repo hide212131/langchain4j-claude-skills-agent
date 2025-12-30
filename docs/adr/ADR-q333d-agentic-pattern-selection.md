@@ -27,7 +27,7 @@
 
 <!-- What problem or architecturally significant requirement motivates this decision? Include constraints, assumptions, scope boundaries, and prior art. Keep value-neutral and explicit. -->
 
-LangChain4j v1.9.0 以降は、エージェント・アーキテクチャの実装パターンとして、以下の 2 つの主要アプローチを提供している：
+LangChain4j v1.10.0 以降は、エージェント・アーキテクチャの実装パターンとして、以下の 2 つの主要アプローチを提供している：
 
 1. **Workflow 型**（明示的な制御フロー）：
    - LangChain4j `Workflow` builder を使用して、スキル選択・実行フローを制御フローで定義
@@ -43,7 +43,7 @@ LangChain4j v1.9.0 以降は、エージェント・アーキテクチャの実�
 
 **制約・仮定**：
 
-- LangChain4j v1.9.0 以降の API に依存
+- LangChain4j v1.10.0 以降の API に依存
 - サーバサイド環境（マルチテナント・多数ユーザリクエスト）での運用を想定
 - Context Engineering（Progressive Disclosure）の実装が重要
 

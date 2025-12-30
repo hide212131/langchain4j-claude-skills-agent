@@ -42,7 +42,7 @@
 
 ## Executive Summary
 
-本分析は、LangChain4j v1.9.0 以降の最新 Agentic AI API（Plan/Act/Reflect パターン）を活用して、Claude Skills の仕様に基づいた Java エージェント実装の最小限の実行系構築に向けた問題空間の探索を行うもの。主な目的は 4 つ：
+本分析は、LangChain4j v1.10.0 以降の最新 Agentic AI API（Plan/Act/Reflect パターン）を活用して、Claude Skills の仕様に基づいた Java エージェント実装の最小限の実行系構築に向けた問題空間の探索を行うもの。主な目的は 4 つ：
 
 1. **LangChain4j の Agentic AI API 実装例の提示**
    - Workflow型 および Pure Agent型（Supervisor/SubAgents）の実装パターン
@@ -70,7 +70,7 @@
 
 ### Current State
 
-- **LangChain4j v1.9.0 以降**：最新 Agentic AI API（Agents モジュール）により、複数エージェントの協調（Supervisor/SubAgents）、Workflow 制御、AgenticScope による情報共有などが提供されている
+- **LangChain4j v1.10.0 以降**：最新 Agentic AI API（Agents モジュール）により、複数エージェントの協調（Supervisor/SubAgents）、Workflow 制御、AgenticScope による情報共有などが提供されている
   - 参照：[LangChain4j Agentic Support](https://docs.langchain4j.dev/tutorials/agents/)
 - **実装パターンの課題**：
   - Workflow型（明示的な制御）と Pure Agent型（柔軟・適応的）のトレードオフ理解が不十分
@@ -164,7 +164,7 @@
 
 ### Technical Investigation
 
-#### 1. LangChain4j Agentic AI API（v1.9.0 以降）
+#### 1. LangChain4j Agentic AI API（v1.10.0 以降）
 
 **Agentic AI Components:**
 
@@ -380,7 +380,7 @@ Claude は必要なコンテキストのみを段階的にロードして効率�
 ### Technical Constraints
 
 1. **LangChain4j バージョン依存**
-   - Agentic AI サポート：v1.9.0 以降（langchain4j-agentic, langchain4j-agentic-a2a モジュール必須）
+   - Agentic AI サポート：v1.10.0 以降（langchain4j-agentic, langchain4j-agentic-a2a モジュール必須）
    - Java Target Version：23 以上（LangChain4j 依存）
 
 2. **Context Engineering の実装限界**
@@ -526,7 +526,7 @@ Claude は必要なコンテキストのみを段階的にロードして効率�
 
 | Risk                                                               | Probability | Impact | Mitigation Strategy                                                                                      |
 | ------------------------------------------------------------------ | ----------- | ------ | -------------------------------------------------------------------------------------------------------- |
-| LangChain4j Agentic API の仕様変更（v1.9.0 -> v2.0 など）          | Medium      | Medium | 版を明示的に固定し、API 変更ノートを継続監視；定期的な互換性チェック実装                                 |
+| LangChain4j Agentic API の仕様変更（v1.10.0 -> v2.0 など）         | Medium      | Medium | 版を明示的に固定し、API 変更ノートを継続監視；定期的な互換性チェック実装                                 |
 | Pure Agent型のコンテキスト管理が「ブラックボックス化」             | High        | High   | 初期実装では Workflow型またはHybrid パターンを優先；Context 可視化の仕組みを設計                         |
 | Workflow型の実装が複雑・保守性低下                                 | Medium      | Medium | 段階的実装（単純 Workflow → Supervisor/SubAgents）；テンプレート化・ドキュメント充実                     |
 | スキル定義メタデータモデルと SKILL.md 仕様の乖離                   | Medium      | Medium | 仕様を明確化する ADR 作成；SKILL.md のバージョン管理を文書に含める                                       |
@@ -560,7 +560,7 @@ Claude は必要なコンテキストのみを段階的にロードして効率�
     → Method: JJUG CCC 発表例の詳細確認；設計段階での層構造の定義
 
 - [ ] **LangChain4j Agentic API の本番環境への適合性**
-  - v1.9.0 の安定性・パフォーマンス・本番利用の実績を確認する必要がある
+  - v1.10.0 の安定性・パフォーマンス・本番利用の実績を確認する必要がある
   - エラーハンドリング・パフォーマンス・ホットリロード対応が必要かどうか、早期に検証する必要がある
     → Method: GitHub Issues、コミュニティチャットでの実装例収集；複数シナリオでの PoC 実施
 
@@ -727,7 +727,7 @@ Claude は必要なコンテキストのみを段階的にロードして効率�
 
 ### Raw Data
 
-- LangChain4j Version: v1.9.0 or later (check Maven Central for latest)
+- LangChain4j Version: v1.10.0 or later (check Maven Central for latest)
 - Java Target Version: 23 or later (LangChain4j 依存)
 
 ---

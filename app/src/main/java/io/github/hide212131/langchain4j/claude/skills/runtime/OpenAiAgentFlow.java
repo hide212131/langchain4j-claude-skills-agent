@@ -3,10 +3,11 @@ package io.github.hide212131.langchain4j.claude.skills.runtime;
 import dev.langchain4j.agentic.Agent;
 import dev.langchain4j.agentic.AgenticServices;
 import dev.langchain4j.agentic.UntypedAgent;
-import dev.langchain4j.agentic.agent.AgentRequest;
-import dev.langchain4j.agentic.agent.AgentResponse;
 import dev.langchain4j.agentic.agent.ErrorContext;
 import dev.langchain4j.agentic.agent.ErrorRecoveryResult;
+import dev.langchain4j.agentic.observability.AgentListener;
+import dev.langchain4j.agentic.observability.AgentRequest;
+import dev.langchain4j.agentic.observability.AgentResponse;
 import dev.langchain4j.agentic.scope.AgenticScope;
 import dev.langchain4j.agentic.scope.ResultWithAgenticScope;
 import dev.langchain4j.model.chat.ChatModel;
@@ -67,28 +68,18 @@ final class OpenAiAgentFlow implements AgentFlow {
         ChatModel chatModel = buildChatModel(log, basicLog, runId, document.id(), events);
 
         PlannerAgent planner = AgenticServices.agentBuilder(PlannerAgent.class).chatModel(chatModel).outputKey(KEY_PLAN)
-                .beforeAgentInvocation(req -> logAgentStart(log, basicLog, runId, document.id(), KEY_PLAN, req, events))
-                .afterAgentInvocation(res -> logAgentDone(log, basicLog, runId, document.id(), KEY_PLAN, res, events))
-                .build();
+                .listener(createAgentListener(log, basicLog, runId, document.id(), KEY_PLAN, events)).build();
 
         ActorAgent actor = AgenticServices.agentBuilder(ActorAgent.class).chatModel(chatModel).outputKey(KEY_ARTIFACT)
-                .beforeAgentInvocation(req -> logAgentStart(log, basicLog, runId, document.id(), "act", req, events))
-                .afterAgentInvocation(res -> logAgentDone(log, basicLog, runId, document.id(), "act", res, events))
-                .build();
+                .listener(createAgentListener(log, basicLog, runId, document.id(), "act", events)).build();
 
         ReflectAgent reflect = AgenticServices.agentBuilder(ReflectAgent.class).chatModel(chatModel)
                 .outputKey(KEY_REFLECT)
-                .beforeAgentInvocation(
-                        req -> logAgentStart(log, basicLog, runId, document.id(), KEY_REFLECT, req, events))
-                .afterAgentInvocation(
-                        res -> logAgentDone(log, basicLog, runId, document.id(), KEY_REFLECT, res, events))
-                .build();
+                .listener(createAgentListener(log, basicLog, runId, document.id(), KEY_REFLECT, events)).build();
 
         UntypedAgent workflow = AgenticServices.sequenceBuilder().subAgents(planner, actor, reflect)
                 .outputKey(KEY_ARTIFACT)
-                .beforeAgentInvocation(
-                        req -> logAgentStart(log, basicLog, runId, document.id(), "workflow", req, events))
-                .afterAgentInvocation(res -> logAgentDone(log, basicLog, runId, document.id(), "workflow", res, events))
+                .listener(createAgentListener(log, basicLog, runId, document.id(), "workflow", events))
                 .errorHandler(ctx -> handleError(log, runId, document.id(), ctx)).build();
 
         Map<String, Object> inputs = Map.of("skillName", document.name(), "skillDescription", document.description(),
@@ -125,6 +116,21 @@ final class OpenAiAgentFlow implements AgentFlow {
             builder.modelName(configuration.openAiModel());
         }
         return builder.build();
+    }
+
+    private AgentListener createAgentListener(VisibilityLog log, boolean basicLog, String runId, String skillId,
+            String phase, VisibilityEventPublisher events) {
+        return new AgentListener() {
+            @Override
+            public void beforeAgentInvocation(AgentRequest request) {
+                logAgentStart(log, basicLog, runId, skillId, phase, request, events);
+            }
+
+            @Override
+            public void afterAgentInvocation(AgentResponse response) {
+                logAgentDone(log, basicLog, runId, skillId, phase, response, events);
+            }
+        };
     }
 
     private void logAgentStart(VisibilityLog log, boolean basicLog, String runId, String skillId, String phase,

@@ -22,8 +22,8 @@ repositories {
 }
 
 dependencies {
-    val langchain4jVersion = "1.9.1"
-    val langchain4jAgenticVersion = "1.9.1-beta17"
+    val langchain4jVersion = "1.10.0"
+    val langchain4jAgenticVersion = "1.10.0-beta18"
     val otelVersion = "1.43.0"
     val jacksonVersion = "2.17.2"
 

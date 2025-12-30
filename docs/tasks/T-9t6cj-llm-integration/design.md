@@ -15,7 +15,7 @@
 
 FR-mcncb を達成するため、LangChain4j の Agentic API を OpenAI Official SDK の実LLMに接続する最小構成をまとめる。API キー/エンドポイントを環境変数 `OPENAI_API_KEY`/`OPENAI_BASE_URL` から注入し、SKILL.md パース → Plan/Act/Reflect → 生成物出力までをダミーではなく実モデルで実行可能にする。可視化フック（T-7k08g）と Observability 方針（ADR-ij1ew）に整合する形で計装ポイントを配置する。
 
-- LangChain4j バージョン: v1.9.1（本タスクおよび以降の実装の前提）
+- LangChain4j バージョン: v1.10.0（本タスクおよび以降の実装の前提）
 
 ## Success Metrics
 
