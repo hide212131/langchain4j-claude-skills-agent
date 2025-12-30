@@ -7,12 +7,12 @@
 
 ## Checklist
 
-- [ ] Phase 1: コード実行環境インターフェース実装
-  - [ ] `CodeExecutionEnvironment` インターフェース定義
-  - [ ] `ExecutionResult` レコード実装
-  - [ ] Docker実装 (`DockerCodeExecutionEnvironment`) をNon-AI Agentとして実装
-  - [ ] T-p1x0zで生成したイメージを使用したコンテナ起動・実行・クリーンアップ
-  - [ ] 依存未充足時のガード処理追加
+- [x] Phase 1: コード実行環境インターフェース実装
+  - [x] `CodeExecutionEnvironment` インターフェース定義
+  - [x] `ExecutionResult` レコード実装
+  - [x] Docker実装 (`DockerCodeExecutionEnvironment`) をNon-AI Agentとして実装
+  - [x] T-p1x0zで生成したイメージを使用したコンテナ起動・実行・クリーンアップ
+  - [x] 依存未充足時のガード処理追加
 - [ ] Phase 2: LangChain4j Agentic統合
   - [ ] `@Agent` アノテーションによるワークフロー統合
   - [ ] AIエージェント（スキルプランナー）とNon-AIエージェント（実行環境）のシーケンス構築
