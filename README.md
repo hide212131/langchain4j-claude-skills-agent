@@ -30,14 +30,21 @@ app/build/install/skills/bin/skills setup download --config=/path/to/config.yaml
 
 ```bash
 # ダウンロードしたスキルから skill-deps.yaml を生成
-app/build/install/skills/bin/skills setup generate-deps --skills-dir=build/skills
+app/build/install/skills/bin/skills setup generate-deps --skills-root=build/skills
 ```
 
 #### 3. Dockerfileの生成 (オプション)
 
 ```bash
 # skill-deps.yaml から Dockerfile を生成
-app/build/install/skills/bin/skills setup generate-dockerfile --skills-dir=build/skills
+app/build/install/skills/bin/skills setup generate-dockerfile --skills-root=build/skills
+
+#### 4. Docker イメージのビルド (オプション)
+
+```bash
+# 生成済み Dockerfile をビルド
+app/build/install/skills/bin/skills setup build-skill-images --skills-root=build/skills
+```
 ```
 
 ### スキルの実行
@@ -45,6 +52,9 @@ app/build/install/skills/bin/skills setup generate-dockerfile --skills-dir=build
 ```bash
 # スキルを実行
 app/build/install/skills/bin/skills run --skill=build/skills/anthropics/skills/pptx/SKILL.md --goal="プレゼン資料を作成"
+
+# 成果物の保存先を指定して実行
+app/build/install/skills/bin/skills run --skill=build/skills/anthropics/skills/pptx/SKILL.md --goal="プレゼン資料を作成" --artifacts-dir=./artifacts
 
 # Gradleから直接実行も可能
 ./gradlew run --args="run --skill app/src/test/resources/skills/e2e/SKILL.md --goal \"デモゴール\" --visibility-level basic"

@@ -10,6 +10,7 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.SkillDocument;
 import io.github.hide212131.langchain4j.claude.skills.runtime.SkillDocumentParser;
 import io.github.hide212131.langchain4j.claude.skills.runtime.VisibilityLevel;
 import io.github.hide212131.langchain4j.claude.skills.runtime.VisibilityLog;
+import io.github.hide212131.langchain4j.claude.skills.runtime.execution.ExecutionBackend;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ErrorPayload;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ExporterType;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.MetricsPayload;
@@ -74,6 +75,12 @@ public final class RunCommand implements Callable<Integer> {
 
     @Option(names = "--otlp-headers", paramLabel = "KEY=VAL,...", description = "OTLP 追加ヘッダ（未指定時は OTEL_EXPORTER_OTLP_HEADERS）")
     private String otlpHeaders;
+
+    @Option(names = "--execution-backend", paramLabel = "BACKEND", description = "実行バックエンド (docker|acads)。未指定時は SKILL_EXECUTION_BACKEND を参照します。", converter = ExecutionBackendConverter.class)
+    private ExecutionBackend executionBackend;
+
+    @Option(names = "--artifacts-dir", paramLabel = "DIR", description = "成果物の保存先ディレクトリ（未指定時は SKILL_ARTIFACTS_DIR を参照します。）")
+    private Path artifactsDir;
     // CHECKSTYLE:ON
 
     @SuppressWarnings("PMD.UnnecessaryConstructor")
@@ -116,10 +123,10 @@ public final class RunCommand implements Callable<Integer> {
                 return EXIT_CONFIGURATION_ERROR;
             }
 
-            AgentFlowFactory factory = new AgentFlowFactory(configuration);
+            AgentFlowFactory factory = new AgentFlowFactory(configuration, resolveExecutionBackend());
             AgentFlow flow = factory.create();
             Supplier<AgentFlowResult> action = () -> flow.run(document, goal == null ? "" : goal, log, basic, runId,
-                    closeablePublisher);
+                    skillPath.toString(), resolveArtifactsDir(), closeablePublisher);
 
             try {
                 AgentFlowResult result = executeWithRetry(action, log, basic, runId, document.id(), closeablePublisher);
@@ -190,6 +197,29 @@ public final class RunCommand implements Callable<Integer> {
         @Override
         public ExporterType convert(String value) {
             return ExporterType.parse(value);
+        }
+    }
+
+    private ExecutionBackend resolveExecutionBackend() {
+        if (executionBackend != null) {
+            return executionBackend;
+        }
+        return ExecutionBackend.parse(System.getenv("SKILL_EXECUTION_BACKEND"));
+    }
+
+    private String resolveArtifactsDir() {
+        if (artifactsDir != null) {
+            return artifactsDir.toString();
+        }
+        String env = System.getenv("SKILL_ARTIFACTS_DIR");
+        return env == null || env.isBlank() ? null : env;
+    }
+
+    private static final class ExecutionBackendConverter implements ITypeConverter<ExecutionBackend> {
+
+        @Override
+        public ExecutionBackend convert(String value) {
+            return ExecutionBackend.parse(value);
         }
     }
 }

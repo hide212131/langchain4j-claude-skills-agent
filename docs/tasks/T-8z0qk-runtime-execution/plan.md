@@ -13,11 +13,11 @@
   - [x] Docker実装 (`DockerCodeExecutionEnvironment`) をNon-AI Agentとして実装
   - [x] T-p1x0zで生成したイメージを使用したコンテナ起動・実行・クリーンアップ
   - [x] 依存未充足時のガード処理追加
-- [ ] Phase 2: LangChain4j Agentic統合
-  - [ ] `@Agent` アノテーションによるワークフロー統合
-  - [ ] AIエージェント（スキルプランナー）とNon-AIエージェント（実行環境）のシーケンス構築
-  - [ ] 環境切り替え設定（Docker/ACADS）の実装
-  - [ ] 外部ネットワーク遮断・インストール禁止の検証テスト
+- [x] Phase 2: LangChain4j Agentic統合
+  - [x] `@Agent` アノテーションによるワークフロー統合
+  - [x] AIエージェント（スキルプランナー）とNon-AIエージェント（実行環境）のシーケンス構築
+  - [x] 環境切り替え設定（Docker/ACADS）の実装
+  - [x] 外部ネットワーク遮断・インストール禁止の検証テスト
 - [ ] Phase 3: ACADS実装（Phase 2）
   - [ ] ACADS実装 (`AcadsCodeExecutionEnvironment`) をNon-AI Agentとして実装
   - [ ] Azure Entra認証とトークン管理
@@ -27,6 +27,8 @@
   - [ ] 各ステップの cmd/exit/stdout/stderr/elapsed を FR-hjz63 準拠で記録
   - [ ] `VisibilityEventPublisher` 経由での可視化基盤連携
   - [ ] pptx/サムネイル/生成ファイルを成果物カタログに登録
+  - [x] 成果物の保存先ディレクトリを指定できるオプションを追加
+  - [x] setup に build-skill-images サブコマンドを追加
 
 ## Risks / Mitigations
 

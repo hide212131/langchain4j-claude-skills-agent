@@ -45,7 +45,7 @@ class DummyAgentFlowTest {
         try (VisibilityEventCollector collector = new VisibilityEventCollector()) {
             VisibilityLog log = new VisibilityLog(Logger.getLogger(DummyAgentFlow.class.getName()));
 
-            flow.run(document, DEMO_GOAL, log, true, "run-1", collector);
+            flow.run(document, DEMO_GOAL, log, true, "run-1", "dummy-skill", null, collector);
 
             List<VisibilityEvent> events = collector.events();
             assertThat(events).hasSizeGreaterThanOrEqualTo(3);

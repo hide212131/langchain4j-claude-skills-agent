@@ -11,6 +11,7 @@ import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 import java.util.logging.StreamHandler;
+import io.github.hide212131.langchain4j.claude.skills.runtime.execution.ExecutionBackend;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -28,7 +29,7 @@ class AgentFlowFactoryTest {
         LlmConfiguration config = new LlmConfiguration(LlmProvider.OPENAI, "sk-test-12345678",
                 "https://api.openai.example", "gpt-4o");
 
-        AgentFlow flow = new AgentFlowFactory(config).create();
+        AgentFlow flow = new AgentFlowFactory(config, ExecutionBackend.DOCKER).create();
 
         assertThat(flow).isInstanceOf(OpenAiAgentFlow.class);
     }
@@ -37,12 +38,13 @@ class AgentFlowFactoryTest {
     @DisplayName("mock プロバイダでは決定論的な Plan/Act/Reflect を返す")
     void runMockFlowDeterministically() {
         LlmConfiguration config = new LlmConfiguration(LlmProvider.MOCK, null, null, null);
-        AgentFlow flow = new AgentFlowFactory(config).create();
+        AgentFlow flow = new AgentFlowFactory(config, ExecutionBackend.DOCKER).create();
         SkillDocument document = new SkillDocument("mock-skill", "Mock Skill", "Desc", "Body line");
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         VisibilityLog log = new VisibilityLog(newLogger(out));
 
-        AgentFlow.AgentFlowResult result = flow.run(document, "mock goal", log, true, "run-mock-1");
+        AgentFlow.AgentFlowResult result = flow.run(document, "mock goal", log, true, "run-mock-1", "dummy-skill",
+                null);
 
         assertThat(result.planLog()).contains("mock goal");
         assertThat(result.actLog()).contains("Mock Skill");

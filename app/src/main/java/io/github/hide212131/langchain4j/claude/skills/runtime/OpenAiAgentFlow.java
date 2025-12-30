@@ -19,6 +19,9 @@ import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.openaiofficial.OpenAiOfficialChatModel;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
+import io.github.hide212131.langchain4j.claude.skills.runtime.execution.CodeExecutionEnvironmentFactory;
+import io.github.hide212131.langchain4j.claude.skills.runtime.execution.ExecutionBackend;
+import io.github.hide212131.langchain4j.claude.skills.runtime.execution.ExecutionChainAgent;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.AgentStatePayload;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.MetricsPayload;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.PromptPayload;
@@ -28,6 +31,8 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.Visibil
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventMetadata;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventPublisher;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventType;
+import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -39,51 +44,70 @@ final class OpenAiAgentFlow implements AgentFlow {
 
     private static final int PREVIEW_LIMIT = 400;
     private static final String KEY_PLAN = "plan";
-    private static final String KEY_ARTIFACT = "artifact";
+    private static final String KEY_EXECUTION_PLAN = "executionPlan";
+    private static final String KEY_EXECUTION_REPORT = "executionReport";
     private static final String KEY_REFLECT = "reflect";
     private static final String KEY_GOAL = "goal";
+    private static final String KEY_SKILL_PATH = "skillPath";
+    private static final String KEY_SKILL_CONTEXT = "skillContext";
+    private static final String KEY_ARTIFACTS_DIR = "artifactsDir";
 
     private final LlmConfiguration configuration;
+    private final ExecutionBackend executionBackend;
 
-    OpenAiAgentFlow(LlmConfiguration configuration) {
+    OpenAiAgentFlow(LlmConfiguration configuration, ExecutionBackend executionBackend) {
         this.configuration = Objects.requireNonNull(configuration, "configuration");
-    }
-
-    @Override
-    @SuppressWarnings("PMD.AvoidCatchingGenericException")
-    public AgentFlowResult run(SkillDocument document, String goal, VisibilityLog log, boolean basicLog, String runId) {
-        return run(document, goal, log, basicLog, runId, VisibilityEventPublisher.noop());
+        this.executionBackend = Objects.requireNonNull(executionBackend, "executionBackend");
     }
 
     @Override
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
     public AgentFlowResult run(SkillDocument document, String goal, VisibilityLog log, boolean basicLog, String runId,
-            VisibilityEventPublisher events) {
+            String skillPath, String artifactsDir) {
+        return run(document, goal, log, basicLog, runId, skillPath, artifactsDir, VisibilityEventPublisher.noop());
+    }
+
+    @Override
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    public AgentFlowResult run(SkillDocument document, String goal, VisibilityLog log, boolean basicLog, String runId,
+            String skillPath, String artifactsDir, VisibilityEventPublisher events) {
         Objects.requireNonNull(document, "document");
         Objects.requireNonNull(log, "log");
         Objects.requireNonNull(runId, "runId");
+        Objects.requireNonNull(skillPath, "skillPath");
         Objects.requireNonNull(events, "events");
 
         String safeGoal = goal == null ? "" : goal.trim();
         ChatModel chatModel = buildChatModel(log, basicLog, runId, document.id(), events);
+        CodeExecutionEnvironmentFactory environmentFactory = new CodeExecutionEnvironmentFactory(executionBackend);
 
         PlannerAgent planner = AgenticServices.agentBuilder(PlannerAgent.class).chatModel(chatModel).outputKey(KEY_PLAN)
                 .listener(createAgentListener(log, basicLog, runId, document.id(), KEY_PLAN, events)).build();
 
-        ActorAgent actor = AgenticServices.agentBuilder(ActorAgent.class).chatModel(chatModel).outputKey(KEY_ARTIFACT)
-                .listener(createAgentListener(log, basicLog, runId, document.id(), "act", events)).build();
+        ExecutionPlanAgent actor = AgenticServices.agentBuilder(ExecutionPlanAgent.class).chatModel(chatModel)
+                .outputKey(KEY_EXECUTION_PLAN)
+                .listener(createAgentListener(log, basicLog, runId, document.id(), "plan.exec", events)).build();
 
         ReflectAgent reflect = AgenticServices.agentBuilder(ReflectAgent.class).chatModel(chatModel)
                 .outputKey(KEY_REFLECT)
                 .listener(createAgentListener(log, basicLog, runId, document.id(), KEY_REFLECT, events)).build();
 
-        UntypedAgent workflow = AgenticServices.sequenceBuilder().subAgents(planner, actor, reflect)
-                .outputKey(KEY_ARTIFACT)
+        ExecutionChainAgent executor = new ExecutionChainAgent(environmentFactory);
+
+        UntypedAgent workflow = AgenticServices.sequenceBuilder().subAgents(planner, actor, executor, reflect)
+                .outputKey(KEY_EXECUTION_REPORT)
                 .listener(createAgentListener(log, basicLog, runId, document.id(), "workflow", events))
                 .errorHandler(ctx -> handleError(log, runId, document.id(), ctx)).build();
 
-        Map<String, Object> inputs = Map.of("skillName", document.name(), "skillDescription", document.description(),
-                "skillBody", document.body(), KEY_GOAL, safeGoal);
+        String skillContext = SkillContextLoader.load(Path.of(skillPath), document.body());
+        Map<String, Object> inputs = new HashMap<>();
+        inputs.put("skillName", document.name());
+        inputs.put("skillDescription", document.description());
+        inputs.put("skillBody", document.body());
+        inputs.put(KEY_GOAL, safeGoal);
+        inputs.put(KEY_SKILL_PATH, skillPath);
+        inputs.put(KEY_SKILL_CONTEXT, skillContext);
+        inputs.put(KEY_ARTIFACTS_DIR, artifactsDir == null ? "" : artifactsDir);
 
         long workflowStart = System.nanoTime();
         try {
@@ -91,7 +115,7 @@ final class OpenAiAgentFlow implements AgentFlow {
             AgenticScope scope = result.agenticScope();
 
             String planLog = stringOrFallback(scope.readState(KEY_PLAN), "Plan を取得できませんでした");
-            String actLog = stringOrFallback(scope.readState(KEY_ARTIFACT), "Act を取得できませんでした");
+            String actLog = stringOrFallback(scope.readState(KEY_EXECUTION_PLAN), "実行計画を取得できませんでした");
             String reflectLog = stringOrFallback(scope.readState(KEY_REFLECT), "Reflect を取得できませんでした");
             String artifact = stringOrFallback(result.result(), "");
 
@@ -279,16 +303,20 @@ final class OpenAiAgentFlow implements AgentFlow {
                 {{skillBody}}
 
                 ゴール: {{goal}}
+                SKILL.md パス: {{skillPath}}
+                参照資料:
+                {{skillContext}}
                 手順の概要を簡潔に日本語で返してください。
                 """)
         @Agent(value = "planner", description = "Plan ステップを生成する")
         String plan(@V("skillName") String skillName, @V("skillDescription") String skillDescription,
-                @V("skillBody") String skillBody, @V("goal") String goal);
+                @V("skillBody") String skillBody, @V("goal") String goal, @V("skillPath") String skillPath,
+                @V("skillContext") String skillContext);
     }
 
-    public interface ActorAgent {
+    public interface ExecutionPlanAgent {
         @UserMessage("""
-                以下の Plan を実行してください。
+                以下の Plan を実行するためのコマンド列を JSON で返してください。
                 Plan:
                 {{plan}}
 
@@ -296,24 +324,46 @@ final class OpenAiAgentFlow implements AgentFlow {
                 {{skillBody}}
 
                 ゴール: {{goal}}
-                実行結果のみを日本語で出力してください。
+
+                出力フォーマット:
+                {
+                  "commands": [
+                    "command1",
+                    "command2"
+                  ],
+                  "outputPatterns": [
+                    "**/*.pptx",
+                    "**/*.png"
+                  ]
+                }
+
+                ルール:
+                - JSON 以外の文字は出力しない
+                - commands は 1 件以上
+                - pip/npm install は使わない
+                - commands は 1 行で実行可能なシェルコマンドのみ
+                - 説明文、コメント、箇条書き、括弧書きは commands に含めない
+                - ゴールが曖昧な場合は仮の題材で 3 枚以上のスライドを作成し、そのための実行コマンドを返す
+                - Python 実行は python3 を使う
+                - 利用できる作成系スクリプトは scripts/html2pptx.js と scripts/thumbnail.py のみ
                 """)
-        @Agent(value = "actor", description = "Act ステップを実行する")
-        String act(@V("plan") String plan, @V("skillBody") String skillBody, @V("goal") String goal);
+        @Agent(value = "executionPlanner", description = "実行計画を作成する")
+        String planExecution(@V("plan") String plan, @V("skillBody") String skillBody, @V("goal") String goal,
+                @V("skillPath") String skillPath, @V("skillContext") String skillContext);
     }
 
     public interface ReflectAgent {
         @UserMessage("""
-                以下の Plan と Act 結果を振り返り、達成度と改善点を短くまとめてください。
+                以下の Plan と 実行結果を振り返り、達成度と改善点を短くまとめてください。
                 Plan:
                 {{plan}}
 
-                Act 結果:
-                {{artifact}}
+                実行結果:
+                {{executionReport}}
 
                 ゴール: {{goal}}
                 """)
         @Agent(value = "reflector", description = "Reflect ステップをまとめる")
-        String reflect(@V("plan") String plan, @V("artifact") String artifact, @V("goal") String goal);
+        String reflect(@V("plan") String plan, @V("executionReport") String executionReport, @V("goal") String goal);
     }
 }

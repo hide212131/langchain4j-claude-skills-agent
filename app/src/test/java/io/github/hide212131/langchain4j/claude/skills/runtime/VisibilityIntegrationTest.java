@@ -35,7 +35,7 @@ class VisibilityIntegrationTest {
             VisibilityLog log = new VisibilityLog(newSilentLogger());
             DummyAgentFlow flow = new DummyAgentFlow();
 
-            flow.run(document, "integration goal", log, true, "run-e2e", collector);
+            flow.run(document, "integration goal", log, true, "run-e2e", skillMd.toString(), null, collector);
 
             List<VisibilityEvent> events = collector.events();
             assertThat(events).extracting(VisibilityEvent::type).contains(VisibilityEventType.PARSE,
@@ -66,7 +66,7 @@ class VisibilityIntegrationTest {
             long startNanos = System.nanoTime();
             for (int i = 0; i < 20; i++) {
                 collector.clear();
-                flow.run(document, "perf goal", log, true, "run-perf-" + i, collector);
+                flow.run(document, "perf goal", log, true, "run-perf-" + i, skillMd.toString(), null, collector);
             }
             long durationMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
 

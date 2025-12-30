@@ -21,20 +21,22 @@ public final class DummyAgentFlow implements AgentFlow {
 
     public AgentFlowResult run(SkillDocument document, String goal) {
         VisibilityLog log = new VisibilityLog(Logger.getLogger(DummyAgentFlow.class.getName()));
-        return run(document, goal, log, false, UUID.randomUUID().toString(), VisibilityEventPublisher.noop());
-    }
-
-    @Override
-    public AgentFlowResult run(SkillDocument document, String goal, VisibilityLog log, boolean basicLog, String runId) {
-        return run(document, goal, log, basicLog, runId, VisibilityEventPublisher.noop());
+        return run(document, goal, log, false, UUID.randomUUID().toString(), "", null, VisibilityEventPublisher.noop());
     }
 
     @Override
     public AgentFlowResult run(SkillDocument document, String goal, VisibilityLog log, boolean basicLog, String runId,
-            VisibilityEventPublisher events) {
+            String skillPath, String artifactsDir) {
+        return run(document, goal, log, basicLog, runId, skillPath, artifactsDir, VisibilityEventPublisher.noop());
+    }
+
+    @Override
+    public AgentFlowResult run(SkillDocument document, String goal, VisibilityLog log, boolean basicLog, String runId,
+            String skillPath, String artifactsDir, VisibilityEventPublisher events) {
         Objects.requireNonNull(document, "document");
         Objects.requireNonNull(log, "log");
         Objects.requireNonNull(runId, "runId");
+        Objects.requireNonNull(skillPath, "skillPath");
         Objects.requireNonNull(events, "events");
         String safeGoal = goal == null ? "" : goal.trim();
 
