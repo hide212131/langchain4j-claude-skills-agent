@@ -38,6 +38,8 @@
 - DependencyDeclarationParser: SKILL.md の依存宣言（言語/パッケージ/ツール）を抽出する。
 - SkillDepsGenerator: 抽出した依存セットから `skill-deps.yaml`（Dockerfile 生成の入力）を自動生成する。
 - DockerfileGenerator: `skill-deps.yaml` から Dockerfile を生成する。
+- SkillImageTagGenerator: スキルパスから規約ベースで Docker イメージタグを生成する純粋関数。
+- SkillImageBuilder: 生成された Dockerfile をビルドし、SkillImageTagGenerator が生成したタグを付与する。
 - CI Dependency Check: 生成したイメージに対し `node/playwright/sharp`、`python -c "import markitdown"` など存在確認を行うジョブ。
 - SkillDownloader (Java 実装): skill-sources.yaml に記載したリポジトリ URL から SKILL.md 群をダウンロードし、サンドボックス内 `/workspace/skills/<skillId>/` に配置する。取得元リポジトリはタグ/コミットで pin し、HTTP(S) のみを使用。
 
@@ -47,7 +49,8 @@
 2. SKILL.md 読み込み → LLM を含むパーサで依存宣言を抽出
 3. 抽出結果から `.skill-runtime/skill-deps.yaml` を自動生成
 4. `template/Dockerfile` をベースに `skill-deps.yaml` の `commands` を差し込み、`Dockerfile` を自動生成
-5. CI で生成イメージの依存充足を検証（不足ならビルド失敗で止める）
+5. 生成された Dockerfile をビルドしてイメージを作成し、規約ベースのタグを付与
+6. CI で生成イメージの依存充足を検証（不足ならビルド失敗で止める）
 
 ### LLM による依存抽出仕様
 
@@ -82,7 +85,7 @@
 - `.skill-runtime/` 配下に `skill-deps.yaml`、`Dockerfile`、その他関連ファイルを出力する。
 - テンプレート Dockerfile はソース管理配下の `run-env/template/Dockerfile` に置く。
 - CI: `.github/workflows/` などに依存検証ジョブ（環境に合わせて調整）。
-- 実行時設定: `application.yaml` にスキル→イメージタグのマッピングと環境種別（local/docker, acads）。
+- イメージタグ: スキルパスから規約ベースで自動生成（マッピング設定ファイルは不要）。
 
 ```
 project-root
@@ -143,6 +146,39 @@ commands:
   - "apt-get update && apt-get install -y libreoffice poppler-utils"
 ```
 
+### イメージタグ生成規約
+
+スキルパスから Docker イメージタグを規約ベースで自動生成する。マッピング設定ファイルは不要。
+
+#### 規約
+
+- スキルパスの `/` を `-` に置き換える
+- バージョンタグは `:latest` 固定（初期実装）
+- プレフィックス（`skill-` など）は付与しない
+
+#### 例
+
+| スキルパス                               | 生成されるイメージタグ                          |
+| ---------------------------------------- | ----------------------------------------------- |
+| `anthropics/skills/document-skills/pptx` | `anthropics-skills-document-skills-pptx:latest` |
+| `anthropics/skills/theme-factory`        | `anthropics-skills-theme-factory:latest`        |
+| `gotalab/skills/custom-skill`            | `gotalab-skills-custom-skill:latest`            |
+
+#### 実装
+
+`SkillImageTagGenerator.generateImageTag(String skillPath)` メソッドで実装する。
+
+```java
+public static String generateImageTag(String skillPath) {
+    String normalized = skillPath.replace("/", "-");
+    return normalized + ":latest";
+}
+```
+
+#### ランタイムでの利用
+
+ランタイム実行時（T-8z0qk）では、この規約に基づいてスキルパスからイメージタグを直接計算する。マッピング設定ファイルやデータベースは不要。
+
 ### セキュリティ・制約（ビルド時）
 
 - 外部ネットワークは次の用途に限定して許可する。
@@ -159,11 +195,12 @@ commands:
 
 ### テスト戦略（ビルド成果物のみ）
 
-- Unit: 依存宣言パースの成功/失敗、`skill-deps.yaml` 自動生成が期待通りの YAML を出すこと、Dockerfile 生成が依存を含むこと。
-- Integration: 生成した Dockerfile でビルドし、必要な依存（node/playwright/sharp、python/markitdown 等）が存在するかを確認（実行フロー統合は別タスク）。
+- Unit: 依存宣言パースの成功/失敗、`skill-deps.yaml` 自動生成が期待通りの YAML を出すこと、Dockerfile 生成が依存を含むこと、イメージタグ生成規約が正しく動作すること。
+- Integration: 生成した Dockerfile でビルドし、規約ベースのタグが付与されること、必要な依存（node/playwright/sharp、python/markitdown 等）が存在するかを確認（実行フロー統合は別タスク）。
 - CI: 依存検証ジョブが不足を検知して失敗すること。
 
 ## Open Questions
 
 - スキル単位で `skill-deps.yaml` を管理する粒度が妥当か。
-- ビルドしたイメージの配布方法（レジストリへの push とタグ/ハッシュ管理）の詳細。
+- ビルドしたイメージの配布方法（レジストリへの push）の詳細。
+- 規約ベースのタグ生成で `:latest` 固定の運用が長期的に妥当か（バージョニング戦略）。

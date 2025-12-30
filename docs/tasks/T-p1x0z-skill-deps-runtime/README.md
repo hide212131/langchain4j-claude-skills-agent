@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Task
-- Status: Complete
+- Status: Approved
   <!-- Draft: Work in progress | Approved: Ready for implementation | Rejected: Not moving forward with this task -->
 
 ## Links
@@ -25,10 +25,11 @@ Java 実装は `io.github.hide212131.langchain4j.claude.skills.bundle` に配置
 ## Status
 
 - Design: Approved
-- Plan: Complete
+- Plan: Approved
 
 ## Outcomes
 
 - SKILL.md 依存パーサと `skill-deps.yaml` 生成の仕様・実装
 - テンプレート Dockerfile へのコマンド差し込みと生成物の検証
+- 規約ベースのイメージタグ生成とビルド機能
 - CI 依存検証ジョブで未充足を検知し、実行前に拒否できること

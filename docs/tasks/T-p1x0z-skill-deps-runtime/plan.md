@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Plan
-- Status: Complete
+- Status: Approved
 
 ## Checklist
 
@@ -16,6 +16,11 @@
 - [x] Phase 3: Dockerfile 自動生成と CI 検証
   - [x] `skill-deps.yaml`（入力）から `.skill-runtime/Dockerfile` を生成
   - [x] CI で生成された Dockerfile/イメージに対し依存存在チェックを行うジョブを作成
+- [ ] Phase 4: イメージビルドとタグ付け
+  - [ ] SkillImageTagGenerator を実装（スキルパスから規約ベースでイメージタグを生成）
+  - [ ] SkillImageBuilder を実装（Dockerfile をビルドし、生成されたタグを付与）
+  - [ ] Gradle タスクまたは CLI コマンドで全スキルのイメージを一括ビルドできるようにする
+  - [ ] 単一スキルのみビルドするオプション（`--skill-path` 指定時）を追加
 
 ## Risks / Mitigations
 
