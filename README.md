@@ -56,6 +56,9 @@ app/build/install/skills/bin/skills run --skill=build/skills/anthropics/skills/p
 # 成果物の保存先を指定して実行
 app/build/install/skills/bin/skills run --skill=build/skills/anthropics/skills/pptx/SKILL.md --goal="プレゼン資料を作成" --artifacts-dir=./artifacts
 
+# ログをファイルに保存して実行
+app/build/install/skills/bin/skills run --skill=build/skills/anthropics/skills/pptx/SKILL.md --goal="プレゼン資料を作成" --log-file=./logs/skills-run.log
+
 # Gradleから直接実行も可能
 ./gradlew run --args="run --skill app/src/test/resources/skills/e2e/SKILL.md --goal \"デモゴール\" --visibility-level basic"
 ```
@@ -68,6 +71,8 @@ app/build/install/skills/bin/skills run --skill=build/skills/anthropics/skills/p
 - `--visibility-level` : 可視化ログレベル。`basic`（デフォルト）または `off`
 - `--llm-provider` : LLMプロバイダ (`mock` または `openai`)
 - `--exporter` : 可視化エクスポーター (`none` または `otlp`)
+- `--artifacts-dir` : 成果物の保存先ディレクトリ（未指定時は `SKILL_ARTIFACTS_DIR`）
+- `--log-file` : ログの保存先ファイル（未指定時は `SKILL_LOG_FILE`）
 
 正常終了時は Plan/Act/Reflect のログと成果物が標準出力に表示されます。
 

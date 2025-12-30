@@ -22,12 +22,16 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.Visibil
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventType;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityMasking;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityPublisherFactory;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
+import java.util.logging.FileHandler;
 import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ITypeConverter;
@@ -81,6 +85,9 @@ public final class RunCommand implements Callable<Integer> {
 
     @Option(names = "--artifacts-dir", paramLabel = "DIR", description = "成果物の保存先ディレクトリ（未指定時は SKILL_ARTIFACTS_DIR を参照します。）")
     private Path artifactsDir;
+
+    @Option(names = "--log-file", paramLabel = "FILE", description = "ログの保存先ファイル（未指定時は SKILL_LOG_FILE を参照します。）")
+    private Path logFile;
     // CHECKSTYLE:ON
 
     @SuppressWarnings("PMD.UnnecessaryConstructor")
@@ -93,51 +100,68 @@ public final class RunCommand implements Callable<Integer> {
     public Integer call() {
         String runId = UUID.randomUUID().toString();
         boolean basic = visibilityLevel == VisibilityLevel.BASIC;
-        VisibilityLog log = new VisibilityLog(Logger.getLogger(RunCommand.class.getName()));
-        ObservabilityConfiguration observability = new ObservabilityConfigurationLoader().load(exporter, otlpEndpoint,
-                otlpHeaders);
-        VisibilityEventPublisher publisher = VisibilityPublisherFactory.create(observability);
-        try (VisibilityEventPublisher closeablePublisher = publisher) {
-            SkillDocumentParser parser = new SkillDocumentParser(closeablePublisher, VisibilityMasking.defaultRules());
-
-            log.info(basic, runId, "-", "parse", "parse.skill", "SKILL.md を読み込みます", "path=" + skillPath, "");
-
-            SkillDocument document;
+        Logger logger = Logger.getLogger(RunCommand.class.getName());
+        FileHandler fileHandler = null;
+        try {
             try {
-                document = parser.parse(skillPath, skillId, runId);
-            } catch (RuntimeException ex) {
-                String fallbackSkillId = skillId == null ? "(不明)" : skillId;
-                log.error(runId, fallbackSkillId, LOG_TAG_ERROR, "parse", "SKILL.md のパースに失敗しました", "", "", ex);
-                spec.commandLine().getErr().println("SKILL.md のパースに失敗しました: " + ex.getMessage());
-                spec.commandLine().getErr().flush();
-                return EXIT_PARSE_ERROR;
-            }
-
-            LlmConfiguration configuration;
-            try {
-                configuration = new LlmConfigurationLoader().load(llmProvider);
-            } catch (RuntimeException ex) {
-                log.error(runId, document.id(), LOG_TAG_ERROR, "config.load", "LLM 設定の読み込みに失敗しました", "", "", ex);
-                spec.commandLine().getErr().println("LLM 設定の読み込みに失敗しました: " + ex.getMessage());
+                fileHandler = configureLogFile(logger);
+            } catch (IllegalStateException ex) {
+                spec.commandLine().getErr().println(ex.getMessage());
                 spec.commandLine().getErr().flush();
                 return EXIT_CONFIGURATION_ERROR;
             }
+            VisibilityLog log = new VisibilityLog(logger);
+            ObservabilityConfiguration observability = new ObservabilityConfigurationLoader().load(exporter,
+                    otlpEndpoint, otlpHeaders);
+            VisibilityEventPublisher publisher = VisibilityPublisherFactory.create(observability);
+            try (VisibilityEventPublisher closeablePublisher = publisher) {
+                SkillDocumentParser parser = new SkillDocumentParser(closeablePublisher,
+                        VisibilityMasking.defaultRules());
 
-            AgentFlowFactory factory = new AgentFlowFactory(configuration, resolveExecutionBackend());
-            AgentFlow flow = factory.create();
-            Supplier<AgentFlowResult> action = () -> flow.run(document, goal == null ? "" : goal, log, basic, runId,
-                    skillPath.toString(), resolveArtifactsDir(), closeablePublisher);
+                log.info(basic, runId, "-", "parse", "parse.skill", "SKILL.md を読み込みます", "path=" + skillPath, "");
 
-            try {
-                AgentFlowResult result = executeWithRetry(action, log, basic, runId, document.id(), closeablePublisher);
-                spec.commandLine().getOut().println(result.formatted());
-                spec.commandLine().getOut().flush();
-                return CommandLine.ExitCode.OK;
-            } catch (RuntimeException ex) {
-                log.error(runId, document.id(), LOG_TAG_ERROR, "run.failed", "エージェント実行が失敗しました", "", "", ex);
-                spec.commandLine().getErr().println("エージェント実行が失敗しました: " + ex.getMessage());
-                spec.commandLine().getErr().flush();
-                return EXIT_EXECUTION_ERROR;
+                SkillDocument document;
+                try {
+                    document = parser.parse(skillPath, skillId, runId);
+                } catch (RuntimeException ex) {
+                    String fallbackSkillId = skillId == null ? "(不明)" : skillId;
+                    log.error(runId, fallbackSkillId, LOG_TAG_ERROR, "parse", "SKILL.md のパースに失敗しました", "", "", ex);
+                    spec.commandLine().getErr().println("SKILL.md のパースに失敗しました: " + ex.getMessage());
+                    spec.commandLine().getErr().flush();
+                    return EXIT_PARSE_ERROR;
+                }
+
+                LlmConfiguration configuration;
+                try {
+                    configuration = new LlmConfigurationLoader().load(llmProvider);
+                } catch (RuntimeException ex) {
+                    log.error(runId, document.id(), LOG_TAG_ERROR, "config.load", "LLM 設定の読み込みに失敗しました", "", "", ex);
+                    spec.commandLine().getErr().println("LLM 設定の読み込みに失敗しました: " + ex.getMessage());
+                    spec.commandLine().getErr().flush();
+                    return EXIT_CONFIGURATION_ERROR;
+                }
+
+                AgentFlowFactory factory = new AgentFlowFactory(configuration, resolveExecutionBackend());
+                AgentFlow flow = factory.create();
+                Supplier<AgentFlowResult> action = () -> flow.run(document, goal == null ? "" : goal, log, basic, runId,
+                        skillPath.toString(), resolveArtifactsDir(), closeablePublisher);
+
+                try {
+                    AgentFlowResult result = executeWithRetry(action, log, basic, runId, document.id(),
+                            closeablePublisher);
+                    spec.commandLine().getOut().println(result.formatted());
+                    spec.commandLine().getOut().flush();
+                    return CommandLine.ExitCode.OK;
+                } catch (RuntimeException ex) {
+                    log.error(runId, document.id(), LOG_TAG_ERROR, "run.failed", "エージェント実行が失敗しました", "", "", ex);
+                    spec.commandLine().getErr().println("エージェント実行が失敗しました: " + ex.getMessage());
+                    spec.commandLine().getErr().flush();
+                    return EXIT_EXECUTION_ERROR;
+                }
+            }
+        } finally {
+            if (fileHandler != null) {
+                fileHandler.close();
             }
         }
     }
@@ -213,6 +237,33 @@ public final class RunCommand implements Callable<Integer> {
         }
         String env = System.getenv("SKILL_ARTIFACTS_DIR");
         return env == null || env.isBlank() ? null : env;
+    }
+
+    private FileHandler configureLogFile(Logger logger) {
+        Path resolved = resolveLogFile();
+        if (resolved == null) {
+            return null;
+        }
+        try {
+            Path parent = resolved.toAbsolutePath().getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            FileHandler handler = new FileHandler(resolved.toString(), true);
+            handler.setFormatter(new SimpleFormatter());
+            logger.addHandler(handler);
+            return handler;
+        } catch (IOException ex) {
+            throw new IllegalStateException("ログファイルの初期化に失敗しました: " + resolved, ex);
+        }
+    }
+
+    private Path resolveLogFile() {
+        if (logFile != null) {
+            return logFile;
+        }
+        String env = System.getenv("SKILL_LOG_FILE");
+        return env == null || env.isBlank() ? null : Path.of(env);
     }
 
     private static final class ExecutionBackendConverter implements ITypeConverter<ExecutionBackend> {
