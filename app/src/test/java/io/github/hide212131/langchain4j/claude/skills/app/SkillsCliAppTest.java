@@ -30,7 +30,7 @@ import picocli.CommandLine;
 @SuppressWarnings({ "PMD.JUnitTestContainsTooManyAsserts", "checkstyle:NoWhitespaceAfter" })
 class SkillsCliAppTest {
 
-    private static final Logger APP_LOGGER = Logger.getLogger(SkillsCliApp.class.getName());
+    private static final Logger APP_LOGGER = Logger.getLogger(RunCommand.class.getName());
     private static final String RUN_RETRY = "run-retry";
 
     @SuppressWarnings("PMD.UnnecessaryConstructor")
@@ -51,7 +51,7 @@ class SkillsCliAppTest {
         ByteArrayOutputStream logs = new ByteArrayOutputStream();
         VisibilityLog log = new VisibilityLog(newLogger(logs));
 
-        String result = SkillsCliApp.executeWithRetry(action, log, true, RUN_RETRY, "skill-x",
+        String result = RunCommand.executeWithRetry(action, log, true, RUN_RETRY, "skill-x",
                 VisibilityEventPublisher.noop());
 
         assertThat(result).isEqualTo("ok");
@@ -66,7 +66,7 @@ class SkillsCliAppTest {
         };
         VisibilityLog log = new VisibilityLog(newLogger(new ByteArrayOutputStream()));
 
-        assertThatThrownBy(() -> SkillsCliApp.executeWithRetry(action, log, true, RUN_RETRY, "skill-x",
+        assertThatThrownBy(() -> RunCommand.executeWithRetry(action, log, true, RUN_RETRY, "skill-x",
                 VisibilityEventPublisher.noop())).isInstanceOf(IllegalStateException.class);
     }
 
@@ -83,7 +83,7 @@ class SkillsCliAppTest {
         try (VisibilityEventCollector collector = new VisibilityEventCollector()) {
             VisibilityLog log = new VisibilityLog(newLogger(new ByteArrayOutputStream()));
 
-            String result = SkillsCliApp.executeWithRetry(action, log, true, RUN_RETRY, "skill-event", collector);
+            String result = RunCommand.executeWithRetry(action, log, true, RUN_RETRY, "skill-event", collector);
 
             assertThat(result).isEqualTo("ok");
             assertThat(collector.events()).hasSize(2).extracting(VisibilityEvent::type)
@@ -113,7 +113,7 @@ class SkillsCliAppTest {
         cmd.setOut(new PrintWriter(out, true, StandardCharsets.UTF_8));
         cmd.setErr(new PrintWriter(err, true, StandardCharsets.UTF_8));
 
-        int exit = cmd.execute("--skill", "src/test/resources/skills/sample/SKILL.md", "--goal", "demo goal",
+        int exit = cmd.execute("run", "--skill", "src/test/resources/skills/sample/SKILL.md", "--goal", "demo goal",
                 "--skill-id", "sample-skill", "--visibility-level", "off");
 
         assertThat(exit).isZero();
@@ -142,7 +142,7 @@ class SkillsCliAppTest {
             // CHECKSTYLE:OFF: NoWhitespaceAfter
             // @formatter:off
             int exit = SkillsCliApp.run(
-                    new String[] { "--skill", "src/test/resources/skills/e2e/SKILL.md", "--goal", "e2e goal",
+                    new String[] { "run", "--skill", "src/test/resources/skills/e2e/SKILL.md", "--goal", "e2e goal",
                             "--visibility-level", "basic" },
                     new PrintStream(stdout, true, StandardCharsets.UTF_8),
                     new PrintStream(stderr, true, StandardCharsets.UTF_8));
@@ -174,8 +174,8 @@ class SkillsCliAppTest {
         // CHECKSTYLE:OFF: NoWhitespaceAfter
         // @formatter:off
         int exit = SkillsCliApp.run(
-                new String[] { "--skill", "src/test/resources/skills/sample/SKILL.md", "--llm-provider", "openai",
-                        "--visibility-level", "off" },
+                new String[] { "run", "--skill", "src/test/resources/skills/sample/SKILL.md", "--llm-provider",
+                        "openai", "--visibility-level", "off" },
                 new PrintStream(out, true, StandardCharsets.UTF_8), new PrintStream(err, true, StandardCharsets.UTF_8));
         // @formatter:on
         // CHECKSTYLE:ON

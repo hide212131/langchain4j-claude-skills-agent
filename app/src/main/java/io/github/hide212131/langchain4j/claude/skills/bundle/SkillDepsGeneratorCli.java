@@ -10,7 +10,7 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.Spec;
 import picocli.CommandLine.Model.CommandSpec;
 
-@Command(name = "generate-skill-deps", description = "SKILL.md から skill-deps.yaml を生成します。", mixinStandardHelpOptions = true)
+@Command(name = "generate-deps", description = "SKILL.md から skill-deps.yaml を生成します。", mixinStandardHelpOptions = true)
 @SuppressWarnings("checkstyle:LineLength")
 public final class SkillDepsGeneratorCli implements Callable<Integer> {
 

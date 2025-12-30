@@ -8,7 +8,7 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.Spec;
 import picocli.CommandLine.Model.CommandSpec;
 
-@Command(name = "generate-dockerfiles", description = "skill-deps.yaml から Dockerfile を生成します。", mixinStandardHelpOptions = true)
+@Command(name = "generate-dockerfile", description = "skill-deps.yaml から Dockerfile を生成します。", mixinStandardHelpOptions = true)
 @SuppressWarnings("checkstyle:LineLength")
 public final class DockerfileGeneratorCli implements Callable<Integer> {
 

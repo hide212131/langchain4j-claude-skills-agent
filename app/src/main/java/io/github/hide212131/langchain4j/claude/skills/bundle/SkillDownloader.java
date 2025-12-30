@@ -70,31 +70,32 @@ public final class SkillDownloader {
             if (!sourceRoot.startsWith(tempDir) || !Files.isDirectory(sourceRoot)) {
                 throw new IllegalArgumentException("取得元パスが存在しません: " + sourceRoot);
             }
-            List<Path> skillFiles = new ArrayList<>();
+            List<Path> skillDirs = new ArrayList<>();
             Files.walkFileTree(sourceRoot, new SimpleFileVisitor<>() {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
                     if (SKILL_FILE_NAME.equals(file.getFileName().toString())) {
-                        skillFiles.add(file);
+                        skillDirs.add(file.getParent());
                     }
                     return FileVisitResult.CONTINUE;
                 }
             });
-            if (skillFiles.isEmpty()) {
+            if (skillDirs.isEmpty()) {
                 throw new IllegalStateException("SKILL.md が見つかりませんでした: " + sourceRoot);
             }
             Path destinationRoot = outputRoot.resolve(source.destination()).normalize();
             if (!destinationRoot.startsWith(outputRoot)) {
                 throw new IllegalArgumentException("出力先が不正です: " + destinationRoot);
             }
-            for (Path file : skillFiles) {
-                Path relative = sourceRoot.relativize(file);
-                Path target = destinationRoot.resolve(relative);
-                Files.createDirectories(target.getParent());
-                Files.copy(file, target, StandardCopyOption.REPLACE_EXISTING);
+            int totalFiles = 0;
+            for (Path skillDir : skillDirs) {
+                Path relativeSkillDir = sourceRoot.relativize(skillDir);
+                Path targetSkillDir = destinationRoot.resolve(relativeSkillDir);
+                int copiedFiles = copyDirectoryRecursively(skillDir, targetSkillDir);
+                totalFiles += copiedFiles;
             }
             return new ResolvedSkillSource(source.repository().toString(), source.ref(), commitHash,
-                    source.sourcePath(), source.destination(), skillFiles.size());
+                    source.sourcePath(), source.destination(), totalFiles);
         } catch (IOException ex) {
             throw new IllegalStateException("SKILL.md の取得に失敗しました。", ex);
         } finally {
@@ -166,6 +167,30 @@ public final class SkillDownloader {
         } catch (IOException ex) {
             throw new IllegalStateException("ロックファイルの書き込みに失敗しました: " + lockFile, ex);
         }
+    }
+
+    private static int copyDirectoryRecursively(Path source, Path destination) throws IOException {
+        if (!Files.isDirectory(source)) {
+            throw new IllegalArgumentException("コピー元がディレクトリではありません: " + source);
+        }
+        final int[] fileCount = { 0 };
+        Files.walkFileTree(source, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                Path targetDir = destination.resolve(source.relativize(dir));
+                Files.createDirectories(targetDir);
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                Path targetFile = destination.resolve(source.relativize(file));
+                Files.copy(file, targetFile, StandardCopyOption.REPLACE_EXISTING);
+                fileCount[0]++;
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        return fileCount[0];
     }
 
     private static void deleteRecursively(Path target) {

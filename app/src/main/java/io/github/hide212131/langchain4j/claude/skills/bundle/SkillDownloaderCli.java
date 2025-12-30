@@ -7,7 +7,7 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.Spec;
 import picocli.CommandLine.Model.CommandSpec;
 
-@Command(name = "download-skills", description = "skill-sources.yaml から SKILL.md を取得します。", mixinStandardHelpOptions = true)
+@Command(name = "download", description = "skill-sources.yaml からスキルをダウンロードします。", mixinStandardHelpOptions = true)
 @SuppressWarnings("checkstyle:LineLength")
 public final class SkillDownloaderCli implements Callable<Integer> {
 
