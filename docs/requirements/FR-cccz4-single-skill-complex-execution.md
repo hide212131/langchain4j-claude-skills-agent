@@ -17,6 +17,7 @@
 - Related Tasks:
   - [T-p1x0z 複雑スキル依存バンドル](../tasks/T-p1x0z-skill-deps-runtime/README.md)
   - [T-8z0qk 複雑スキルランタイム統合](../tasks/T-8z0qk-runtime-execution/README.md)
+  - [T-63g7b スキル実行エージェント設計](../tasks/T-63g7b-skill-execution-agent/README.md)
 
 ## Requirement Statement
 

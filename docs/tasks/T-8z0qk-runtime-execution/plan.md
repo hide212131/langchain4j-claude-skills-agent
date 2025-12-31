@@ -13,20 +13,19 @@
   - [x] Docker実装 (`DockerCodeExecutionEnvironment`) をNon-AI Agentとして実装
   - [x] T-p1x0zで生成したイメージを使用したコンテナ起動・実行・クリーンアップ
   - [x] 依存未充足時のガード処理追加
-- [x] Phase 2: LangChain4j Agentic統合
-  - [x] `@Agent` アノテーションによるワークフロー統合
-  - [x] AIエージェント（スキルプランナー）とNon-AIエージェント（実行環境）のシーケンス構築
-  - [x] 環境切り替え設定（Docker/ACADS）の実装
+- [x] Phase 2: Docker 実行環境の実装
+  - [x] Docker実装 (`DockerCodeExecutionEnvironment`) を実装
+  - [x] T-p1x0zで生成したイメージを使用したコンテナ起動・実行・クリーンアップ
+  - [x] 依存未充足時のガード処理追加
   - [x] 外部ネットワーク遮断・インストール禁止の検証テスト
 - [ ] Phase 3: ACADS実装（Phase 2）
   - [ ] ACADS実装 (`AcadsCodeExecutionEnvironment`) をNon-AI Agentとして実装
   - [ ] Azure Entra認証とトークン管理
   - [ ] セッションID管理（テナント分離）
   - [ ] ファイルパス変換（Docker `/workspace` ⇔ ACADS `/mnt/data`）
-- [ ] Phase 4: トレース/成果物
-  - [ ] 各ステップの cmd/exit/stdout/stderr/elapsed を FR-hjz63 準拠で記録
-  - [ ] `VisibilityEventPublisher` 経由での可視化基盤連携
-  - [ ] pptx/サムネイル/生成ファイルを成果物カタログに登録
+- [ ] Phase 4: 実行結果/成果物の取り扱い
+  - [ ] 各ステップの cmd/exit/stdout/stderr/elapsed を構造化して返却
+  - [ ] 成果物の一覧取得/ダウンロード API を提供
   - [x] 成果物の保存先ディレクトリを指定できるオプションを追加
   - [x] setup に build-skill-images サブコマンドを追加
 
@@ -39,5 +38,4 @@
 ## Notes
 
 - **依存管理**: 実行時の `pip/npm install` は禁止。依存不足は事前検証で検知する。
-- **Non-AI Agent**: `CodeExecutionEnvironment`の各実装は[LangChain4j Non-AI Agents](https://docs.langchain4j.dev/tutorials/agents#non-ai-agents)パターンで実装し、AIエージェントとシームレスに統合。
 - **参考実装**: `dev.langchain4j.code.azure.acads.SessionsREPLTool`のファイル操作・認証パターンを活用。

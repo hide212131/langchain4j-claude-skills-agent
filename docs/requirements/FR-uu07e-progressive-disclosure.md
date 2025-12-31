@@ -16,7 +16,7 @@
 - Dependent Requirements:
   - [NFR-kc6k1 Context Engineering 最適化](../requirements/NFR-kc6k1-context-engineering-optimization.md)
 - Related Tasks:
-  - N/A – タスクは要件承認後に作成
+  - [T-63g7b スキル実行エージェント設計](../tasks/T-63g7b-skill-execution-agent/README.md)
 
 ## Requirement Statement
 

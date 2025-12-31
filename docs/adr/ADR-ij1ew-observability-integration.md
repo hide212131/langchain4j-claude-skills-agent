@@ -22,6 +22,7 @@
   - [T-7k08g プロンプト・エージェント可視化タスク](../tasks/T-7k08g-prompt-visibility/README.md)
   - [T-9t6cj 実LLM接続タスク](../tasks/T-9t6cj-llm-integration/README.md)
   - [T-9ciut コード品質ツールの統合](../tasks/T-9ciut-code-quality-tools/README.md)
+  - [T-63g7b スキル実行エージェント設計](../tasks/T-63g7b-skill-execution-agent/README.md)
 
 ## Context
 

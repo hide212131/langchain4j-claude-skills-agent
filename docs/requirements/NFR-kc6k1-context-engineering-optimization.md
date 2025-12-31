@@ -13,7 +13,7 @@
 - Dependent Requirements:
   - N/A – 後続要件なし
 - Related Tasks:
-  - N/A – タスクは要件承認後に作成
+  - [T-63g7b スキル実行エージェント設計](../tasks/T-63g7b-skill-execution-agent/README.md)
 
 ## Requirement Statement
 
