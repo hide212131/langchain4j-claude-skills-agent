@@ -14,7 +14,7 @@
   - [ADR-ehfcj スキル実行エンジン設計](../../adr/ADR-ehfcj-skill-execution-engine.md)
   - [ADR-38940 セキュリティ・リソース管理フレームワーク](../../adr/ADR-38940-security-resource-management.md)
 - Related Tasks:
-  - [T-p1x0z 複雑スキル依存バンドル・実行分離](../T-p1x0z-skill-deps-runtime/README.md)
+  - [T-p1x0z 複雑スキル依存バンドル](../T-p1x0z-skill-deps-runtime/README.md)
 
 ## Summary
 

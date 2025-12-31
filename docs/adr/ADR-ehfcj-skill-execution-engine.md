@@ -18,7 +18,7 @@
   - [FR-2ff4z 複数スキル連鎖実行](../requirements/FR-2ff4z-multi-skill-composition.md)
 - Related Tasks:
   - [T-0mcn0 最小実行基盤タスク](../tasks/T-0mcn0-minimal-foundation/README.md)
-  - [T-p1x0z 複雑スキル依存バンドル・実行分離](../tasks/T-p1x0z-skill-deps-runtime/README.md)
+  - [T-p1x0z 複雑スキル依存バンドル](../tasks/T-p1x0z-skill-deps-runtime/README.md)
   - [T-8z0qk 複雑スキルランタイム統合](../tasks/T-8z0qk-runtime-execution/README.md)
 
 ## Context
