@@ -78,7 +78,7 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 ### Deliverables
 
 - スキル実行エージェントの基盤 API
-- 実行計画/結果のデータ構造
+- ExecutionTaskList/ExecutionTask/ExecutionResult のデータ構造
 
 ### Verification
 
