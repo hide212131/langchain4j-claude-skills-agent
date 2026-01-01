@@ -38,30 +38,61 @@ User Request
    │
    ▼
 SkillExecutionAgent
-   │  ├─ SkillResolver (SKILL.md / frontmatter)
-   │  ├─ ExecutionPlanner (分岐・手順決定)
-   │  ├─ ResourceLoader (Progressive Disclosure)
-   │  ├─ ToolInvoker (Code Execution Engine 連携)
+   │  ├─ ExecutionPlanningAgent (分岐・手順決定)
+   │  │  └─ LocalResourceTool (SKILL.md / frontmatter / ローカル参照)
+   │  ├─ ExecutionEnvironmentTool (Code Execution Engine 連携)
+   │  ├─ PlanExecutorAgent (実行計画の実行と評価)
    │  └─ TraceEmitter (可視化/観測性)
 ```
 
 ### Components
 
 - SkillExecutionAgent: スキル実行の司令塔。入力を受け取り、実行計画と実行順序を管理する
-- SkillResolver: SKILL.md と参照リソースの所在を解決する
-- ExecutionPlanner: 条件分岐と手順を評価し、実行ステップを構築する
-- ResourceLoader: Progressive Disclosure ルールに従い、必要時のみリソースを取得する
-- ToolInvoker: T-8z0qk の CodeExecutionEnvironment を呼び出し、スクリプト/コマンド実行を行う
+- ExecutionPlanningAgent: 条件分岐と手順を評価し、必要な情報収集を行ったうえで実行ステップ（タスクリスト）を構築する
+- LocalResourceTool: SKILL.md とローカル参照リソースを読み込み、エントリポイントと参照先を解決する
+- ExecutionEnvironmentTool: T-8z0qk の CodeExecutionEnvironment を呼び出し、スクリプト/コマンド実行とリモート環境確認を行う
+- PlanExecutorAgent: タスクリストの実行、実行結果の評価、リトライ判断を担う
 - TraceEmitter: FR-hjz63/NFR-30zem の要求に従いイベントを発行する
 
-### Data Flow
+### 実行計画作成
 
-- 1. リクエストを受け取る
-- 2. SkillResolver が SKILL.md を読み込み、エントリポイントを決定
-- 3. ExecutionPlanner が条件分岐を評価し、ステップ列を生成
-- 4. ResourceLoader が必要リソースのみ取得
-- 5. ToolInvoker がコード実行エンジン（T-8z0qk）に実行依頼し、結果を収集
-- 6. TraceEmitter が各ステップを可視化・観測性へ送信
+実行計画作成は、ExecutionPlanningAgent が与えられたゴールを満たすためのタスクリストを構築するフェーズである。
+「推論する」はエージェントによるLLMの推論を示す。
+
+1. ExecutionPlanningAgent が実行計画作成に必要な前提情報として、ゴールとSKILL.md を読み、計画作成へむけ取りうるアクションを推論する。
+   - ゴールは自然言語の文、添付がある場合はファイルパスとして扱う
+2. ExecutionPlanningAgent がアクションを実行し、計画作成に必要な情報を収集する
+   - ExecutionPlanningAgent が LocalResourceTool を tool calling し、ローカルの追加ドキュメントやその他のリソースを読む。（例: `scripts/` `references/` `assets/` `./` 上のファイルなど）
+   - ExecutionEnvironmentTool を用いてリモートのコード実行環境を確認する（ファイルの存在確認など）
+3. ExecutionPlanningAgent が収集結果をコンテキストに追加し、推論して、タスクリストの項目を組み立てる
+   - ローカル/リモートの区別、入力情報、処理内容、出力情報を明示する
+   - タスクリスト生成後、PlanExecutorAgent が実行を開始し、ExecutionEnvironmentTool がコード実行エンジン（T-8z0qk）へ実行依頼を行い、TraceEmitter が各ステップを可視化・観測性へ送信する
+
+タスクリストの各タスクは以下の構造で記述する。
+
+- ステータス: 未実施/実行中/異常終了/完了
+- 入力情報: 自然言語の文、またはファイルパス
+- 処理内容:
+  - ローカル/リモートの区別（ドキュメント参照ならローカル、コード実行環境ならリモート）
+  - ローカルの場合は LLM への出力情報依頼内容
+  - リモートの場合は具体的なコマンド（パスはフルパス）
+- 出力情報:
+  - リモートなら処理結果が標準出力かファイルか
+  - ファイル出力の場合はファイルパス
+
+### スキル実行
+
+PlanExecutorAgent が実行計画で作成したタスクリストに従い、タスクを順次実行する。
+
+1. PlanExecutorAgent が各タスクのローカル/リモート区分に従い実行手段を選択する
+   - ローカル: LLM への出力情報依頼を実行する
+   - リモート: ExecutionEnvironmentTool でコマンドを実行する
+2. PlanExecutorAgent がタスクのステータスを未実施から実行中へ更新する
+3. PlanExecutorAgent が実行結果（標準出力/生成ファイルなど）をコンテキストに追加する
+4. PlanExecutorAgent が成否に応じてステータスを完了/異常終了へ更新する
+5. PlanExecutorAgent が異常終了の場合は、原因分析のためにエラー状況を付与して一定回数リトライする
+6. PlanExecutorAgent がリトライに失敗した場合は、スキル全体を異常終了するか、実行計画自体を修正して再試行する
+7. TraceEmitter により各タスクの開始/終了/失敗を可視化イベントとして送信する
 
 ### Storage Layout and Paths (if applicable)
 
@@ -85,11 +116,14 @@ Implementation Notes
 - コード実行は T-8z0qk の CodeExecutionEnvironment を利用する
 - CodeExecutionEnvironment の API 仕様は T-8z0qk とすり合わせながら段階的に確定する
 - 可視化イベントは ADR-ij1ew のフォーマットに従う
+- "Agent" が付くコンポーネントは LangChain4j の `dev.langchain4j.agentic` API を用いて実装する
+- "Tool" が付くコンポーネントは Agent から呼ばれる `@Tool` アノテーション付きのツールとして実装する
 
 ### Data Models and Types
 
 - SkillExecutionPlan: ステップ列と分岐条件
-- ExecutionStep: 実行タイプ（リソース取得/スクリプト/プロンプト）とメタ情報
+- ExecutionTaskList: 実行計画作成フェーズで生成されるタスク一覧
+- ExecutionTask: 入力情報/処理内容/出力情報/ステータスのセット（計画単位）
 - ExecutionResult: 標準出力、標準エラー、終了コード、生成物
 
 ### Error Handling

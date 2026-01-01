@@ -38,8 +38,9 @@
 ## Plan Summary
 
 - Phase 1 – 基盤インターフェースと責務分離
-- Phase 2 – 実行ステップ制御とリソース取得
-- Phase 3 – 可視化連携とテスト強化
+- Phase 2 – 実行計画作成
+- Phase 3 – スキル実行とリトライ制御
+- Phase 4 – 可視化連携とテスト強化
 
 ### Phase Status Tracking
 
@@ -98,11 +99,11 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 
 ---
 
-## Phase 2: 実行ステップ制御とリソース取得
+## Phase 2: 実行計画作成
 
 ### Phase 2 Goal
 
-- 実行計画の生成と Progressive Disclosure を統合する
+- ExecutionPlanningAgent による実行計画作成を確立する
 
 ### Phase 2 Inputs
 
@@ -110,21 +111,20 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
   - Phase 1: 実行計画モデル
   - T-8z0qk: コード実行エンジンの呼び出しインターフェース
 - Source Code to Modify:
-  - /src/... – 実行計画生成とリソース取得
+  - /src/... – 実行計画生成と情報収集
 
 ### Phase 2 Tasks
 
 - [ ] **実行計画の生成**
-  - [ ] SKILL.md 解析と分岐選択
-  - [ ] 実行ステップ列の生成
-- [ ] **リソース取得**
-  - [ ] 必要時のみ参照ファイルをロード
-  - [ ] 取得結果を可視化イベントに反映
+  - [ ] ExecutionPlanningAgent によるゴール/スキル解析と分岐選択
+  - [ ] LocalResourceTool の tool calling によるローカル参照の取得
+  - [ ] ExecutionEnvironmentTool によるリモート環境確認（ファイル存在確認など）
+  - [ ] ExecutionTaskList/ExecutionTask（ステータス込み）の生成
 
 ### Phase 2 Deliverables
 
 - 実行計画生成ロジック
-- 遅延ロードによるリソース取得
+- ExecutionTaskList/ExecutionTask の生成
 
 ### Phase 2 Verification
 
@@ -137,7 +137,7 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 
 ### Phase 2 Acceptance Criteria
 
-- 分岐と遅延ロードが正しく動作し、可視化に反映される
+- 実行計画が要件どおりに構築され、タスクリストが生成される
 
 ### Phase 2 Rollback/Fallback
 
@@ -145,13 +145,53 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 
 ---
 
-## Phase 3: 可視化連携とテスト強化
+## Phase 3: スキル実行とリトライ制御
 
 ### Phase 3 Goal
 
-- 観測性イベントとテストの網羅性を高める
+- PlanExecutorAgent によるスキル実行とリトライ制御を確立する
 
 ### Phase 3 Tasks
+
+- [ ] **スキル実行**
+  - [ ] PlanExecutorAgent によるタスクリスト実行
+  - [ ] ExecutionEnvironmentTool によるコマンド実行
+  - [ ] ステータス更新（未実施/実行中/異常終了/完了）
+- [ ] **リトライ制御**
+  - [ ] 異常終了時のエラー状況付与とリトライ
+  - [ ] リトライ失敗時のスキル異常終了/計画修正の分岐
+
+### Phase 3 Deliverables
+
+- スキル実行ロジック
+- リトライ制御の実装方針
+
+### Phase 3 Verification
+
+```bash
+./gradlew check
+./gradlew test --tests "<suite or package>"
+# Optional: broader runs
+./gradlew test
+```
+
+### Phase 3 Acceptance Criteria
+
+- ステータス更新とリトライ制御が期待どおりに動作する
+
+### Phase 3 Rollback/Fallback
+
+- 既存の簡易実行経路にフォールバック
+
+---
+
+## Phase 4: 可視化連携とテスト強化
+
+### Phase 4 Goal
+
+- 観測性イベントとテストの網羅性を高める
+
+### Phase 4 Tasks
 
 - [ ] Test utilities
   - [ ] 可視化イベント検証のヘルパー
@@ -176,12 +216,12 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
   - [ ] Boundary conditions
   - [ ] Resource cleanup
 
-### Phase 3 Deliverables
+### Phase 4 Deliverables
 
 - 新規実装の包括的テスト
 - 既知の制約とフォローアップの記録
 
-### Phase 3 Verification
+### Phase 4 Verification
 
 ```bash
 ./gradlew check
@@ -189,7 +229,7 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 ./gradlew test
 ```
 
-### Phase 3 Acceptance Criteria
+### Phase 4 Acceptance Criteria
 
 - 主要経路のテストが通り、可視化イベントが欠落しない
 
