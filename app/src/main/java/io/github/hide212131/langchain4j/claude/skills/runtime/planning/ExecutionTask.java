@@ -1,18 +1,26 @@
 package io.github.hide212131.langchain4j.claude.skills.runtime.planning;
 
+import dev.langchain4j.model.output.structured.Description;
 import java.util.Objects;
 
 /**
  * 実行計画のタスク。
  */
-public record ExecutionTask(String id, ExecutionTaskStatus status, ExecutionTaskLocation location, String input,
-        String action, String command, ExecutionTaskOutput output) {
+public record ExecutionTask(@Description("タスク識別子。未指定の場合は連番を付与する。") String id,
+        @Description("短いタスク名。一覧で識別できる粒度で記述する。") String title,
+        @Description("タスク内容の説明。自然言語で簡潔に記述する。") String description,
+        @Description("タスクの状態。計画作成時は PENDING を用いる。") ExecutionTaskStatus status,
+        @Description("入力情報。自然言語の指示やファイルパスを記述する。") String input, @Description("具体的なタスク実施内容。コマンド実行かまたはLLM推論による生成") String action,
+        @Description("コマンド実行が必要な場合の具体的なコマンド。パスはフルパスで記述する。") String command,
+        @Description("出力情報。標準出力やファイル出力などの種別と詳細を記述する。") ExecutionTaskOutput output) {
 
-    public ExecutionTask(String id, ExecutionTaskStatus status, ExecutionTaskLocation location, String input,
+    @SuppressWarnings("checkstyle:ParameterNumber")
+    public ExecutionTask(String id, String title, String description, ExecutionTaskStatus status, String input,
             String action, String command, ExecutionTaskOutput output) {
         this.id = normalize(id);
+        this.title = normalize(title);
+        this.description = normalize(description);
         this.status = status == null ? ExecutionTaskStatus.PENDING : status;
-        this.location = location == null ? ExecutionTaskLocation.LOCAL : location;
         this.input = input == null ? "" : input;
         this.action = action == null ? "" : action;
         this.command = command == null ? "" : command;
@@ -28,19 +36,25 @@ public record ExecutionTask(String id, ExecutionTaskStatus status, ExecutionTask
 
     public ExecutionTask withId(String newId) {
         Objects.requireNonNull(newId, "newId");
-        return new ExecutionTask(newId, status, location, input, action, command, output);
+        return new ExecutionTask(newId, title, description, status, input, action, command, output);
     }
 
     public String formatForLog() {
         StringBuilder sb = new StringBuilder(128);
-        sb.append('[').append(status.label()).append("] ").append(location.label());
+        sb.append('[').append(status.label()).append("]");
+        if (!title.isBlank()) {
+            sb.append(" / タイトル: ").append(title);
+        }
         if (!action.isBlank()) {
             sb.append(" / ").append(action);
+        }
+        if (!description.isBlank()) {
+            sb.append(" / 詳細: ").append(description);
         }
         if (!input.isBlank()) {
             sb.append(" / 入力: ").append(input);
         }
-        if (location == ExecutionTaskLocation.REMOTE && !command.isBlank()) {
+        if (!command.isBlank()) {
             sb.append(" / command: ").append(command);
         }
         if (!"none".equals(output.type())) {
