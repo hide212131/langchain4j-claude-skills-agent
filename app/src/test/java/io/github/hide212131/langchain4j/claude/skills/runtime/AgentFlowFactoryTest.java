@@ -24,14 +24,14 @@ class AgentFlowFactoryTest {
     }
 
     @Test
-    @DisplayName("LLM_PROVIDER=openai の場合は OpenAiAgentFlow を生成する")
+    @DisplayName("LLM_PROVIDER=openai の場合は ExecutionPlanningFlow を生成する")
     void createOpenAiFlow() {
         LlmConfiguration config = new LlmConfiguration(LlmProvider.OPENAI, "sk-test-12345678",
                 "https://api.openai.example", "gpt-4o");
 
         AgentFlow flow = new AgentFlowFactory(config, ExecutionBackend.DOCKER).create();
 
-        assertThat(flow).isInstanceOf(OpenAiAgentFlow.class);
+        assertThat(flow).isInstanceOf(ExecutionPlanningFlow.class);
     }
 
     @Test

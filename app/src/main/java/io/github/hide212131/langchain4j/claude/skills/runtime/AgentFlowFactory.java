@@ -17,7 +17,7 @@ public final class AgentFlowFactory {
     public AgentFlow create() {
         return switch (configuration.provider()) {
         case MOCK -> new DummyAgentFlow();
-        case OPENAI -> new OpenAiAgentFlow(configuration, executionBackend);
+        case OPENAI -> new ExecutionPlanningFlow(configuration, executionBackend);
         };
     }
 }

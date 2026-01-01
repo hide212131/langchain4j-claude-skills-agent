@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Implementation Plan
-- Status: Draft
+- Status: Phase 2 In Progress
   <!-- Draft: Planning complete, awaiting start | Phase X In Progress: Actively working | Cancelled: Work intentionally halted before completion | Complete: All phases done and verified -->
 
 ## Links
@@ -115,11 +115,11 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 
 ### Phase 2 Tasks
 
-- [ ] **実行計画の生成**
-  - [ ] ExecutionPlanningAgent によるゴール/スキル解析と分岐選択
-  - [ ] LocalResourceTool の tool calling によるローカル参照の取得
-  - [ ] ExecutionEnvironmentTool によるリモート環境確認（ファイル存在確認など）
-  - [ ] ExecutionTaskList/ExecutionTask（ステータス込み）の生成
+- [x] **実行計画の生成**
+  - [x] ExecutionPlanningAgent によるゴール/スキル解析と分岐選択
+  - [x] LocalResourceTool の tool calling によるローカル参照の取得
+  - [x] ExecutionEnvironmentTool によるリモート環境確認（ファイル存在確認など）
+  - [x] ExecutionTaskList/ExecutionTask（ステータス込み）の生成
 
 ### Phase 2 Deliverables
 
@@ -135,9 +135,19 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 ./gradlew test
 ```
 
+#### PPTX-001 確認手順（実行計画作成〜LangFuse確認）
+
+```bash
+./gradlew :app:installDist
+set -a; source .env; set +a; app/build/install/skills/bin/skills run --skill=build/skills/anthropics/skills/pptx/SKILL.md --goal "PPTX-001 以下のファイルのテキスト抽出してください。build/work/langchain4j_presentation.pptx、出力は build/work/pptx-001/langchain4j_presentation.md" --llm-provider=openai
+set -a; source .env; set +a; ./gradlew langfuseReport -Plimit=5
+set -a; source .env; set +a; ./gradlew langfusePrompt -PtraceId="<traceId>"
+```
+
 ### Phase 2 Acceptance Criteria
 
 - 実行計画が要件どおりに構築され、タスクリストが生成される
+- PPTX-001 の実行計画が作成される
 
 ### Phase 2 Rollback/Fallback
 

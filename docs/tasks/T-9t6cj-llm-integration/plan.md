@@ -17,7 +17,7 @@ LangChain4j の ChatModel/AgenticScope を OpenAI Official SDK の実LLMに接�
 
 ## Success Metrics
 
-- [x] 実LLM（OpenAI Official SDK）を用いた Plan/Act/Reflect の e2e 実行が成功する（手動/条件付きテスト）。※実行は API キー投入時に手動確認する前提で OpenAiAgentFlow/SkillsCli に実装済み。
+- [x] 実LLM（OpenAI Official SDK）を用いた実行計画作成の e2e 実行が成功する（手動/条件付きテスト）。※実行は API キー投入時に手動確認する前提で ExecutionPlanningFlow/SkillsCli に実装済み。
 - [x] モックと実LLMを設定で切り替えられる（`LLM_PROVIDER` 環境変数/`--llm-provider` で切替、デフォルト mock）。
 - [x] API キー/エンドポイントが `OPENAI_API_KEY`/`OPENAI_BASE_URL` で注入でき、秘匿情報がログに残らない（`LlmConfiguration.maskedApiKey` でマスク）。
 - [x] 可視化フック（T-7k08g）が実LLM経路でも発火する（ChatModelListener/AgenticScope のイベントを VisibilityEventPublisher に送出）。
@@ -141,7 +141,7 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 
 - [x] `./gradlew check`（ローカル実行で完了）
 - [x] `./gradlew test`（ローカル実行で完了）
-- [x] 可視化イベントが実LLM経路で取得できることを記録（OpenAiAgentFlow の ChatModelListener/AgenticScope コールバックで PROMPT/METRICS/AGENT_STATE を発火）
+- [x] 可視化イベントが実LLM経路で取得できることを記録（ExecutionPlanningFlow の ChatModelListener コールバックで PROMPT/METRICS を発火）
 - [x] 設定方法とマスキング仕様を README/関連ドキュメントに追記
 
 ## Open Questions

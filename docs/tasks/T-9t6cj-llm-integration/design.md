@@ -19,7 +19,7 @@ FR-mcncb を達成するため、LangChain4j の Agentic API を OpenAI Official
 
 ## Success Metrics
 
-- [x] ChatModel/AgenticScope が実LLMにリクエストを送信し、Plan/Act/Reflect の各ステップで応答を受け取れる（OpenAiAgentFlow/SkillsCli に実装済み。実行は API キー投入時の手動確認で担保）。
+- [x] ChatModel/AgenticScope が実LLMにリクエストを送信し、実行計画作成の応答を受け取れる（ExecutionPlanningFlow/SkillsCli に実装済み。実行は API キー投入時の手動確認で担保）。
 - [x] API キー/エンドポイントが `OPENAI_API_KEY`/`OPENAI_BASE_URL` から注入され、ログに秘匿値を残さない（`LlmConfiguration.maskedApiKey` でマスク）。
 - [x] モック/実LLMの切替が設定で可能で、CI はモックで決定論的に通る（デフォルト mock、`LLM_PROVIDER`/`--llm-provider` で切替）。
 - [x] 可視化フック（T-7k08g）経由でプロンプト・メトリクスが取得できる（ChatModelListener/AgenticScope コールバックで VisibilityEvent を発火）。
