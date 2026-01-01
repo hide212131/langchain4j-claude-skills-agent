@@ -1,13 +1,12 @@
 package io.github.hide212131.langchain4j.claude.skills.app;
 
-import io.github.hide212131.langchain4j.claude.skills.runtime.AgentFlow;
-import io.github.hide212131.langchain4j.claude.skills.runtime.AgentFlow.AgentFlowResult;
-import io.github.hide212131.langchain4j.claude.skills.runtime.AgentFlowFactory;
-import io.github.hide212131.langchain4j.claude.skills.runtime.LlmConfiguration;
-import io.github.hide212131.langchain4j.claude.skills.runtime.LlmConfigurationLoader;
+import io.github.hide212131.langchain4j.claude.skills.runtime.DefaultSkillExecutionAgent;
 import io.github.hide212131.langchain4j.claude.skills.runtime.LlmProvider;
-import io.github.hide212131.langchain4j.claude.skills.runtime.SkillDocument;
-import io.github.hide212131.langchain4j.claude.skills.runtime.SkillDocumentParser;
+import io.github.hide212131.langchain4j.claude.skills.runtime.SkillExecutionAgent;
+import io.github.hide212131.langchain4j.claude.skills.runtime.SkillExecutionConfigurationException;
+import io.github.hide212131.langchain4j.claude.skills.runtime.SkillExecutionParseException;
+import io.github.hide212131.langchain4j.claude.skills.runtime.SkillExecutionRequest;
+import io.github.hide212131.langchain4j.claude.skills.runtime.SkillExecutionResult;
 import io.github.hide212131.langchain4j.claude.skills.runtime.VisibilityLevel;
 import io.github.hide212131.langchain4j.claude.skills.runtime.VisibilityLog;
 import io.github.hide212131.langchain4j.claude.skills.runtime.execution.ExecutionBackend;
@@ -20,7 +19,6 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.Visibil
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventMetadata;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventPublisher;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventType;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityMasking;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityPublisherFactory;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -115,45 +113,32 @@ public final class RunCommand implements Callable<Integer> {
                     otlpEndpoint, otlpHeaders);
             VisibilityEventPublisher publisher = VisibilityPublisherFactory.create(observability);
             try (VisibilityEventPublisher closeablePublisher = publisher) {
-                SkillDocumentParser parser = new SkillDocumentParser(closeablePublisher,
-                        VisibilityMasking.defaultRules());
-
                 log.info(basic, runId, "-", "parse", "parse.skill", "SKILL.md を読み込みます", "path=" + skillPath, "");
 
-                SkillDocument document;
+                SkillExecutionAgent agent = new DefaultSkillExecutionAgent();
+                SkillExecutionRequest request = new SkillExecutionRequest(skillPath, goal, skillId, runId,
+                        resolveExecutionBackend(), llmProvider, resolveArtifactsDir(), visibilityLevel,
+                        closeablePublisher, log);
+                Supplier<SkillExecutionResult> action = () -> agent.execute(request);
+                String fallbackSkillId = skillId == null ? "(不明)" : skillId;
                 try {
-                    document = parser.parse(skillPath, skillId, runId);
-                } catch (RuntimeException ex) {
-                    String fallbackSkillId = skillId == null ? "(不明)" : skillId;
-                    log.error(runId, fallbackSkillId, LOG_TAG_ERROR, "parse", "SKILL.md のパースに失敗しました", "", "", ex);
-                    spec.commandLine().getErr().println("SKILL.md のパースに失敗しました: " + ex.getMessage());
-                    spec.commandLine().getErr().flush();
-                    return EXIT_PARSE_ERROR;
-                }
-
-                LlmConfiguration configuration;
-                try {
-                    configuration = new LlmConfigurationLoader().load(llmProvider);
-                } catch (RuntimeException ex) {
-                    log.error(runId, document.id(), LOG_TAG_ERROR, "config.load", "LLM 設定の読み込みに失敗しました", "", "", ex);
-                    spec.commandLine().getErr().println("LLM 設定の読み込みに失敗しました: " + ex.getMessage());
-                    spec.commandLine().getErr().flush();
-                    return EXIT_CONFIGURATION_ERROR;
-                }
-
-                AgentFlowFactory factory = new AgentFlowFactory(configuration, resolveExecutionBackend());
-                AgentFlow flow = factory.create();
-                Supplier<AgentFlowResult> action = () -> flow.run(document, goal == null ? "" : goal, log, basic, runId,
-                        skillPath.toString(), resolveArtifactsDir(), closeablePublisher);
-
-                try {
-                    AgentFlowResult result = executeWithRetry(action, log, basic, runId, document.id(),
+                    SkillExecutionResult result = executeWithRetry(action, log, basic, runId, fallbackSkillId,
                             closeablePublisher);
-                    spec.commandLine().getOut().println(result.formatted());
+                    spec.commandLine().getOut().println(result.flowResult().formatted());
                     spec.commandLine().getOut().flush();
                     return CommandLine.ExitCode.OK;
+                } catch (SkillExecutionParseException ex) {
+                    log.error(runId, fallbackSkillId, LOG_TAG_ERROR, "parse", "SKILL.md のパースに失敗しました", "", "", ex);
+                    spec.commandLine().getErr().println(ex.getMessage());
+                    spec.commandLine().getErr().flush();
+                    return EXIT_PARSE_ERROR;
+                } catch (SkillExecutionConfigurationException ex) {
+                    log.error(runId, fallbackSkillId, LOG_TAG_ERROR, "config.load", "LLM 設定の読み込みに失敗しました", "", "", ex);
+                    spec.commandLine().getErr().println(ex.getMessage());
+                    spec.commandLine().getErr().flush();
+                    return EXIT_CONFIGURATION_ERROR;
                 } catch (RuntimeException ex) {
-                    log.error(runId, document.id(), LOG_TAG_ERROR, "run.failed", "エージェント実行が失敗しました", "", "", ex);
+                    log.error(runId, fallbackSkillId, LOG_TAG_ERROR, "run.failed", "エージェント実行が失敗しました", "", "", ex);
                     spec.commandLine().getErr().println("エージェント実行が失敗しました: " + ex.getMessage());
                     spec.commandLine().getErr().flush();
                     return EXIT_EXECUTION_ERROR;
@@ -176,6 +161,10 @@ public final class RunCommand implements Callable<Integer> {
         try {
             return action.get();
         } catch (RuntimeException first) {
+            if (first instanceof SkillExecutionParseException
+                    || first instanceof SkillExecutionConfigurationException) {
+                throw first;
+            }
             log.warn(runId, skillId, LOG_TAG_ERROR, "run.retry", "エラーが発生したため再試行します", "", "", first);
             publishRetryEvent(publisher, runId, skillId, first, 1);
             try {
@@ -231,12 +220,12 @@ public final class RunCommand implements Callable<Integer> {
         return ExecutionBackend.parse(System.getenv("SKILL_EXECUTION_BACKEND"));
     }
 
-    private String resolveArtifactsDir() {
+    private Path resolveArtifactsDir() {
         if (artifactsDir != null) {
-            return artifactsDir.toString();
+            return artifactsDir;
         }
         String env = System.getenv("SKILL_ARTIFACTS_DIR");
-        return env == null || env.isBlank() ? null : env;
+        return env == null || env.isBlank() ? null : Path.of(env);
     }
 
     private FileHandler configureLogFile(Logger logger) {

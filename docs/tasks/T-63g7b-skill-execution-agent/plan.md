@@ -67,12 +67,12 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 
 ### Tasks
 
-- [ ] **設計境界の確定**
-  - [ ] 公開 API（入力/出力/制約）の確定
-  - [ ] 実行エンジンとの責務分離をコードで表現
-- [ ] **基盤構造の配置**
-  - [ ] パッケージ配置を docs/architecture.md に準拠して決定
-  - [ ] 主要インターフェース/データ構造を追加
+- [x] **設計境界の確定**
+  - [x] 公開 API（入力/出力/制約）の確定
+  - [x] 実行エンジンとの責務分離をコードで表現
+- [x] **基盤構造の配置**
+  - [x] パッケージ配置を docs/architecture.md に準拠して決定
+  - [x] 主要インターフェース/データ構造を追加
 
 ### Deliverables
 
