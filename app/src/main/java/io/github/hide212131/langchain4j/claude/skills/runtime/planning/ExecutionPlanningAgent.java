@@ -49,6 +49,8 @@ public final class ExecutionPlanningAgent {
                 - スキルディレクトリ上の追加ファイルの情報を読むには ExecutionEnvironmentTool を使います。
 
                 要求事項:
+                - 実行開始時は、入力ファイルを必ず実行環境へアップロードする手順を含めてください。
+                - 実行終了時は、出力がファイルの場合に必ずダウンロードする手順を含めてください。
                 - タスクは実行環境で実行可能なコマンドに分解してください。
                 - 各タスクは具体的かつ実行可能である必要があります。
                 - 各タスクには title, description, command, output を含めてください。

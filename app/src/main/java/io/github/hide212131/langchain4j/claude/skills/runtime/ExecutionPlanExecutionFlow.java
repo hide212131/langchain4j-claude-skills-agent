@@ -5,6 +5,8 @@ import dev.langchain4j.model.chat.Capability;
 import dev.langchain4j.model.openaiofficial.OpenAiOfficialChatModel;
 import io.github.hide212131.langchain4j.claude.skills.runtime.execution.CodeExecutionEnvironmentFactory;
 import io.github.hide212131.langchain4j.claude.skills.runtime.execution.ExecutionBackend;
+import io.github.hide212131.langchain4j.claude.skills.runtime.execution.PlanExecutorAgent;
+import io.github.hide212131.langchain4j.claude.skills.runtime.execution.PlanExecutorAgent.PlanExecutionResult;
 import io.github.hide212131.langchain4j.claude.skills.runtime.planning.ExecutionEnvironmentTool;
 import io.github.hide212131.langchain4j.claude.skills.runtime.planning.ExecutionPlanningAgent;
 import io.github.hide212131.langchain4j.claude.skills.runtime.planning.ExecutionTaskList;
@@ -19,15 +21,15 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-/** 実行計画作成にフォーカスした LLM フロー。 */
+/** 実行計画作成とタスク実行をまとめて行う LLM フロー。 */
 @SuppressWarnings({ "PMD.AvoidDuplicateLiterals", "PMD.GuardLogStatement", "PMD.CouplingBetweenObjects",
         "PMD.UseObjectForClearerAPI", "PMD.AvoidCatchingGenericException" })
-final class ExecutionPlanningFlow implements AgentFlow {
+final class ExecutionPlanExecutionFlow implements AgentFlow {
 
     private final LlmConfiguration configuration;
     private final ExecutionBackend executionBackend;
 
-    ExecutionPlanningFlow(LlmConfiguration configuration, ExecutionBackend executionBackend) {
+    ExecutionPlanExecutionFlow(LlmConfiguration configuration, ExecutionBackend executionBackend) {
         this.configuration = Objects.requireNonNull(configuration, "configuration");
         this.executionBackend = Objects.requireNonNull(executionBackend, "executionBackend");
     }
@@ -51,17 +53,30 @@ final class ExecutionPlanningFlow implements AgentFlow {
 
         String safeGoal = goal == null ? "" : goal.trim();
         ChatModel chatModel = buildChatModel(log, basicLog, runId, document.id(), events);
+        CodeExecutionEnvironmentFactory environmentFactory = new CodeExecutionEnvironmentFactory(executionBackend);
+        ExecutionEnvironmentTool environmentTool = new ExecutionEnvironmentTool(environmentFactory, Path.of(skillPath));
         long start = System.nanoTime();
         try {
-            ExecutionTaskList taskList = buildTaskList(chatModel, document, safeGoal, skillPath, "", log, runId);
+            ExecutionTaskList taskList = buildTaskList(chatModel, document, safeGoal, skillPath, "", log, runId,
+                    environmentTool);
             String planLog = taskList.formatForLog();
-            log.info(basicLog, runId, document.id(), "plan", "plan.tasks", "実行計画を作成しました", "", planLog);
+            if (taskList.tasks().isEmpty()) {
+                String note = "実行計画のみを作成しました。";
+                log.info(basicLog, runId, document.id(), "plan", "plan.tasks", "実行計画を作成しました", "", planLog);
+                publishWorkflowMetrics(events, runId, document.id(), nanosToMillis(start));
+                return new AgentFlowResult(planLog, note, note, "");
+            }
+
+            PlanExecutorAgent executor = new PlanExecutorAgent(chatModel, environmentTool);
+            PlanExecutionResult execution = executor.execute(taskList, safeGoal, document.id(), runId, log, basicLog,
+                    events);
+            String actLog = execution.reportLog();
+            String reflectLog = "実行後ステータス:" + System.lineSeparator() + execution.taskList().formatForLog();
             publishWorkflowMetrics(events, runId, document.id(), nanosToMillis(start));
-            String note = "実行計画のみを作成しました。";
-            return new AgentFlowResult(planLog, note, note, "");
+            return new AgentFlowResult(planLog, actLog, reflectLog, "");
         } catch (RuntimeException ex) {
-            log.error(runId, document.id(), "error", "planning.run",
-                    "実行計画の作成中に例外が発生しました (apiKey=" + configuration.maskedApiKey() + ")", "", "", ex);
+            log.error(runId, document.id(), "error", "execution.run",
+                    "実行計画の作成またはタスク実行中に例外が発生しました (apiKey=" + configuration.maskedApiKey() + ")", "", "", ex);
             throw ex;
         }
     }
@@ -81,13 +96,12 @@ final class ExecutionPlanningFlow implements AgentFlow {
         return builder.build();
     }
 
+    @SuppressWarnings("checkstyle:ParameterNumber")
     private ExecutionTaskList buildTaskList(ChatModel chatModel, SkillDocument document, String goal, String skillPath,
-            String planSummary, VisibilityLog log, String runId) {
+            String planSummary, VisibilityLog log, String runId, ExecutionEnvironmentTool environmentTool) {
         try {
             Path skillMdPath = Path.of(skillPath);
             LocalResourceTool resourceTool = new LocalResourceTool(skillMdPath);
-            ExecutionEnvironmentTool environmentTool = new ExecutionEnvironmentTool(
-                    new CodeExecutionEnvironmentFactory(executionBackend), skillMdPath);
             ExecutionPlanningAgent planner = new ExecutionPlanningAgent(chatModel, resourceTool, environmentTool);
             return planner.plan(document, goal, skillPath, planSummary);
         } catch (RuntimeException ex) {

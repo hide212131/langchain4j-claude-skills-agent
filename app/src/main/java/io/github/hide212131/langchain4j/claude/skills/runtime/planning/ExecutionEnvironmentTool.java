@@ -1,6 +1,7 @@
 package io.github.hide212131.langchain4j.claude.skills.runtime.planning;
 
 import dev.langchain4j.agent.tool.Tool;
+import io.github.hide212131.langchain4j.claude.skills.runtime.execution.ExecutionResult;
 import io.github.hide212131.langchain4j.claude.skills.runtime.execution.CodeExecutionEnvironment;
 import io.github.hide212131.langchain4j.claude.skills.runtime.execution.CodeExecutionEnvironmentFactory;
 import java.nio.file.Path;
@@ -35,6 +36,15 @@ public final class ExecutionEnvironmentTool {
         String relative = normalized.substring(WORKSPACE_PREFIX.length());
         RemoteFileList matches = listRemoteFiles(relative);
         return new RemoteFileCheck(normalized, matches.paths().contains(normalized));
+    }
+
+    public ExecutionResult executeCommand(String command) {
+        if (command == null || command.isBlank()) {
+            throw new IllegalArgumentException("command は空にできません");
+        }
+        try (CodeExecutionEnvironment environment = factory.create(skillMdPath)) {
+            return environment.executeCommand(command);
+        }
     }
 
     private String normalizeRemotePath(String remotePath) {

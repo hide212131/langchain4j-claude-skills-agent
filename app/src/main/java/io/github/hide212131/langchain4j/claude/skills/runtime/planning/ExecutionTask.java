@@ -7,10 +7,10 @@ import java.util.Objects;
  * 実行計画のタスク。
  */
 public record ExecutionTask(@Description("タスク識別子。未指定の場合は連番を付与する。") String id,
-        @Description("短いタスク名。一覧で識別できる粒度で記述する。") String title,
-        @Description("タスク内容の説明。自然言語で簡潔に記述する。") String description,
+        @Description("短いタスク名。一覧で識別できる粒度で記述する。") String title, @Description("タスク内容の説明。自然言語で簡潔に記述する。") String description,
         @Description("タスクの状態。計画作成時は PENDING を用いる。") ExecutionTaskStatus status,
-        @Description("入力情報。自然言語の指示やファイルパスを記述する。") String input, @Description("具体的なタスク実施内容。コマンド実行かまたはLLM推論による生成") String action,
+        @Description("入力情報。自然言語の指示やファイルパスを記述する。") String input,
+        @Description("具体的なタスク実施内容。コマンド実行かまたはLLM推論による生成") String action,
         @Description("コマンド実行が必要な場合の具体的なコマンド。パスはフルパスで記述する。") String command,
         @Description("出力情報。標準出力やファイル出力などの種別と詳細を記述する。") ExecutionTaskOutput output) {
 
@@ -39,9 +39,14 @@ public record ExecutionTask(@Description("タスク識別子。未指定の場�
         return new ExecutionTask(newId, title, description, status, input, action, command, output);
     }
 
+    public ExecutionTask withStatus(ExecutionTaskStatus newStatus) {
+        Objects.requireNonNull(newStatus, "newStatus");
+        return new ExecutionTask(id, title, description, newStatus, input, action, command, output);
+    }
+
     public String formatForLog() {
         StringBuilder sb = new StringBuilder(128);
-        sb.append('[').append(status.label()).append("]");
+        sb.append('[').append(status.label()).append(']');
         if (!title.isBlank()) {
             sb.append(" / タイトル: ").append(title);
         }
