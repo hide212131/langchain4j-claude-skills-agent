@@ -20,6 +20,7 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEv
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventPublisher;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventType;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 
@@ -33,6 +34,8 @@ public final class PlanExecutorAgent {
     private static final String PHASE_ACT = "act";
     private static final String OUTPUT_TYPE_FILE = "file";
     private static final String OUTPUT_TYPE_NONE = "none";
+
+    private static final int MAX_RETRIES = 5;
 
     private final TaskExecutionAgent agent;
 
@@ -54,11 +57,15 @@ public final class PlanExecutorAgent {
         List<ExecutionTask> completed = new ArrayList<>();
         List<ExecutionResult> results = new ArrayList<>();
         List<String> artifacts = new ArrayList<>();
-        for (ExecutionTask task : taskList.tasks()) {
+        boolean aborted = false;
+        for (Iterator<ExecutionTask> iterator = taskList.tasks().iterator(); iterator.hasNext() && !aborted;) {
+            ExecutionTask task = iterator.next();
             publishTaskState(events, runId, skillId, "task.start", goal, task, "実行中");
             log.info(basicLog, runId, skillId, PHASE_ACT, "task.start", "タスクを実行します", taskSummary(task), "");
-            try {
-                ExecutionResult result = agent.execute(goalValue(goal), task, describeOutput(task.output()));
+            RetryOutcome outcome = executeWithRetry(goal, task, log, basicLog, runId, skillId);
+            ExecutionResult result = outcome.result();
+            RuntimeException lastException = outcome.lastException();
+            if (result != null && result.exitCode() == 0) {
                 log.info(basicLog, runId, skillId, PHASE_ACT, "task.execute", "タスクを実行しました", taskSummary(task),
                         resultSummary(result));
                 results.add(result);
@@ -67,15 +74,72 @@ public final class PlanExecutorAgent {
                 log.info(basicLog, runId, skillId, PHASE_ACT, "task.complete", "タスクが完了しました", taskSummary(task),
                         resultSummary(result));
                 completed.add(task.withStatus(ExecutionTaskStatus.COMPLETED));
-            } catch (RuntimeException ex) {
-                publishTaskError(events, runId, skillId, task, ex);
-                log.error(runId, skillId, "error", "task.failed", "タスク実行が失敗しました", taskSummary(task), "", ex);
-                throw new IllegalStateException("タスク実行が失敗しました: " + taskSummary(task), ex);
+            } else {
+                if (result != null) {
+                    results.add(result);
+                }
+                IllegalStateException error = buildFailureException(task, result, lastException);
+                publishTaskError(events, runId, skillId, task, error);
+                publishTaskState(events, runId, skillId, "task.abort", goal, task, "処理続行不能");
+                log.error(runId, skillId, "error", "task.aborted", "処理続行不能のため終了します", taskSummary(task),
+                        error.getMessage(), error);
+                completed.add(task.withStatus(ExecutionTaskStatus.FAILED));
+                aborted = true;
             }
         }
+        return buildExecutionResult(taskList, completed, results, artifacts);
+    }
+
+    private RetryOutcome executeWithRetry(String goal, ExecutionTask task, SkillLog log, boolean basicLog, String runId,
+            String skillId) {
+        ExecutionResult result = null;
+        RuntimeException lastException = null;
+        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                result = agent.execute(goalValue(goal), task, describeOutput(task.output()));
+                if (result.exitCode() == 0) {
+                    break;
+                }
+                if (attempt < MAX_RETRIES) {
+                    logRetry(log, basicLog, runId, skillId, task, "試行=" + attempt + " exit=" + result.exitCode());
+                }
+            } catch (RuntimeException ex) {
+                lastException = ex;
+                if (attempt < MAX_RETRIES) {
+                    logRetry(log, basicLog, runId, skillId, task, "試行=" + attempt + " error=" + ex.getMessage());
+                }
+            }
+        }
+        return new RetryOutcome(result, lastException);
+    }
+
+    private static void logRetry(SkillLog log, boolean basicLog, String runId, String skillId, ExecutionTask task,
+            String detail) {
+        log.info(basicLog, runId, skillId, PHASE_ACT, "task.retry", "タスクをリトライします", taskSummary(task), detail);
+    }
+
+    private static IllegalStateException buildFailureException(ExecutionTask task, ExecutionResult result,
+            RuntimeException lastException) {
+        return new IllegalStateException(buildFailureMessage(task, result), lastException);
+    }
+
+    private static String buildFailureMessage(ExecutionTask task, ExecutionResult result) {
+        StringBuilder message = new StringBuilder(64);
+        message.append("タスク実行が失敗しました: ").append(taskSummary(task));
+        if (result != null) {
+            message.append(" (exit=").append(result.exitCode()).append(')');
+        }
+        return message.toString();
+    }
+
+    private static PlanExecutionResult buildExecutionResult(ExecutionTaskList taskList, List<ExecutionTask> completed,
+            List<ExecutionResult> results, List<String> artifacts) {
         ExecutionTaskList updated = new ExecutionTaskList(taskList.goal(), completed);
         String report = ExecutionReportFormatter.format(results, artifacts);
         return new PlanExecutionResult(updated, results, artifacts, report);
+    }
+
+    private record RetryOutcome(ExecutionResult result, RuntimeException lastException) {
     }
 
     private static void collectArtifact(ExecutionTaskOutput output, List<String> artifacts) {
@@ -171,8 +235,8 @@ public final class PlanExecutorAgent {
         @SystemMessage("""
                 タスクの command 有無に従い実行手段を選択する
                 - command あり: コマンドを実行し、結果を返す
-                - command なし: ゴールとタスク情報に基づいて必要な出力を生成する
-                command は "(agent)"、exitCode は 0、stdout に生成結果、stderr は空文字列、elapsedMs は 0 を設定する
+                - command なし: ゴールとタスク情報に基づいて必要な出力を stdout に生成する。生成したら exit code 0 を返す。
+                過去の command 実行結果が複数存在している場合、command 実行が失敗していることを示す。実行結果が でない場合 exitCode や stderr、失敗した command の内容を確認し、問題を修正した command を実行する。
                 """)
         @UserMessage("""
                 ゴール: {{goal}}

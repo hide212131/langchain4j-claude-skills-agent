@@ -72,13 +72,13 @@ final class ExecutionPlanExecutionFlow implements AgentFlow {
         String safeOutputDirectoryPath = outputDirectoryPath == null ? "" : outputDirectoryPath.trim();
         ChatModel chatModel = buildChatModel(log, basicLog, runId, document.id(), events);
         CodeExecutionEnvironmentFactory environmentFactory = new CodeExecutionEnvironmentFactory(executionBackend);
-        ExecutionEnvironmentTool environmentTool = new ExecutionEnvironmentTool(environmentFactory, Path.of(skillPath),
-                log, basicLog, runId, document.id(), events);
         long start = System.nanoTime();
-        try {
+        try (ExecutionEnvironmentTool environmentTool = new ExecutionEnvironmentTool(environmentFactory,
+                Path.of(skillPath), log, basicLog, runId, document.id(), events)) {
             publishInputGoal(events, runId, document.id(), safeGoal);
-            uploadInputFileIfNeeded(safeInputFilePath, environmentTool, log, basicLog, runId, document.id(), events);
-            ExecutionTaskList taskList = buildTaskList(chatModel, document, safeGoal, safeInputFilePath,
+            String remoteInputFilePath = uploadInputFileIfNeeded(safeInputFilePath, environmentTool, log, basicLog,
+                    runId, document.id(), events);
+            ExecutionTaskList taskList = buildTaskList(chatModel, document, safeGoal, remoteInputFilePath,
                     safeOutputDirectoryPath, skillPath, "", log, runId, environmentTool);
             String planLog = taskList.formatForLog();
             if (taskList.tasks().isEmpty()) {
@@ -140,14 +140,15 @@ final class ExecutionPlanExecutionFlow implements AgentFlow {
         }
     }
 
-    private void uploadInputFileIfNeeded(String inputFilePath, ExecutionEnvironmentTool environmentTool, SkillLog log,
+    private String uploadInputFileIfNeeded(String inputFilePath, ExecutionEnvironmentTool environmentTool, SkillLog log,
             boolean basicLog, String runId, String skillId, SkillEventPublisher events) {
         if (inputFilePath == null || inputFilePath.isBlank()) {
-            return;
+            return "";
         }
         log.info(basicLog, runId, skillId, "plan", "plan.input.upload", "入力ファイルをアップロードします", inputFilePath, "");
-        environmentTool.uploadFile(Path.of(inputFilePath));
-        publishInputUpload(events, runId, skillId, inputFilePath);
+        String remotePath = environmentTool.uploadFile(Path.of(inputFilePath));
+        publishInputUpload(events, runId, skillId, remotePath);
+        return remotePath == null ? "" : remotePath.trim();
     }
 
     private List<String> downloadArtifactsIfNeeded(String outputDirectoryPath, List<String> artifacts,

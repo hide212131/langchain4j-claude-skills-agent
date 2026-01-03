@@ -43,7 +43,7 @@ public class DockerCodeExecutionEnvironment implements CodeExecutionEnvironment 
         String resolvedCommand = "export NODE_PATH=\"$(npm root -g)\" " + "&& export PATH=\"$(npm bin -g):$PATH\" "
                 + "&& " + command;
         List<String> dockerCommand = List.of(DOCKER_COMMAND, "exec", "-w", workspace.containerPath(), containerId, "sh",
-                "-lc", resolvedCommand);
+                "-c", resolvedCommand);
         return DockerProcessRunner.run(dockerCommand, command);
     }
 

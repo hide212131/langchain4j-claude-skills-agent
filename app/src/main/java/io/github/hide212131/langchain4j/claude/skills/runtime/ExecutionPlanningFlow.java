@@ -70,8 +70,9 @@ final class ExecutionPlanningFlow implements AgentFlow {
                     new CodeExecutionEnvironmentFactory(executionBackend), skillMdPath, log, basicLog, runId,
                     document.id(), events);
             publishInputGoal(events, runId, document.id(), safeGoal);
-            uploadInputFileIfNeeded(safeInputFilePath, environmentTool, log, basicLog, runId, document.id(), events);
-            ExecutionTaskList taskList = buildTaskList(chatModel, document, safeGoal, safeInputFilePath,
+            String remoteInputFilePath = uploadInputFileIfNeeded(safeInputFilePath, environmentTool, log, basicLog,
+                    runId, document.id(), events);
+            ExecutionTaskList taskList = buildTaskList(chatModel, document, safeGoal, remoteInputFilePath,
                     safeOutputDirectoryPath, skillPath, "", log, runId, environmentTool);
             String planLog = taskList.formatForLog();
             log.info(basicLog, runId, document.id(), "plan", "plan.tasks", "実行計画を作成しました", "", planLog);
@@ -114,14 +115,15 @@ final class ExecutionPlanningFlow implements AgentFlow {
         }
     }
 
-    private void uploadInputFileIfNeeded(String inputFilePath, ExecutionEnvironmentTool environmentTool, SkillLog log,
+    private String uploadInputFileIfNeeded(String inputFilePath, ExecutionEnvironmentTool environmentTool, SkillLog log,
             boolean basicLog, String runId, String skillId, SkillEventPublisher events) {
         if (inputFilePath == null || inputFilePath.isBlank()) {
-            return;
+            return "";
         }
         log.info(basicLog, runId, skillId, "plan", "plan.input.upload", "入力ファイルをアップロードします", inputFilePath, "");
-        environmentTool.uploadFile(Path.of(inputFilePath));
-        publishInputUpload(events, runId, skillId, inputFilePath);
+        String remotePath = environmentTool.uploadFile(Path.of(inputFilePath));
+        publishInputUpload(events, runId, skillId, remotePath);
+        return remotePath == null ? "" : remotePath.trim();
     }
 
     private static void publishInputGoal(SkillEventPublisher events, String runId, String skillId, String goal) {

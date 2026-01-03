@@ -17,7 +17,7 @@ import java.util.Objects;
 /**
  * 実行環境の状態確認を行うツール。
  */
-public final class ExecutionEnvironmentTool {
+public final class ExecutionEnvironmentTool implements AutoCloseable {
 
     private static final String WORKSPACE_PREFIX = "/workspace/";
     private static final String PHASE_TOOL = "tool";
@@ -34,6 +34,7 @@ public final class ExecutionEnvironmentTool {
     private final String runId;
     private final String skillId;
     private final SkillEventPublisher events;
+    private CodeExecutionEnvironment environment;
 
     public ExecutionEnvironmentTool(CodeExecutionEnvironmentFactory factory, Path skillMdPath) {
         this(factory, skillMdPath, null, false, null, null, SkillEventPublisher.noop());
@@ -50,13 +51,25 @@ public final class ExecutionEnvironmentTool {
         this.events = Objects.requireNonNull(events, "events");
     }
 
+    private CodeExecutionEnvironment getEnvironment() {
+        if (environment == null) {
+            environment = factory.create(skillMdPath);
+        }
+        return environment;
+    }
+
+    @Override
+    public void close() {
+        if (environment != null) {
+            environment.close();
+            environment = null;
+        }
+    }
+
     @Tool("リモート実行環境のファイル一覧を取得します。pattern は glob 形式です。")
     public RemoteFileList listRemoteFiles(String pattern) {
         String input = "pattern=" + pattern;
-        RemoteFileList result;
-        try (CodeExecutionEnvironment environment = factory.create(skillMdPath)) {
-            result = new RemoteFileList(pattern, environment.listFiles(pattern));
-        }
+        RemoteFileList result = new RemoteFileList(pattern, getEnvironment().listFiles(pattern));
         String output = "paths=" + result.paths();
         logToolInfo(STEP_LIST_REMOTE_FILES, "リモートファイル一覧を取得しました", input, output);
         publishToolEvent(STEP_LIST_REMOTE_FILES, "listRemoteFiles", input, output, null);
@@ -79,10 +92,7 @@ public final class ExecutionEnvironmentTool {
     public String uploadFile(Path localPath) {
         Objects.requireNonNull(localPath, "localPath");
         String input = "localPath=" + localPath;
-        String remotePath;
-        try (CodeExecutionEnvironment environment = factory.create(skillMdPath)) {
-            remotePath = environment.uploadFile(localPath);
-        }
+        String remotePath = getEnvironment().uploadFile(localPath);
         String output = "remotePath=" + remotePath;
         logToolInfo(STEP_UPLOAD_FILE, "入力ファイルをアップロードしました", input, output);
         publishToolEvent(STEP_UPLOAD_FILE, "uploadFile", input, output, null);
@@ -92,10 +102,7 @@ public final class ExecutionEnvironmentTool {
     public byte[] downloadFile(String remotePath) {
         Objects.requireNonNull(remotePath, "remotePath");
         String input = "remotePath=" + remotePath;
-        byte[] data;
-        try (CodeExecutionEnvironment environment = factory.create(skillMdPath)) {
-            data = environment.downloadFile(remotePath);
-        }
+        byte[] data = getEnvironment().downloadFile(remotePath);
         String output = "bytes=" + data.length;
         logToolInfo(STEP_DOWNLOAD_FILE, "成果物をダウンロードしました", input, output);
         publishToolEvent(STEP_DOWNLOAD_FILE, "downloadFile", input, output, null);
@@ -108,10 +115,7 @@ public final class ExecutionEnvironmentTool {
             throw new IllegalArgumentException("command は空にできません");
         }
         String input = "command=" + command;
-        ExecutionResult result;
-        try (CodeExecutionEnvironment environment = factory.create(skillMdPath)) {
-            result = environment.executeCommand(command);
-        }
+        ExecutionResult result = getEnvironment().executeCommand(command);
         String output = result.toString();
         logToolInfo(STEP_EXECUTE_COMMAND, "リモートコマンドを実行しました", input, output);
         publishToolEvent(STEP_EXECUTE_COMMAND, "executeCommand", input, output, null);
