@@ -13,6 +13,7 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEv
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventMetadata;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventPublisher;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventType;
+import java.util.List;
 import java.util.Objects;
 
 /** LLM リクエスト/レスポンスをスキルイベントへ送るリスナー。 */
@@ -53,7 +54,7 @@ final class SkillChatModelListener implements ChatModelListener {
     @Override
     public void onResponse(ChatModelResponseContext ctx) {
         ChatResponse response = ctx.chatResponse();
-        String output = response != null && response.aiMessage() != null ? response.aiMessage().text() : "(empty)";
+        String output = formatResponseOutput(response);
         log.info(basicLog, runId, skillId, PHASE_LLM, STEP_LLM_RESPONSE, "OpenAI から応答を受信しました", "", output);
         TokenUsage usage = TokenUsageExtractor.from(response);
         publishPrompt(events, runId, skillId, STEP_LLM_RESPONSE, "(llm-response)", output, model, usage);
@@ -80,6 +81,21 @@ final class SkillChatModelListener implements ChatModelListener {
         SkillEventMetadata metadata = new SkillEventMetadata(runId, skillId, PHASE_LLM, STEP_LLM_METRICS, null);
         events.publish(new SkillEvent(SkillEventType.METRICS, metadata,
                 new MetricsPayload(input, output, latencyMillis, null)));
+    }
+
+    private static String formatResponseOutput(ChatResponse response) {
+        if (response == null || response.aiMessage() == null) {
+            return "(empty)";
+        }
+        String text = response.aiMessage().text();
+        if (text != null) {
+            return text;
+        }
+        List<?> toolRequests = response.aiMessage().toolExecutionRequests();
+        if (toolRequests != null && !toolRequests.isEmpty()) {
+            return toolRequests.toString();
+        }
+        return "(empty)";
     }
 
     private static long nanosToMillis(long startNanos) {

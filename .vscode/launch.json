@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "PPTX-001: Java Debug (skills run)",
+      "type": "java",
+      "request": "launch",
+      "mainClass": "io.github.hide212131.langchain4j.claude.skills.app.SkillsCliApp",
+      "projectName": "app",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "args": [
+        "run",
+        "--skill=build/skills/anthropics/skills/pptx/SKILL.md",
+        "--goal",
+        "pptxファイルのテキストを抽出してください。",
+        "--input-file",
+        "app/src/test/resources/skills/pptx/langchain4j_presentation.pptx",
+        "--llm-provider=openai"
+      ]
+    }
+  ]
+}

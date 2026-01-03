@@ -54,7 +54,7 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 
 ```bash
 ./gradlew :app:installDist
-set -a; source .env; set +a; app/build/install/skills/bin/skills run --skill=build/skills/anthropics/skills/pptx/SKILL.md --goal "PPTX-001 以下のファイルのテキスト抽出してください。" --input-file build/work/langchain4j_presentation.pptx --llm-provider=openai
+set -a; source .env; set +a; app/build/install/skills/bin/skills run --skill=build/skills/anthropics/skills/pptx/SKILL.md --goal "PPTX-001 以下のファイルのテキスト抽出してください。" --input-file app/src/test/resources/skills/pptx/langchain4j_presentation.pptx --llm-provider=openai
 set -a; source .env; set +a; ./gradlew langfuseReport -Plimit=5
 set -a; source .env; set +a; ./gradlew langfusePrompt -PtraceId="<traceId>"
 ```

@@ -52,6 +52,7 @@ public final class ExecutionEnvironmentTool {
         }
     }
 
+    @Tool("リモート実行環境でコマンドを実行します。")
     public ExecutionResult executeCommand(String command) {
         if (command == null || command.isBlank()) {
             throw new IllegalArgumentException("command は空にできません");

@@ -2,6 +2,7 @@ package io.github.hide212131.langchain4j.claude.skills.runtime.execution;
 
 import dev.langchain4j.agentic.Agent;
 import dev.langchain4j.agentic.AgenticServices;
+import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
@@ -39,7 +40,7 @@ public final class PlanExecutorAgent {
         Objects.requireNonNull(chatModel, "chatModel");
         Objects.requireNonNull(environmentTool, "environmentTool");
         this.agent = AgenticServices.agentBuilder(TaskExecutionAgent.class).chatModel(chatModel).tools(environmentTool)
-                .build();
+                .chatMemory(MessageWindowChatMemory.withMaxMessages(10)).build();
     }
 
     public PlanExecutionResult execute(ExecutionTaskList taskList, String goal, String skillId, String runId,
@@ -57,8 +58,7 @@ public final class PlanExecutorAgent {
             publishTaskState(events, runId, skillId, "task.start", goal, task, "実行中");
             log.info(basicLog, runId, skillId, PHASE_ACT, "task.start", "タスクを実行します", taskSummary(task), "");
             try {
-                ExecutionResult result = agent.execute(goalValue(goal), task.id(), task.title(), task.description(),
-                        task.input(), task.action(), describeOutput(task.output()));
+                ExecutionResult result = agent.execute(goalValue(goal), task, describeOutput(task.output()));
                 log.info(basicLog, runId, skillId, PHASE_ACT, "task.execute", "タスクを実行しました", taskSummary(task),
                         resultSummary(result));
                 results.add(result);
@@ -167,26 +167,20 @@ public final class PlanExecutorAgent {
         }
     }
 
-    @SuppressWarnings("PMD.UseObjectForClearerAPI")
     public interface TaskExecutionAgent {
         @SystemMessage("""
                 タスクの command 有無に従い実行手段を選択する
-                - command あり: ExecutionEnvironmentTool でコマンドを実行し、結果を返す
+                - command あり: コマンドを実行し、結果を返す
                 - command なし: ゴールとタスク情報に基づいて必要な出力を生成する
                 command は "(agent)"、exitCode は 0、stdout に生成結果、stderr は空文字列、elapsedMs は 0 を設定する
                 """)
         @UserMessage("""
                 ゴール: {{goal}}
-                タスクID: {{taskId}}
-                タイトル: {{taskTitle}}
-                説明: {{taskDescription}}
-                入力: {{taskInput}}
-                アクション: {{taskAction}}
+                タスク: {{task}}
                 出力要件: {{taskOutput}}
                 """)
         @Agent(value = "planExecutorAgent", description = "実行計画のタスクを実行する")
-        ExecutionResult execute(@V("goal") String goal, @V("taskId") String taskId, @V("taskTitle") String taskTitle,
-                @V("taskDescription") String taskDescription, @V("taskInput") String taskInput,
-                @V("taskAction") String taskAction, @V("taskOutput") String taskOutput);
+        ExecutionResult execute(@V("goal") String goal, @V("task") ExecutionTask task,
+                @V("taskOutput") String taskOutput);
     }
 }
