@@ -149,6 +149,15 @@ public final class OtlpSkillPublisher implements SkillEventPublisher, AutoClosea
             if (metrics.outputTokens() != null) {
                 span.setAttribute("gen_ai.usage.output_tokens", metrics.outputTokens());
             }
+        } else if (payload instanceof ToolPayload tool) {
+            span.setAttribute("skill.tool.name", safe(tool.toolName()));
+            span.setAttribute("skill.tool.input", safe(tool.input()));
+            span.setAttribute("skill.tool.output", safe(tool.output()));
+            if (tool.errorType() != null && !tool.errorType().isBlank()) {
+                span.setStatus(StatusCode.ERROR, tool.errorMessage());
+                span.setAttribute("skill.tool.error_type", tool.errorType());
+                span.setAttribute("skill.tool.error_message", safe(tool.errorMessage()));
+            }
         } else if (payload instanceof ErrorPayload error) {
             span.setStatus(StatusCode.ERROR, error.message());
             span.setAttribute("skill.error.message", error.message());

@@ -72,7 +72,8 @@ final class ExecutionPlanExecutionFlow implements AgentFlow {
         String safeOutputDirectoryPath = outputDirectoryPath == null ? "" : outputDirectoryPath.trim();
         ChatModel chatModel = buildChatModel(log, basicLog, runId, document.id(), events);
         CodeExecutionEnvironmentFactory environmentFactory = new CodeExecutionEnvironmentFactory(executionBackend);
-        ExecutionEnvironmentTool environmentTool = new ExecutionEnvironmentTool(environmentFactory, Path.of(skillPath));
+        ExecutionEnvironmentTool environmentTool = new ExecutionEnvironmentTool(environmentFactory, Path.of(skillPath),
+                log, basicLog, runId, document.id(), events);
         long start = System.nanoTime();
         try {
             publishInputGoal(events, runId, document.id(), safeGoal);

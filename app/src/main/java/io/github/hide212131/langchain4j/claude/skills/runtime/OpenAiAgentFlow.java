@@ -116,7 +116,8 @@ final class OpenAiAgentFlow implements AgentFlow {
             String planLog = stringOrFallback(scope.readState(KEY_PLAN), "Plan を取得できませんでした");
             String actLog = stringOrFallback(scope.readState(KEY_EXECUTION_PLAN), "実行計画を取得できませんでした");
             String reflectLog = stringOrFallback(scope.readState(KEY_REFLECT), "Reflect を取得できませんでした");
-            ExecutionTaskList taskList = buildTaskList(chatModel, document, safeGoal, skillPath, planLog, log, runId);
+            ExecutionTaskList taskList = buildTaskList(chatModel, document, safeGoal, skillPath, planLog, log, basicLog,
+                    runId, events);
             String combinedPlan = mergePlanLog(planLog, taskList);
             String artifact = stringOrFallback(result.result(), "");
 
@@ -146,12 +147,13 @@ final class OpenAiAgentFlow implements AgentFlow {
 
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private ExecutionTaskList buildTaskList(ChatModel chatModel, SkillDocument document, String goal, String skillPath,
-            String planSummary, SkillLog log, String runId) {
+            String planSummary, SkillLog log, boolean basicLog, String runId, SkillEventPublisher events) {
         try {
             Path skillMdPath = Path.of(skillPath);
             LocalResourceTool resourceTool = new LocalResourceTool(skillMdPath);
             ExecutionEnvironmentTool environmentTool = new ExecutionEnvironmentTool(
-                    new CodeExecutionEnvironmentFactory(executionBackend), skillMdPath);
+                    new CodeExecutionEnvironmentFactory(executionBackend), skillMdPath, log, basicLog, runId,
+                    document.id(), events);
             ExecutionPlanningAgent planner = new ExecutionPlanningAgent(chatModel, resourceTool, environmentTool);
             return planner.plan(document, goal, "", "", skillPath, planSummary);
         } catch (RuntimeException ex) {

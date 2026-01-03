@@ -67,7 +67,8 @@ final class ExecutionPlanningFlow implements AgentFlow {
         try {
             Path skillMdPath = Path.of(skillPath);
             ExecutionEnvironmentTool environmentTool = new ExecutionEnvironmentTool(
-                    new CodeExecutionEnvironmentFactory(executionBackend), skillMdPath);
+                    new CodeExecutionEnvironmentFactory(executionBackend), skillMdPath, log, basicLog, runId,
+                    document.id(), events);
             publishInputGoal(events, runId, document.id(), safeGoal);
             uploadInputFileIfNeeded(safeInputFilePath, environmentTool, log, basicLog, runId, document.id(), events);
             ExecutionTaskList taskList = buildTaskList(chatModel, document, safeGoal, safeInputFilePath,
