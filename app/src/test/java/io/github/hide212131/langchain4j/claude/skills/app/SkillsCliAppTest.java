@@ -66,8 +66,9 @@ class SkillsCliAppTest {
         };
         SkillLog log = new SkillLog(newLogger(new ByteArrayOutputStream()));
 
-        assertThatThrownBy(() -> RunCommand.executeWithRetry(action, log, true, RUN_RETRY, "skill-x",
-                SkillEventPublisher.noop())).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(
+                () -> RunCommand.executeWithRetry(action, log, true, RUN_RETRY, "skill-x", SkillEventPublisher.noop()))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -86,8 +87,8 @@ class SkillsCliAppTest {
             String result = RunCommand.executeWithRetry(action, log, true, RUN_RETRY, "skill-event", collector);
 
             assertThat(result).isEqualTo("ok");
-            assertThat(collector.events()).hasSize(2).extracting(SkillEvent::type)
-                    .containsExactly(SkillEventType.ERROR, SkillEventType.METRICS);
+            assertThat(collector.events()).hasSize(2).extracting(SkillEvent::type).containsExactly(SkillEventType.ERROR,
+                    SkillEventType.METRICS);
 
             SkillEvent errorEvent = collector.events().get(0);
             assertThat(errorEvent.metadata().runId()).isEqualTo(RUN_RETRY);

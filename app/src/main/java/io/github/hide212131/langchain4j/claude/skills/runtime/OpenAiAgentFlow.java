@@ -132,8 +132,8 @@ final class OpenAiAgentFlow implements AgentFlow {
     private ChatModel buildChatModel(SkillLog log, boolean basicLog, String runId, String skillId,
             SkillEventPublisher events) {
         OpenAiOfficialChatModel.Builder builder = OpenAiOfficialChatModel.builder().apiKey(configuration.openAiApiKey())
-                .listeners(List.of(new SkillChatModelListener(log, basicLog, runId, skillId, events,
-                        configuration.openAiModel())))
+                .listeners(List.of(
+                        new SkillChatModelListener(log, basicLog, runId, skillId, events, configuration.openAiModel())))
                 .supportedCapabilities(Set.of(Capability.RESPONSE_FORMAT_JSON_SCHEMA)).strictJsonSchema(true);
         if (configuration.openAiBaseUrl() != null) {
             builder.baseUrl(configuration.openAiBaseUrl());
@@ -153,7 +153,7 @@ final class OpenAiAgentFlow implements AgentFlow {
             ExecutionEnvironmentTool environmentTool = new ExecutionEnvironmentTool(
                     new CodeExecutionEnvironmentFactory(executionBackend), skillMdPath);
             ExecutionPlanningAgent planner = new ExecutionPlanningAgent(chatModel, resourceTool, environmentTool);
-            return planner.plan(document, goal, skillPath, planSummary);
+            return planner.plan(document, goal, "", "", skillPath, planSummary);
         } catch (RuntimeException ex) {
             log.warn(runId, document.id(), "plan", "plan.tasks", "実行計画の作成に失敗しました", "", "", ex);
             return ExecutionTaskList.empty(goal);
@@ -240,14 +240,13 @@ final class OpenAiAgentFlow implements AgentFlow {
 
     private static void publishWorkflowMetrics(SkillEventPublisher events, String runId, String skillId,
             long latencyMillis) {
-        SkillEventMetadata metadata = new SkillEventMetadata(runId, skillId, "workflow", "workflow.done",
-                null);
-        events.publish(new SkillEvent(SkillEventType.METRICS, metadata,
-                new MetricsPayload(null, null, latencyMillis, null)));
+        SkillEventMetadata metadata = new SkillEventMetadata(runId, skillId, "workflow", "workflow.done", null);
+        events.publish(
+                new SkillEvent(SkillEventType.METRICS, metadata, new MetricsPayload(null, null, latencyMillis, null)));
     }
 
-    private static void publishLlmMetrics(SkillEventPublisher events, String runId, String skillId,
-            TokenUsage usage, long latencyMillis) {
+    private static void publishLlmMetrics(SkillEventPublisher events, String runId, String skillId, TokenUsage usage,
+            long latencyMillis) {
         Long input = usage == null ? null : usage.inputTokens();
         Long output = usage == null ? null : usage.outputTokens();
         SkillEventMetadata metadata = new SkillEventMetadata(runId, skillId, "llm", "llm.metrics", null);
@@ -288,8 +287,8 @@ final class OpenAiAgentFlow implements AgentFlow {
         private final String model;
         private long lastRequestStartNanos;
 
-        SkillChatModelListener(SkillLog log, boolean basicLog, String runId, String skillId,
-                SkillEventPublisher events, String model) {
+        SkillChatModelListener(SkillLog log, boolean basicLog, String runId, String skillId, SkillEventPublisher events,
+                String model) {
             this.log = Objects.requireNonNull(log, "log");
             this.basicLog = basicLog;
             this.runId = Objects.requireNonNull(runId, "runId");

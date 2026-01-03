@@ -84,8 +84,8 @@ public final class OtlpSkillPublisher implements SkillEventPublisher, AutoClosea
     private SpanContext rootSpanContextFor(SkillEventMetadata metadata) {
         String runId = safe(metadata.runId());
         return rootSpanContexts.computeIfAbsent(runId, id -> {
-            Span root = tracer.spanBuilder("skills.run").setSpanKind(SpanKind.INTERNAL)
-                    .setAttribute("skill.run_id", id).startSpan();
+            Span root = tracer.spanBuilder("skills.run").setSpanKind(SpanKind.INTERNAL).setAttribute("skill.run_id", id)
+                    .startSpan();
 
             if (metadata.skillId() != null && !metadata.skillId().isBlank()) {
                 root.setAttribute("skill.skill_id", metadata.skillId().trim());
@@ -119,6 +119,27 @@ public final class OtlpSkillPublisher implements SkillEventPublisher, AutoClosea
             span.setAttribute("skill.agent.goal", safe(state.goal()));
             span.setAttribute("skill.agent.decision", state.decision());
             span.setAttribute("skill.agent.state", safe(state.stateSummary()));
+        } else if (payload instanceof InputPayload input) {
+            if (!input.goal().isBlank()) {
+                span.setAttribute("skill.input.goal", input.goal());
+            }
+            if (!input.inputFilePath().isBlank()) {
+                span.setAttribute("skill.input.file_path", input.inputFilePath());
+            }
+        } else if (payload instanceof OutputPayload output) {
+            span.setAttribute("skill.output.type", output.outputType());
+            if (!output.taskId().isBlank()) {
+                span.setAttribute("skill.output.task_id", output.taskId());
+            }
+            if (!output.sourcePath().isBlank()) {
+                span.setAttribute("skill.output.source_path", output.sourcePath());
+            }
+            if (!output.destinationPath().isBlank()) {
+                span.setAttribute("skill.output.destination_path", output.destinationPath());
+            }
+            if (!output.content().isBlank()) {
+                span.setAttribute("skill.output.content", output.content());
+            }
         } else if (payload instanceof MetricsPayload metrics) {
             span.setAttribute("skill.metrics.latency_ms", safeLong(metrics.latencyMillis()));
             span.setAttribute("skill.metrics.retry_count", safeLong(metrics.retryCount()));

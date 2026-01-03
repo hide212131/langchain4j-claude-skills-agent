@@ -9,6 +9,7 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.planning.Execution
 import io.github.hide212131.langchain4j.claude.skills.runtime.planning.ExecutionPlanningAgent;
 import io.github.hide212131.langchain4j.claude.skills.runtime.planning.ExecutionTaskList;
 import io.github.hide212131.langchain4j.claude.skills.runtime.planning.LocalResourceTool;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.InputPayload;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.MetricsPayload;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEvent;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventMetadata;
@@ -67,7 +68,8 @@ final class ExecutionPlanningFlow implements AgentFlow {
             Path skillMdPath = Path.of(skillPath);
             ExecutionEnvironmentTool environmentTool = new ExecutionEnvironmentTool(
                     new CodeExecutionEnvironmentFactory(executionBackend), skillMdPath);
-            uploadInputFileIfNeeded(safeInputFilePath, environmentTool, log, basicLog, runId, document.id());
+            publishInputGoal(events, runId, document.id(), safeGoal);
+            uploadInputFileIfNeeded(safeInputFilePath, environmentTool, log, basicLog, runId, document.id(), events);
             ExecutionTaskList taskList = buildTaskList(chatModel, document, safeGoal, safeInputFilePath,
                     safeOutputDirectoryPath, skillPath, "", log, runId, environmentTool);
             String planLog = taskList.formatForLog();
@@ -85,8 +87,8 @@ final class ExecutionPlanningFlow implements AgentFlow {
     private ChatModel buildChatModel(SkillLog log, boolean basicLog, String runId, String skillId,
             SkillEventPublisher events) {
         OpenAiOfficialChatModel.Builder builder = OpenAiOfficialChatModel.builder().apiKey(configuration.openAiApiKey())
-                .listeners(List.of(new SkillChatModelListener(log, basicLog, runId, skillId, events,
-                        configuration.openAiModel())))
+                .listeners(List.of(
+                        new SkillChatModelListener(log, basicLog, runId, skillId, events, configuration.openAiModel())))
                 .supportedCapabilities(Set.of(Capability.RESPONSE_FORMAT_JSON_SCHEMA)).strictJsonSchema(true);
         if (configuration.openAiBaseUrl() != null) {
             builder.baseUrl(configuration.openAiBaseUrl());
@@ -111,21 +113,32 @@ final class ExecutionPlanningFlow implements AgentFlow {
         }
     }
 
-    private void uploadInputFileIfNeeded(String inputFilePath, ExecutionEnvironmentTool environmentTool,
-            SkillLog log, boolean basicLog, String runId, String skillId) {
+    private void uploadInputFileIfNeeded(String inputFilePath, ExecutionEnvironmentTool environmentTool, SkillLog log,
+            boolean basicLog, String runId, String skillId, SkillEventPublisher events) {
         if (inputFilePath == null || inputFilePath.isBlank()) {
             return;
         }
         log.info(basicLog, runId, skillId, "plan", "plan.input.upload", "入力ファイルをアップロードします", inputFilePath, "");
         environmentTool.uploadFile(Path.of(inputFilePath));
+        publishInputUpload(events, runId, skillId, inputFilePath);
+    }
+
+    private static void publishInputGoal(SkillEventPublisher events, String runId, String skillId, String goal) {
+        SkillEventMetadata metadata = new SkillEventMetadata(runId, skillId, "plan", "plan.input.goal", null);
+        events.publish(new SkillEvent(SkillEventType.INPUT, metadata, new InputPayload(goal, "")));
+    }
+
+    private static void publishInputUpload(SkillEventPublisher events, String runId, String skillId,
+            String inputFilePath) {
+        SkillEventMetadata metadata = new SkillEventMetadata(runId, skillId, "plan", "plan.input.upload", null);
+        events.publish(new SkillEvent(SkillEventType.INPUT, metadata, new InputPayload("", inputFilePath)));
     }
 
     private static void publishWorkflowMetrics(SkillEventPublisher events, String runId, String skillId,
             long latencyMillis) {
-        SkillEventMetadata metadata = new SkillEventMetadata(runId, skillId, "workflow", "workflow.done",
-                null);
-        events.publish(new SkillEvent(SkillEventType.METRICS, metadata,
-                new MetricsPayload(null, null, latencyMillis, null)));
+        SkillEventMetadata metadata = new SkillEventMetadata(runId, skillId, "workflow", "workflow.done", null);
+        events.publish(
+                new SkillEvent(SkillEventType.METRICS, metadata, new MetricsPayload(null, null, latencyMillis, null)));
     }
 
     private static long nanosToMillis(long startNanos) {

@@ -38,16 +38,16 @@ class SkillIntegrationTest {
             flow.run(document, "integration goal", log, true, "run-e2e", skillMd.toString(), null, collector);
 
             List<SkillEvent> events = collector.events();
-            assertThat(events).extracting(SkillEvent::type).contains(SkillEventType.PARSE,
-                    SkillEventType.PROMPT, SkillEventType.AGENT_STATE);
+            assertThat(events).extracting(SkillEvent::type).contains(SkillEventType.PARSE, SkillEventType.PROMPT,
+                    SkillEventType.AGENT_STATE);
             assertThat(events).allMatch(event -> "run-e2e".equals(event.metadata().runId()));
 
             SkillEvent bodyEvent = events.stream().filter(event -> "parse.body".equals(event.metadata().step()))
                     .findFirst().orElseThrow();
             assertThat(((ParsePayload) bodyEvent.payload()).bodyPreview()).contains("Plan/Act/Reflect");
 
-            SkillEvent reflectEvent = events.stream()
-                    .filter(event -> "reflect.eval".equals(event.metadata().step())).findFirst().orElseThrow();
+            SkillEvent reflectEvent = events.stream().filter(event -> "reflect.eval".equals(event.metadata().step()))
+                    .findFirst().orElseThrow();
             assertThat(((PromptPayload) reflectEvent.payload()).response()).contains("Reflect");
             assertThat(reflectEvent.metadata().skillId()).isEqualTo("e2e-skill");
         }

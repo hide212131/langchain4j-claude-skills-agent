@@ -32,8 +32,8 @@ final class SkillChatModelListener implements ChatModelListener {
     private final String model;
     private long lastRequestStartNanos;
 
-    SkillChatModelListener(SkillLog log, boolean basicLog, String runId, String skillId,
-            SkillEventPublisher events, String model) {
+    SkillChatModelListener(SkillLog log, boolean basicLog, String runId, String skillId, SkillEventPublisher events,
+            String model) {
         this.log = Objects.requireNonNull(log, "log");
         this.basicLog = basicLog;
         this.runId = Objects.requireNonNull(runId, "runId");
@@ -73,12 +73,11 @@ final class SkillChatModelListener implements ChatModelListener {
                 new PromptPayload(prompt, response, model, "assistant", usage)));
     }
 
-    private static void publishLlmMetrics(SkillEventPublisher events, String runId, String skillId,
-            TokenUsage usage, long latencyMillis) {
+    private static void publishLlmMetrics(SkillEventPublisher events, String runId, String skillId, TokenUsage usage,
+            long latencyMillis) {
         Long input = usage == null ? null : usage.inputTokens();
         Long output = usage == null ? null : usage.outputTokens();
-        SkillEventMetadata metadata = new SkillEventMetadata(runId, skillId, PHASE_LLM, STEP_LLM_METRICS,
-                null);
+        SkillEventMetadata metadata = new SkillEventMetadata(runId, skillId, PHASE_LLM, STEP_LLM_METRICS, null);
         events.publish(new SkillEvent(SkillEventType.METRICS, metadata,
                 new MetricsPayload(input, output, latencyMillis, null)));
     }

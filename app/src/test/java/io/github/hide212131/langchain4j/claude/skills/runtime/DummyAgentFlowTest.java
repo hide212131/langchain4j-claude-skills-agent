@@ -49,8 +49,7 @@ class DummyAgentFlowTest {
 
             List<SkillEvent> events = collector.events();
             assertThat(events).hasSizeGreaterThanOrEqualTo(3);
-            assertThat(events).extracting(SkillEvent::type).contains(SkillEventType.PROMPT,
-                    SkillEventType.AGENT_STATE);
+            assertThat(events).extracting(SkillEvent::type).contains(SkillEventType.PROMPT, SkillEventType.AGENT_STATE);
 
             SkillEvent planEvent = events.stream().filter(event -> "plan.prompt".equals(event.metadata().step()))
                     .findFirst().orElseThrow();

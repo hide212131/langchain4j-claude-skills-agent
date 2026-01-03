@@ -144,8 +144,8 @@ public final class PlanExecutorAgent {
                 new AgentStatePayload(goalValue(goal), step, summary)));
     }
 
-    private static void publishTaskError(SkillEventPublisher events, String runId, String skillId,
-            ExecutionTask task, Throwable error) {
+    private static void publishTaskError(SkillEventPublisher events, String runId, String skillId, ExecutionTask task,
+            Throwable error) {
         SkillEventMetadata metadata = new SkillEventMetadata(runId, skillId, "error", "task.failed", null);
         String message = "タスク実行でエラーが発生しました: " + safe(task.id()) + " " + error.getMessage();
         events.publish(new SkillEvent(SkillEventType.ERROR, metadata,

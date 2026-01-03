@@ -184,13 +184,12 @@ public final class RunCommand implements Callable<Integer> {
         }
     }
 
-    private static void publishRetryEvent(SkillEventPublisher publisher, String runId, String skillId,
-            Throwable error, int retryCount) {
+    private static void publishRetryEvent(SkillEventPublisher publisher, String runId, String skillId, Throwable error,
+            int retryCount) {
         SkillEventMetadata errorMetadata = new SkillEventMetadata(runId, skillId, "error", "run.retry", null);
         publisher.publish(new SkillEvent(SkillEventType.ERROR, errorMetadata,
                 new ErrorPayload("エージェント実行でエラーが発生しました: " + error.getMessage(), error.getClass().getSimpleName())));
-        SkillEventMetadata metricsMetadata = new SkillEventMetadata(runId, skillId, "metrics", "run.retry",
-                null);
+        SkillEventMetadata metricsMetadata = new SkillEventMetadata(runId, skillId, "metrics", "run.retry", null);
         publisher.publish(new SkillEvent(SkillEventType.METRICS, metricsMetadata,
                 new MetricsPayload(null, null, null, retryCount)));
     }
