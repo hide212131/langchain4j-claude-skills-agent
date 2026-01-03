@@ -12,7 +12,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 @SuppressWarnings("PMD.JUnitTestContainsTooManyAsserts")
-class OtlpVisibilityPublisherTest {
+class OtlpSkillPublisherTest {
 
     private static final String RUN_ID = "run-1";
     private static final String SKILL_ID = "skill-1";
@@ -20,21 +20,21 @@ class OtlpVisibilityPublisherTest {
     private static final String SKILLS_RUN = "skills.run";
 
     @SuppressWarnings("PMD.UnnecessaryConstructor")
-    OtlpVisibilityPublisherTest() {
+    OtlpSkillPublisherTest() {
         // default
     }
 
     @Test
-    @DisplayName("可視化イベントを Span 属性にマッピングしてエクスポートする")
+    @DisplayName("スキルイベントを Span 属性にマッピングしてエクスポートする")
     void publishMapsAttributes() {
         List<SpanData> spansCopy;
         try (InMemorySpanExporter exporter = InMemorySpanExporter.create();
-                OtlpVisibilityPublisher publisher = new OtlpVisibilityPublisher(exporter)) {
-            VisibilityEventMetadata metadata = new VisibilityEventMetadata(RUN_ID, SKILL_ID, "plan", "plan.prompt",
+                OtlpSkillPublisher publisher = new OtlpSkillPublisher(exporter)) {
+            SkillEventMetadata metadata = new SkillEventMetadata(RUN_ID, SKILL_ID, "plan", "plan.prompt",
                     Instant.ofEpochMilli(0));
             PromptPayload payload = new PromptPayload("prompt-text", "resp", "gpt", "assistant",
                     new TokenUsage(10L, 5L, 15L));
-            publisher.publish(new VisibilityEvent(VisibilityEventType.PROMPT, metadata, payload));
+            publisher.publish(new SkillEvent(SkillEventType.PROMPT, metadata, payload));
 
             spansCopy = List.copyOf(exporter.getFinishedSpanItems());
         }
@@ -42,13 +42,13 @@ class OtlpVisibilityPublisherTest {
         assertThat(spansCopy).hasSize(2);
         SpanData span = spansCopy.stream().filter(s -> PLAN_PROMPT.equals(s.getName())).findFirst().orElseThrow();
         assertThat(span.getName()).isEqualTo(PLAN_PROMPT);
-        assertThat(span.getAttributes().get(AttributeKey.stringKey("visibility.run_id"))).isEqualTo(RUN_ID);
-        assertThat(span.getAttributes().get(AttributeKey.stringKey("visibility.prompt.role"))).isEqualTo("assistant");
+        assertThat(span.getAttributes().get(AttributeKey.stringKey("skill.run_id"))).isEqualTo(RUN_ID);
+        assertThat(span.getAttributes().get(AttributeKey.stringKey("skill.prompt.role"))).isEqualTo("assistant");
         assertThat(span.getAttributes().get(AttributeKey.stringKey("gen_ai.request.prompt"))).isEqualTo("prompt-text");
         assertThat(span.getAttributes().get(AttributeKey.stringKey("gen_ai.response.text"))).isEqualTo("resp");
         assertThat(span.getAttributes().get(AttributeKey.longKey("gen_ai.usage.total_tokens"))).isEqualTo(15L);
-        assertThat(span.getAttributes().get(AttributeKey.stringKey("visibility.prompt.content"))).isNull();
-        assertThat(span.getAttributes().get(AttributeKey.longKey("visibility.usage.total_tokens"))).isNull();
+        assertThat(span.getAttributes().get(AttributeKey.stringKey("skill.prompt.content"))).isNull();
+        assertThat(span.getAttributes().get(AttributeKey.longKey("skill.usage.total_tokens"))).isNull();
     }
 
     @Test
@@ -56,15 +56,15 @@ class OtlpVisibilityPublisherTest {
     void sameRunIdSharesTraceId() {
         List<SpanData> spansCopy;
         try (InMemorySpanExporter exporter = InMemorySpanExporter.create();
-                OtlpVisibilityPublisher publisher = new OtlpVisibilityPublisher(exporter)) {
-            VisibilityEventMetadata plan = new VisibilityEventMetadata(RUN_ID, SKILL_ID, "plan", "plan.prompt",
+                OtlpSkillPublisher publisher = new OtlpSkillPublisher(exporter)) {
+            SkillEventMetadata plan = new SkillEventMetadata(RUN_ID, SKILL_ID, "plan", "plan.prompt",
                     Instant.ofEpochMilli(0));
-            publisher.publish(new VisibilityEvent(VisibilityEventType.PROMPT, plan,
+            publisher.publish(new SkillEvent(SkillEventType.PROMPT, plan,
                     new PromptPayload("p", "r", "gpt", "assistant", null)));
 
-            VisibilityEventMetadata act = new VisibilityEventMetadata(RUN_ID, SKILL_ID, "act", "act.call",
+            SkillEventMetadata act = new SkillEventMetadata(RUN_ID, SKILL_ID, "act", "act.call",
                     Instant.ofEpochMilli(1));
-            publisher.publish(new VisibilityEvent(VisibilityEventType.AGENT_STATE, act,
+            publisher.publish(new SkillEvent(SkillEventType.AGENT_STATE, act,
                     new AgentStatePayload("goal", "decision", "state")));
 
             // root span は publisher.close() で end されるため、ここではイベントspan同士の関係のみ検証する。
@@ -82,15 +82,15 @@ class OtlpVisibilityPublisherTest {
     void publishMetricsAndErrorAttributes() {
         List<SpanData> spansCopy;
         try (InMemorySpanExporter exporter = InMemorySpanExporter.create();
-                OtlpVisibilityPublisher publisher = new OtlpVisibilityPublisher(exporter)) {
-            VisibilityEventMetadata metrics = new VisibilityEventMetadata(RUN_ID, SKILL_ID, "metrics", "workflow.done",
+                OtlpSkillPublisher publisher = new OtlpSkillPublisher(exporter)) {
+            SkillEventMetadata metrics = new SkillEventMetadata(RUN_ID, SKILL_ID, "metrics", "workflow.done",
                     Instant.ofEpochMilli(2));
             publisher.publish(
-                    new VisibilityEvent(VisibilityEventType.METRICS, metrics, new MetricsPayload(5L, 3L, 42L, 1)));
+                    new SkillEvent(SkillEventType.METRICS, metrics, new MetricsPayload(5L, 3L, 42L, 1)));
 
-            VisibilityEventMetadata error = new VisibilityEventMetadata(RUN_ID, SKILL_ID, "error", "run.failed",
+            SkillEventMetadata error = new SkillEventMetadata(RUN_ID, SKILL_ID, "error", "run.failed",
                     Instant.ofEpochMilli(3));
-            publisher.publish(new VisibilityEvent(VisibilityEventType.ERROR, error,
+            publisher.publish(new SkillEvent(SkillEventType.ERROR, error,
                     new ErrorPayload("失敗しました", "IllegalStateException")));
 
             spansCopy = List.copyOf(exporter.getFinishedSpanItems());
@@ -98,9 +98,9 @@ class OtlpVisibilityPublisherTest {
 
         SpanData metricsSpan = spansCopy.stream().filter(span -> "workflow.done".equals(span.getName())).findFirst()
                 .orElseThrow();
-        assertThat(metricsSpan.getAttributes().get(AttributeKey.longKey("visibility.metrics.latency_ms")))
+        assertThat(metricsSpan.getAttributes().get(AttributeKey.longKey("skill.metrics.latency_ms")))
                 .isEqualTo(42L);
-        assertThat(metricsSpan.getAttributes().get(AttributeKey.longKey("visibility.metrics.retry_count")))
+        assertThat(metricsSpan.getAttributes().get(AttributeKey.longKey("skill.metrics.retry_count")))
                 .isEqualTo(1L);
         assertThat(metricsSpan.getAttributes().get(AttributeKey.longKey("gen_ai.usage.input_tokens"))).isEqualTo(5L);
         assertThat(metricsSpan.getAttributes().get(AttributeKey.longKey("gen_ai.usage.output_tokens"))).isEqualTo(3L);
@@ -108,9 +108,9 @@ class OtlpVisibilityPublisherTest {
         SpanData errorSpan = spansCopy.stream().filter(span -> "run.failed".equals(span.getName())).findFirst()
                 .orElseThrow();
         assertThat(errorSpan.getStatus().getStatusCode()).isEqualTo(StatusCode.ERROR);
-        assertThat(errorSpan.getAttributes().get(AttributeKey.stringKey("visibility.error.message")))
+        assertThat(errorSpan.getAttributes().get(AttributeKey.stringKey("skill.error.message")))
                 .contains("失敗しました");
-        assertThat(errorSpan.getAttributes().get(AttributeKey.stringKey("visibility.error.type")))
+        assertThat(errorSpan.getAttributes().get(AttributeKey.stringKey("skill.error.type")))
                 .isEqualTo("IllegalStateException");
         assertThat(spansCopy.stream().map(SpanData::getTraceId).distinct()).hasSize(1);
     }

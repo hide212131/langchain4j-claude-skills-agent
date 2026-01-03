@@ -20,7 +20,7 @@ LangChain4j の ChatModel/AgenticScope を OpenAI Official SDK の実LLMに接�
 - [x] 実LLM（OpenAI Official SDK）を用いた実行計画作成の e2e 実行が成功する（手動/条件付きテスト）。※実行は API キー投入時に手動確認する前提で ExecutionPlanningFlow/SkillsCli に実装済み。
 - [x] モックと実LLMを設定で切り替えられる（`LLM_PROVIDER` 環境変数/`--llm-provider` で切替、デフォルト mock）。
 - [x] API キー/エンドポイントが `OPENAI_API_KEY`/`OPENAI_BASE_URL` で注入でき、秘匿情報がログに残らない（`LlmConfiguration.maskedApiKey` でマスク）。
-- [x] 可視化フック（T-7k08g）が実LLM経路でも発火する（ChatModelListener/AgenticScope のイベントを VisibilityEventPublisher に送出）。
+- [x] 可視化フック（T-7k08g）が実LLM経路でも発火する（ChatModelListener/AgenticScope のイベントを SkillEventPublisher に送出）。
 
 ## Scope
 

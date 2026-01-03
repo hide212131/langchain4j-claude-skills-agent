@@ -5,9 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.github.hide212131.langchain4j.claude.skills.runtime.AgentFlow.AgentFlowResult;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.AgentStatePayload;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.PromptPayload;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEvent;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventCollector;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventType;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEvent;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventCollector;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventType;
 import java.util.List;
 import java.util.logging.Logger;
 import org.junit.jupiter.api.DisplayName;
@@ -39,25 +39,25 @@ class DummyAgentFlowTest {
 
     @Test
     @DisplayName("Plan/Act/Reflect のイベントを可視化スキーマで出力する")
-    void runEmitsVisibilityEvents() {
+    void runEmitsSkillEvents() {
         SkillDocument document = new SkillDocument("sample", "Sample", "Desc", "Body content");
         DummyAgentFlow flow = new DummyAgentFlow();
-        try (VisibilityEventCollector collector = new VisibilityEventCollector()) {
-            VisibilityLog log = new VisibilityLog(Logger.getLogger(DummyAgentFlow.class.getName()));
+        try (SkillEventCollector collector = new SkillEventCollector()) {
+            SkillLog log = new SkillLog(Logger.getLogger(DummyAgentFlow.class.getName()));
 
             flow.run(document, DEMO_GOAL, log, true, "run-1", "dummy-skill", null, collector);
 
-            List<VisibilityEvent> events = collector.events();
+            List<SkillEvent> events = collector.events();
             assertThat(events).hasSizeGreaterThanOrEqualTo(3);
-            assertThat(events).extracting(VisibilityEvent::type).contains(VisibilityEventType.PROMPT,
-                    VisibilityEventType.AGENT_STATE);
+            assertThat(events).extracting(SkillEvent::type).contains(SkillEventType.PROMPT,
+                    SkillEventType.AGENT_STATE);
 
-            VisibilityEvent planEvent = events.stream().filter(event -> "plan.prompt".equals(event.metadata().step()))
+            SkillEvent planEvent = events.stream().filter(event -> "plan.prompt".equals(event.metadata().step()))
                     .findFirst().orElseThrow();
             assertThat(((PromptPayload) planEvent.payload()).prompt()).contains(DEMO_GOAL);
             assertThat(planEvent.metadata().runId()).isEqualTo("run-1");
 
-            VisibilityEvent actEvent = events.stream().filter(event -> "act.call".equals(event.metadata().step()))
+            SkillEvent actEvent = events.stream().filter(event -> "act.call".equals(event.metadata().step()))
                     .findFirst().orElseThrow();
             assertThat(((AgentStatePayload) actEvent.payload()).decision()).contains("Act:");
             assertThat(actEvent.metadata().skillId()).isEqualTo("sample");

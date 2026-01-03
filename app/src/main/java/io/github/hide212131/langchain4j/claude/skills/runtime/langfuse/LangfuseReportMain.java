@@ -55,7 +55,7 @@ public final class LangfuseReportMain {
             List<LangfuseJsonScan.FoundValue> outputTokens = LangfuseJsonScan.findValues(trace,
                     "gen_ai.usage.output_tokens");
             List<LangfuseJsonScan.FoundValue> latencyMs = LangfuseJsonScan.findValues(trace,
-                    "visibility.metrics.latency_ms");
+                    "skill.metrics.latency_ms");
             if (!inputTokens.isEmpty() || !outputTokens.isEmpty() || !latencyMs.isEmpty()) {
                 matchedTraces++;
             }

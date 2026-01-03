@@ -7,13 +7,13 @@ import java.util.logging.Logger;
 
 @SuppressWarnings({ "PMD.UseObjectForClearerAPI", "PMD.GuardLogStatement", "PMD.AvoidDuplicateLiterals",
         "PMD.ConsecutiveLiteralAppends" })
-public final class VisibilityLog {
+public final class SkillLog {
 
     private static final int FORMAT_BUFFER_SIZE = 192;
 
     private final Logger logger;
 
-    public VisibilityLog(Logger logger) {
+    public SkillLog(Logger logger) {
         this.logger = Objects.requireNonNull(logger, "logger");
     }
 

@@ -10,10 +10,10 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.planning.Execution
 import io.github.hide212131.langchain4j.claude.skills.runtime.planning.ExecutionTaskList;
 import io.github.hide212131.langchain4j.claude.skills.runtime.planning.LocalResourceTool;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.MetricsPayload;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEvent;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventMetadata;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventPublisher;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventType;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEvent;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventMetadata;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventPublisher;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventType;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
@@ -34,24 +34,24 @@ final class ExecutionPlanningFlow implements AgentFlow {
 
     @Override
     @SuppressWarnings("checkstyle:ParameterNumber")
-    public AgentFlowResult run(SkillDocument document, String goal, VisibilityLog log, boolean basicLog, String runId,
+    public AgentFlowResult run(SkillDocument document, String goal, SkillLog log, boolean basicLog, String runId,
             String skillPath, String artifactsDir) {
         return run(document, goal, null, null, log, basicLog, runId, skillPath, artifactsDir,
-                VisibilityEventPublisher.noop());
+                SkillEventPublisher.noop());
     }
 
     @Override
     @SuppressWarnings({ "PMD.AvoidCatchingGenericException", "checkstyle:ParameterNumber" })
-    public AgentFlowResult run(SkillDocument document, String goal, VisibilityLog log, boolean basicLog, String runId,
-            String skillPath, String artifactsDir, VisibilityEventPublisher events) {
+    public AgentFlowResult run(SkillDocument document, String goal, SkillLog log, boolean basicLog, String runId,
+            String skillPath, String artifactsDir, SkillEventPublisher events) {
         return run(document, goal, null, null, log, basicLog, runId, skillPath, artifactsDir, events);
     }
 
     @Override
     @SuppressWarnings({ "PMD.AvoidCatchingGenericException", "checkstyle:ParameterNumber" })
     public AgentFlowResult run(SkillDocument document, String goal, String inputFilePath, String outputDirectoryPath,
-            VisibilityLog log, boolean basicLog, String runId, String skillPath, String artifactsDir,
-            VisibilityEventPublisher events) {
+            SkillLog log, boolean basicLog, String runId, String skillPath, String artifactsDir,
+            SkillEventPublisher events) {
         Objects.requireNonNull(document, "document");
         Objects.requireNonNull(log, "log");
         Objects.requireNonNull(runId, "runId");
@@ -82,10 +82,10 @@ final class ExecutionPlanningFlow implements AgentFlow {
         }
     }
 
-    private ChatModel buildChatModel(VisibilityLog log, boolean basicLog, String runId, String skillId,
-            VisibilityEventPublisher events) {
+    private ChatModel buildChatModel(SkillLog log, boolean basicLog, String runId, String skillId,
+            SkillEventPublisher events) {
         OpenAiOfficialChatModel.Builder builder = OpenAiOfficialChatModel.builder().apiKey(configuration.openAiApiKey())
-                .listeners(List.of(new VisibilityChatModelListener(log, basicLog, runId, skillId, events,
+                .listeners(List.of(new SkillChatModelListener(log, basicLog, runId, skillId, events,
                         configuration.openAiModel())))
                 .supportedCapabilities(Set.of(Capability.RESPONSE_FORMAT_JSON_SCHEMA)).strictJsonSchema(true);
         if (configuration.openAiBaseUrl() != null) {
@@ -99,7 +99,7 @@ final class ExecutionPlanningFlow implements AgentFlow {
 
     @SuppressWarnings("checkstyle:ParameterNumber")
     private ExecutionTaskList buildTaskList(ChatModel chatModel, SkillDocument document, String goal,
-            String inputFilePath, String outputDirectoryPath, String skillPath, String planSummary, VisibilityLog log,
+            String inputFilePath, String outputDirectoryPath, String skillPath, String planSummary, SkillLog log,
             String runId, ExecutionEnvironmentTool environmentTool) {
         try {
             LocalResourceTool resourceTool = new LocalResourceTool(Path.of(skillPath));
@@ -112,7 +112,7 @@ final class ExecutionPlanningFlow implements AgentFlow {
     }
 
     private void uploadInputFileIfNeeded(String inputFilePath, ExecutionEnvironmentTool environmentTool,
-            VisibilityLog log, boolean basicLog, String runId, String skillId) {
+            SkillLog log, boolean basicLog, String runId, String skillId) {
         if (inputFilePath == null || inputFilePath.isBlank()) {
             return;
         }
@@ -120,11 +120,11 @@ final class ExecutionPlanningFlow implements AgentFlow {
         environmentTool.uploadFile(Path.of(inputFilePath));
     }
 
-    private static void publishWorkflowMetrics(VisibilityEventPublisher events, String runId, String skillId,
+    private static void publishWorkflowMetrics(SkillEventPublisher events, String runId, String skillId,
             long latencyMillis) {
-        VisibilityEventMetadata metadata = new VisibilityEventMetadata(runId, skillId, "workflow", "workflow.done",
+        SkillEventMetadata metadata = new SkillEventMetadata(runId, skillId, "workflow", "workflow.done",
                 null);
-        events.publish(new VisibilityEvent(VisibilityEventType.METRICS, metadata,
+        events.publish(new SkillEvent(SkillEventType.METRICS, metadata,
                 new MetricsPayload(null, null, latencyMillis, null)));
     }
 

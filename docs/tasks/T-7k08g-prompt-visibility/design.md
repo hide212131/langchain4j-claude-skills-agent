@@ -45,7 +45,7 @@ Agentic Workflow (Plan/Act/Reflect) --+--> OTLP Export (LangFuse/Azure など)
 
 ### Components
 
-- VisibilityLogger（新設ユーティリティ、具体名後述）: SKILL パース結果、LLM プロンプト、AgenticScope 状態、入出力パラメータ、メトリクスを構造化イベントとして生成。マスキングフィルタを備える。
+- SkillLogger（新設ユーティリティ、具体名後述）: SKILL パース結果、LLM プロンプト、AgenticScope 状態、入出力パラメータ、メトリクスを構造化イベントとして生成。マスキングフィルタを備える。
 - Parser Hook: SKILL.md 読み込み時に YAML frontmatter/Markdown 本文、JSON Schema 検証結果をイベント化。
 - Agentic Hooks: Plan/Act/Reflect の各ステップでプロンプト/応答と決定を記録。エラーハンドリング（NFR-mt1ve）用の例外情報/リトライ情報も併記。
 - Exporters: OTLP（トレース/ログ/メトリクス）のみ。共通イベントスキーマから変換し、送信先は設定で切り替える。
@@ -56,14 +56,14 @@ Agentic Workflow (Plan/Act/Reflect) --+--> OTLP Export (LangFuse/Azure など)
 - 送信は OpenTelemetry OTLP（HTTP/JSON）で行い、ビジネスコードは OpenTelemetry API のみを呼ぶ。送信先は Exporter の設定で切り替える（ADR-ij1ew の方針に従う）。
 - フェーズの優先順は「LangFuse を OTLP 送信先として検証」→「Azure Application Insights を後続フェーズで追加」。LangFuse 固有属性は実装せず、gen_ai 属性を中心に共通スキーマで送る。
 - OTLP エンドポイント/ヘッダは環境変数（例: `OTEL_EXPORTER_OTLP_ENDPOINT`/`OTEL_EXPORTER_OTLP_HEADERS`）で指定し、未設定時は送信を無効化できる構成にする。
-- マスキング済みの VisibilityEvent を Span/Log に変換し、`skillId`/`runId`/`phase` を Trace 属性に付与。ペイロード内の秘匿情報は送信前に除去する。
+- マスキング済みの SkillEvent を Span/Log に変換し、`skillId`/`runId`/`phase` を Trace 属性に付与。ペイロード内の秘匿情報は送信前に除去する。
 - ローカル検証は LangFuse 公式 docker-compose（例: `docker compose -f https://raw.githubusercontent.com/langfuse/langfuse/main/docker-compose.yml up -d`）で立ち上げる前提。Gradle タスク（`langfuseUp`/`langfuseDown`）で compose をラップして簡易起動する。クラウド環境の構築は本タスクの範囲外。
 
 ### OTLP / OpenTelemetry 方針
 
 - OpenTelemetry Java SDK（<https://github.com/open-telemetry/opentelemetry-java>）を用いてトレース/ログ/メトリクスを生成・送信する。ビジネスコードからは OpenTelemetry API のみを呼び、Exporter で宛先を切り替える（ADR-ij1ew）。
 - 生成する Span/Log には OpenTelemetry Semantic Conventions の gen_ai 属性（例: `gen_ai.system`, `gen_ai.request.model`, `gen_ai.response.id`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` など）を付与し、LLM 呼び出しの文脈を明示する。
-- AgenticScope の Plan/Act/Reflect それぞれを Span として表現し、VisibilityEvent の主要フィールドを gen_ai 属性にマッピングする。秘匿値はマスクした上で属性化する。
+- AgenticScope の Plan/Act/Reflect それぞれを Span として表現し、SkillEvent の主要フィールドを gen_ai 属性にマッピングする。秘匿値はマスクした上で属性化する。
 - OTLP エンドポイントは `OTEL_EXPORTER_OTLP_ENDPOINT` で指定し、環境ごとに LangFuse / Azure Application Insights へ切り替えられる構成を維持する。LangFuse 固有属性は付与しない。
 
 ### トレース/メトリクス取得（レポート）方針
@@ -73,7 +73,7 @@ Agentic Workflow (Plan/Act/Reflect) --+--> OTLP Export (LangFuse/Azure など)
 - 取得項目（例）: 直近 N 件または直近24hの `gen_ai.*` 属性を集計し、総/平均/中央値のトークン数、p95 レイテンシ、エラー率を標準出力に表示する。LangFuse API を直接叩き、外部送信は行わない。
 - レポートは開発者ローカル利用を想定し、本番観測（Azure Application Insights など）は後続フェーズで別途整備する。
 - プロンプト取得用 Gradle タスク（例: `langfusePrompt`）を用意し、最新または指定トレースから「プロンプト関連イベント」を抽出する。抽出条件の一例:
-  - VisibilityEvent 種別が `prompt` のイベント
+  - SkillEvent 種別が `prompt` のイベント
   - または `gen_ai.request.prompt`/`gen_ai.request.messages.*` が付与された Span/Log
   - フィルタ結果を JSON あるいはテキストで標準出力に整形し、比較やレビューに利用できる形にする
 - 資格情報指定は環境変数 `LANGFUSE_HOST`/`LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` または Gradle プロパティ（`-Phost`/`-PpublicKey`/`-PsecretKey` など）で受け付け、未設定時は安全にスキップする。
@@ -99,16 +99,16 @@ java -jar agent.jar --skill path/to/SKILL.md --visibility-level debug
 ```
 
 - パラメータ例: `--visibility-level (off|errors|basic|debug)`, `--exporter (none|otlp)`, `--masking-rules path`.
-- Agent 内部 API: `VisibilityLogger.recordPrompt`, `recordAgentState`, `recordMetrics`（仮）を通じて統一スキーマで記録。
+- Agent 内部 API: `SkillLogger.recordPrompt`, `recordAgentState`, `recordMetrics`（仮）を通じて統一スキーマで記録。
 
 Implementation Notes
 
-- 名前に "Manager"/汎用 "Util" を避け、責務ごとに命名（例: `VisibilityEvents`, `PromptTraceExporter`）。
+- 名前に "Manager"/汎用 "Util" を避け、責務ごとに命名（例: `SkillEvents`, `PromptTraceExporter`）。
 - try-with-resources でエクスポーターのリソースを管理し、リークを防止。
 
 ### Data Models and Types
 
-- `VisibilityEvent`: イベント種別（parse/prompt/agent-state/metrics/error）、タイムスタンプ、skillId、runId、phase、payload（構造化オブジェクト）。
+- `SkillEvent`: イベント種別（parse/prompt/agent-state/metrics/error）、タイムスタンプ、skillId、runId、phase、payload（構造化オブジェクト）。
 - `PromptPayload`: system/user/context プロンプト、モデル応答、トークン使用量。
 - `AgentStatePayload`: AgenticScope メモリ、決定内容、入出力パラメータ。
 - `MetricsPayload`: レイテンシ、トークン数、エラー率、再試行回数。
@@ -164,7 +164,7 @@ Decision Rationale
 
 ### Unit Tests
 
-- VisibilityLogger のイベント生成・マスキング単体テストを追加。
+- SkillLogger のイベント生成・マスキング単体テストを追加。
 - SKILL パース成功/失敗ケースのイベント内容を検証。
 - ダミー LLM 応答と最小パース/実行スタブを用い、Plan/Act/Reflect で期待イベントが出る赤テストを先に書く。
 

@@ -3,10 +3,10 @@ package io.github.hide212131.langchain4j.claude.skills.runtime;
 import java.util.Locale;
 
 /** 可視化ログの出力レベル。 */
-public enum VisibilityLevel {
+public enum SkillLevel {
     BASIC, OFF;
 
-    public static VisibilityLevel parse(String raw) {
+    public static SkillLevel parse(String raw) {
         if (raw == null || raw.isBlank()) {
             return BASIC;
         }

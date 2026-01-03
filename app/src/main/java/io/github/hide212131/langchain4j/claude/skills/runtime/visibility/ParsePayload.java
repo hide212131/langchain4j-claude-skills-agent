@@ -5,7 +5,7 @@ import java.util.Map;
 
 /** SKILL.md パース結果の可視化ペイロード。 */
 public record ParsePayload(String path, Map<String, Object> frontMatter, String bodyPreview, boolean validated)
-        implements VisibilityPayload {
+        implements SkillPayload {
 
     public ParsePayload(String path, Map<String, Object> frontMatter, String bodyPreview, boolean validated) {
         this.path = requirePath(path);

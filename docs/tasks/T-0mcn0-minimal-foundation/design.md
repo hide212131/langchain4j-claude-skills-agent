@@ -45,7 +45,7 @@ SKILL.md -> Parser -> SkillModel (POJO)
 
 - SkillParser (最小): YAML frontmatter + 本文を読み取り POJO 化。必須項目のみ。
 - DummyAgentFlow: ADR-q333d を参照し、**Workflow 型**の簡易実装で Plan/Act/Reflect を順実行（明示制御で最小化）。LLM は固定文字列を返すダミー。
-- VisibilityPlaceholder: Phase/skillId/runId を含む簡易ログ出力。将来の T-7k08g で拡張。
+- SkillPlaceholder: Phase/skillId/runId を含む簡易ログ出力。将来の T-7k08g で拡張。
 - ErrorGuard: try-catch と 1 回のリトライ枠組み、例外時の日本語ログ。
 
 #### 可視化プレースホルダのフィールド
@@ -77,7 +77,7 @@ Usage
 ```
 
 - オプション例: `--skill <path>`, `--visibility-level basic`.
-- Java API: `runSkill(Path skillPath, VisibilityLevel level)`（仮）。
+- Java API: `runSkill(Path skillPath, SkillLevel level)`（仮）。
 
 Implementation Notes
 
@@ -87,7 +87,7 @@ Implementation Notes
 ### Data Models and Types
 
 - `SkillDocument`（id/title/description/body）。
-- `VisibilityEvent`（phase/skillId/runId/step/message/inputSummary/outputSummary/error）※プレースホルダ。
+- `SkillEvent`（phase/skillId/runId/step/message/inputSummary/outputSummary/error）※プレースホルダ。
 
 ### Error Handling
 
@@ -136,7 +136,7 @@ Decision Rationale
 
 - パーサの成功/失敗ケース。
 - DummyAgentFlow が固定レスポンスを返し、Plan/Act/Reflect が順に呼ばれること。
-- VisibilityPlaceholder が phase 付きで出力すること。
+- SkillPlaceholder が phase 付きで出力すること。
 
 ### Integration Tests
 

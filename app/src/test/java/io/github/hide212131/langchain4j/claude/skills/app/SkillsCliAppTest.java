@@ -3,13 +3,13 @@ package io.github.hide212131.langchain4j.claude.skills.app;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import io.github.hide212131.langchain4j.claude.skills.runtime.VisibilityLog;
+import io.github.hide212131.langchain4j.claude.skills.runtime.SkillLog;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ErrorPayload;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.MetricsPayload;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEvent;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventCollector;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventPublisher;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventType;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEvent;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventCollector;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventPublisher;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventType;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
@@ -49,10 +49,10 @@ class SkillsCliAppTest {
             return "ok";
         };
         ByteArrayOutputStream logs = new ByteArrayOutputStream();
-        VisibilityLog log = new VisibilityLog(newLogger(logs));
+        SkillLog log = new SkillLog(newLogger(logs));
 
         String result = RunCommand.executeWithRetry(action, log, true, RUN_RETRY, "skill-x",
-                VisibilityEventPublisher.noop());
+                SkillEventPublisher.noop());
 
         assertThat(result).isEqualTo("ok");
         assertThat(logs.toString(StandardCharsets.UTF_8)).contains("再試行します");
@@ -64,10 +64,10 @@ class SkillsCliAppTest {
         Supplier<String> action = () -> {
             throw new IllegalStateException("always");
         };
-        VisibilityLog log = new VisibilityLog(newLogger(new ByteArrayOutputStream()));
+        SkillLog log = new SkillLog(newLogger(new ByteArrayOutputStream()));
 
         assertThatThrownBy(() -> RunCommand.executeWithRetry(action, log, true, RUN_RETRY, "skill-x",
-                VisibilityEventPublisher.noop())).isInstanceOf(IllegalStateException.class);
+                SkillEventPublisher.noop())).isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -80,16 +80,16 @@ class SkillsCliAppTest {
             }
             return "ok";
         };
-        try (VisibilityEventCollector collector = new VisibilityEventCollector()) {
-            VisibilityLog log = new VisibilityLog(newLogger(new ByteArrayOutputStream()));
+        try (SkillEventCollector collector = new SkillEventCollector()) {
+            SkillLog log = new SkillLog(newLogger(new ByteArrayOutputStream()));
 
             String result = RunCommand.executeWithRetry(action, log, true, RUN_RETRY, "skill-event", collector);
 
             assertThat(result).isEqualTo("ok");
-            assertThat(collector.events()).hasSize(2).extracting(VisibilityEvent::type)
-                    .containsExactly(VisibilityEventType.ERROR, VisibilityEventType.METRICS);
+            assertThat(collector.events()).hasSize(2).extracting(SkillEvent::type)
+                    .containsExactly(SkillEventType.ERROR, SkillEventType.METRICS);
 
-            VisibilityEvent errorEvent = collector.events().get(0);
+            SkillEvent errorEvent = collector.events().get(0);
             assertThat(errorEvent.metadata().runId()).isEqualTo(RUN_RETRY);
             assertThat(errorEvent.metadata().skillId()).isEqualTo("skill-event");
             assertThat(errorEvent.metadata().step()).isEqualTo("run.retry");
@@ -97,7 +97,7 @@ class SkillsCliAppTest {
             assertThat(errorEvent.payload()).isInstanceOfSatisfying(ErrorPayload.class,
                     payload -> assertThat(payload.message()).contains("first"));
 
-            VisibilityEvent metricsEvent = collector.events().get(1);
+            SkillEvent metricsEvent = collector.events().get(1);
             assertThat(metricsEvent.metadata().phase()).isEqualTo("metrics");
             assertThat(metricsEvent.payload()).isInstanceOfSatisfying(MetricsPayload.class,
                     payload -> assertThat(payload.retryCount()).isEqualTo(1));

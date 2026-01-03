@@ -9,31 +9,31 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.Metrics
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.PromptPayload;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.TokenUsage;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.TokenUsageExtractor;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEvent;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventMetadata;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventPublisher;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventType;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEvent;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventMetadata;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventPublisher;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventType;
 import java.util.Objects;
 
-/** LLM リクエスト/レスポンスを可視化へ送るリスナー。 */
+/** LLM リクエスト/レスポンスをスキルイベントへ送るリスナー。 */
 @SuppressWarnings({ "PMD.AvoidDuplicateLiterals", "PMD.GuardLogStatement" })
-final class VisibilityChatModelListener implements ChatModelListener {
+final class SkillChatModelListener implements ChatModelListener {
 
     private static final String PHASE_LLM = "llm";
     private static final String STEP_LLM_REQUEST = "llm.request";
     private static final String STEP_LLM_RESPONSE = "llm.response";
     private static final String STEP_LLM_METRICS = "llm.metrics";
 
-    private final VisibilityLog log;
+    private final SkillLog log;
     private final boolean basicLog;
     private final String runId;
     private final String skillId;
-    private final VisibilityEventPublisher events;
+    private final SkillEventPublisher events;
     private final String model;
     private long lastRequestStartNanos;
 
-    VisibilityChatModelListener(VisibilityLog log, boolean basicLog, String runId, String skillId,
-            VisibilityEventPublisher events, String model) {
+    SkillChatModelListener(SkillLog log, boolean basicLog, String runId, String skillId,
+            SkillEventPublisher events, String model) {
         this.log = Objects.requireNonNull(log, "log");
         this.basicLog = basicLog;
         this.runId = Objects.requireNonNull(runId, "runId");
@@ -66,20 +66,20 @@ final class VisibilityChatModelListener implements ChatModelListener {
     }
 
     @SuppressWarnings("checkstyle:ParameterNumber")
-    private static void publishPrompt(VisibilityEventPublisher events, String runId, String skillId, String step,
+    private static void publishPrompt(SkillEventPublisher events, String runId, String skillId, String step,
             String prompt, String response, String model, TokenUsage usage) {
-        VisibilityEventMetadata metadata = new VisibilityEventMetadata(runId, skillId, PHASE_LLM, step, null);
-        events.publish(new VisibilityEvent(VisibilityEventType.PROMPT, metadata,
+        SkillEventMetadata metadata = new SkillEventMetadata(runId, skillId, PHASE_LLM, step, null);
+        events.publish(new SkillEvent(SkillEventType.PROMPT, metadata,
                 new PromptPayload(prompt, response, model, "assistant", usage)));
     }
 
-    private static void publishLlmMetrics(VisibilityEventPublisher events, String runId, String skillId,
+    private static void publishLlmMetrics(SkillEventPublisher events, String runId, String skillId,
             TokenUsage usage, long latencyMillis) {
         Long input = usage == null ? null : usage.inputTokens();
         Long output = usage == null ? null : usage.outputTokens();
-        VisibilityEventMetadata metadata = new VisibilityEventMetadata(runId, skillId, PHASE_LLM, STEP_LLM_METRICS,
+        SkillEventMetadata metadata = new SkillEventMetadata(runId, skillId, PHASE_LLM, STEP_LLM_METRICS,
                 null);
-        events.publish(new VisibilityEvent(VisibilityEventType.METRICS, metadata,
+        events.publish(new SkillEvent(SkillEventType.METRICS, metadata,
                 new MetricsPayload(input, output, latencyMillis, null)));
     }
 

@@ -7,19 +7,19 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.SkillExecutionConf
 import io.github.hide212131.langchain4j.claude.skills.runtime.SkillExecutionParseException;
 import io.github.hide212131.langchain4j.claude.skills.runtime.SkillExecutionRequest;
 import io.github.hide212131.langchain4j.claude.skills.runtime.SkillExecutionResult;
-import io.github.hide212131.langchain4j.claude.skills.runtime.VisibilityLevel;
-import io.github.hide212131.langchain4j.claude.skills.runtime.VisibilityLog;
+import io.github.hide212131.langchain4j.claude.skills.runtime.SkillLevel;
+import io.github.hide212131.langchain4j.claude.skills.runtime.SkillLog;
 import io.github.hide212131.langchain4j.claude.skills.runtime.execution.ExecutionBackend;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ErrorPayload;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ExporterType;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.MetricsPayload;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ObservabilityConfiguration;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ObservabilityConfigurationLoader;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEvent;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventMetadata;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventPublisher;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventType;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityPublisherFactory;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEvent;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventMetadata;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventPublisher;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventType;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillPublisherFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -69,8 +69,8 @@ public final class RunCommand implements Callable<Integer> {
     private String skillId;
 
     @SuppressWarnings("PMD.ImmutableField")
-    @Option(names = "--visibility-level", paramLabel = "LEVEL", defaultValue = "basic", description = "可視化ログレベル (basic|off)", converter = VisibilityLevelConverter.class)
-    private VisibilityLevel visibilityLevel = VisibilityLevel.BASIC;
+    @Option(names = "--visibility-level", paramLabel = "LEVEL", defaultValue = "basic", description = "可視化ログレベル (basic|off)", converter = SkillLevelConverter.class)
+    private SkillLevel visibilityLevel = SkillLevel.BASIC;
 
     @Option(names = "--llm-provider", paramLabel = "PROVIDER", description = "LLM プロバイダ (mock|openai)。未指定時は環境変数/ .env を参照します。", converter = LlmProviderConverter.class)
     private LlmProvider llmProvider;
@@ -103,7 +103,7 @@ public final class RunCommand implements Callable<Integer> {
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
     public Integer call() {
         String runId = UUID.randomUUID().toString();
-        boolean basic = visibilityLevel == VisibilityLevel.BASIC;
+        boolean basic = visibilityLevel == SkillLevel.BASIC;
         Logger logger = Logger.getLogger(RunCommand.class.getName());
         FileHandler fileHandler = null;
         try {
@@ -114,11 +114,11 @@ public final class RunCommand implements Callable<Integer> {
                 spec.commandLine().getErr().flush();
                 return EXIT_CONFIGURATION_ERROR;
             }
-            VisibilityLog log = new VisibilityLog(logger);
+            SkillLog log = new SkillLog(logger);
             ObservabilityConfiguration observability = new ObservabilityConfigurationLoader().load(exporter,
                     otlpEndpoint, otlpHeaders);
-            VisibilityEventPublisher publisher = VisibilityPublisherFactory.create(observability);
-            try (VisibilityEventPublisher closeablePublisher = publisher) {
+            SkillEventPublisher publisher = SkillPublisherFactory.create(observability);
+            try (SkillEventPublisher closeablePublisher = publisher) {
                 log.info(basic, runId, "-", "parse", "parse.skill", "SKILL.md を読み込みます", "path=" + skillPath, "");
 
                 SkillExecutionAgent agent = new DefaultSkillExecutionAgent();
@@ -158,8 +158,8 @@ public final class RunCommand implements Callable<Integer> {
     }
 
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
-    static <T> T executeWithRetry(Supplier<T> action, VisibilityLog log, boolean basic, String runId, String skillId,
-            VisibilityEventPublisher publisher) {
+    static <T> T executeWithRetry(Supplier<T> action, SkillLog log, boolean basic, String runId, String skillId,
+            SkillEventPublisher publisher) {
         Objects.requireNonNull(action, "action");
         Objects.requireNonNull(log, "log");
         Objects.requireNonNull(skillId, "skillId");
@@ -184,22 +184,22 @@ public final class RunCommand implements Callable<Integer> {
         }
     }
 
-    private static void publishRetryEvent(VisibilityEventPublisher publisher, String runId, String skillId,
+    private static void publishRetryEvent(SkillEventPublisher publisher, String runId, String skillId,
             Throwable error, int retryCount) {
-        VisibilityEventMetadata errorMetadata = new VisibilityEventMetadata(runId, skillId, "error", "run.retry", null);
-        publisher.publish(new VisibilityEvent(VisibilityEventType.ERROR, errorMetadata,
+        SkillEventMetadata errorMetadata = new SkillEventMetadata(runId, skillId, "error", "run.retry", null);
+        publisher.publish(new SkillEvent(SkillEventType.ERROR, errorMetadata,
                 new ErrorPayload("エージェント実行でエラーが発生しました: " + error.getMessage(), error.getClass().getSimpleName())));
-        VisibilityEventMetadata metricsMetadata = new VisibilityEventMetadata(runId, skillId, "metrics", "run.retry",
+        SkillEventMetadata metricsMetadata = new SkillEventMetadata(runId, skillId, "metrics", "run.retry",
                 null);
-        publisher.publish(new VisibilityEvent(VisibilityEventType.METRICS, metricsMetadata,
+        publisher.publish(new SkillEvent(SkillEventType.METRICS, metricsMetadata,
                 new MetricsPayload(null, null, null, retryCount)));
     }
 
-    private static final class VisibilityLevelConverter implements ITypeConverter<VisibilityLevel> {
+    private static final class SkillLevelConverter implements ITypeConverter<SkillLevel> {
 
         @Override
-        public VisibilityLevel convert(String value) {
-            return VisibilityLevel.parse(value);
+        public SkillLevel convert(String value) {
+            return SkillLevel.parse(value);
         }
     }
 

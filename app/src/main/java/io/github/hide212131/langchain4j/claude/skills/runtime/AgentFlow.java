@@ -1,36 +1,36 @@
 package io.github.hide212131.langchain4j.claude.skills.runtime;
 
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventPublisher;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventPublisher;
 
 /** Plan/Act/Reflect を実行するフローの共通インターフェース。 */
 public interface AgentFlow {
 
-    AgentFlowResult run(SkillDocument document, String goal, VisibilityLog log, boolean basicLog, String runId,
+    AgentFlowResult run(SkillDocument document, String goal, SkillLog log, boolean basicLog, String runId,
             String skillPath, String artifactsDir);
 
-    default AgentFlowResult run(SkillDocument document, String goal, VisibilityLog log, boolean basicLog, String runId,
-            String skillPath, String artifactsDir, VisibilityEventPublisher events) {
+    default AgentFlowResult run(SkillDocument document, String goal, SkillLog log, boolean basicLog, String runId,
+            String skillPath, String artifactsDir, SkillEventPublisher events) {
         return run(document, goal, log, basicLog, runId, skillPath, artifactsDir);
     }
 
-    default AgentFlowResult run(SkillDocument document, String goal, String inputFilePath, VisibilityLog log,
+    default AgentFlowResult run(SkillDocument document, String goal, String inputFilePath, SkillLog log,
             boolean basicLog, String runId, String skillPath, String artifactsDir) {
         return run(document, goal, log, basicLog, runId, skillPath, artifactsDir);
     }
 
-    default AgentFlowResult run(SkillDocument document, String goal, String inputFilePath, VisibilityLog log,
-            boolean basicLog, String runId, String skillPath, String artifactsDir, VisibilityEventPublisher events) {
+    default AgentFlowResult run(SkillDocument document, String goal, String inputFilePath, SkillLog log,
+            boolean basicLog, String runId, String skillPath, String artifactsDir, SkillEventPublisher events) {
         return run(document, goal, inputFilePath, log, basicLog, runId, skillPath, artifactsDir);
     }
 
     default AgentFlowResult run(SkillDocument document, String goal, String inputFilePath, String outputDirectoryPath,
-            VisibilityLog log, boolean basicLog, String runId, String skillPath, String artifactsDir) {
+            SkillLog log, boolean basicLog, String runId, String skillPath, String artifactsDir) {
         return run(document, goal, inputFilePath, log, basicLog, runId, skillPath, artifactsDir);
     }
 
     default AgentFlowResult run(SkillDocument document, String goal, String inputFilePath, String outputDirectoryPath,
-            VisibilityLog log, boolean basicLog, String runId, String skillPath, String artifactsDir,
-            VisibilityEventPublisher events) {
+            SkillLog log, boolean basicLog, String runId, String skillPath, String artifactsDir,
+            SkillEventPublisher events) {
         return run(document, goal, inputFilePath, outputDirectoryPath, log, basicLog, runId, skillPath, artifactsDir);
     }
 

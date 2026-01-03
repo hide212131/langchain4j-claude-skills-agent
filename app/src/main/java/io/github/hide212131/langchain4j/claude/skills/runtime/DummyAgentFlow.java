@@ -2,10 +2,10 @@ package io.github.hide212131.langchain4j.claude.skills.runtime;
 
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.AgentStatePayload;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.PromptPayload;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEvent;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventMetadata;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventPublisher;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventType;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEvent;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventMetadata;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventPublisher;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventType;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.logging.Logger;
@@ -20,19 +20,19 @@ public final class DummyAgentFlow implements AgentFlow {
     }
 
     public AgentFlowResult run(SkillDocument document, String goal) {
-        VisibilityLog log = new VisibilityLog(Logger.getLogger(DummyAgentFlow.class.getName()));
-        return run(document, goal, log, false, UUID.randomUUID().toString(), "", null, VisibilityEventPublisher.noop());
+        SkillLog log = new SkillLog(Logger.getLogger(DummyAgentFlow.class.getName()));
+        return run(document, goal, log, false, UUID.randomUUID().toString(), "", null, SkillEventPublisher.noop());
     }
 
     @Override
-    public AgentFlowResult run(SkillDocument document, String goal, VisibilityLog log, boolean basicLog, String runId,
+    public AgentFlowResult run(SkillDocument document, String goal, SkillLog log, boolean basicLog, String runId,
             String skillPath, String artifactsDir) {
-        return run(document, goal, log, basicLog, runId, skillPath, artifactsDir, VisibilityEventPublisher.noop());
+        return run(document, goal, log, basicLog, runId, skillPath, artifactsDir, SkillEventPublisher.noop());
     }
 
     @Override
-    public AgentFlowResult run(SkillDocument document, String goal, VisibilityLog log, boolean basicLog, String runId,
-            String skillPath, String artifactsDir, VisibilityEventPublisher events) {
+    public AgentFlowResult run(SkillDocument document, String goal, SkillLog log, boolean basicLog, String runId,
+            String skillPath, String artifactsDir, SkillEventPublisher events) {
         Objects.requireNonNull(document, "document");
         Objects.requireNonNull(log, "log");
         Objects.requireNonNull(runId, "runId");
@@ -43,20 +43,20 @@ public final class DummyAgentFlow implements AgentFlow {
         String plan = "Plan: " + (safeGoal.isEmpty() ? "SKILL.md に従う" : safeGoal);
         log.info(basicLog, runId, document.id(), "plan", "plan.prompt", "Plan を生成しました",
                 "goal=" + (safeGoal.isEmpty() ? "(none)" : safeGoal), plan);
-        events.publish(new VisibilityEvent(VisibilityEventType.PROMPT,
-                new VisibilityEventMetadata(runId, document.id(), "plan", "plan.prompt", null),
+        events.publish(new SkillEvent(SkillEventType.PROMPT,
+                new SkillEventMetadata(runId, document.id(), "plan", "plan.prompt", null),
                 new PromptPayload(safeGoal.isEmpty() ? "goalなし" : safeGoal, plan, null, "assistant", null)));
 
         String act = "Act: " + document.name() + " を実行";
         log.info(basicLog, runId, document.id(), "act", "act.call", "Act を実行しました", "", act);
-        events.publish(new VisibilityEvent(VisibilityEventType.AGENT_STATE,
-                new VisibilityEventMetadata(runId, document.id(), "act", "act.call", null),
+        events.publish(new SkillEvent(SkillEventType.AGENT_STATE,
+                new SkillEventMetadata(runId, document.id(), "act", "act.call", null),
                 new AgentStatePayload(safeGoal, act, "dummy-act")));
 
         String reflect = "Reflect: 完了 (goal=" + (safeGoal.isEmpty() ? "なし" : safeGoal) + ")";
         log.info(basicLog, runId, document.id(), "reflect", "reflect.eval", "Reflect を実行しました", "", reflect);
-        events.publish(new VisibilityEvent(VisibilityEventType.PROMPT,
-                new VisibilityEventMetadata(runId, document.id(), "reflect", "reflect.eval", null),
+        events.publish(new SkillEvent(SkillEventType.PROMPT,
+                new SkillEventMetadata(runId, document.id(), "reflect", "reflect.eval", null),
                 new PromptPayload("act結果を振り返り", reflect, null, "assistant", null)));
 
         String artifact = document.body() + System.lineSeparator() + "---" + System.lineSeparator() + "Goal: "

@@ -6,20 +6,20 @@ import java.util.List;
 import java.util.Objects;
 
 /** メモリ内にイベントを蓄積するシンプルなパブリッシャ。テスト向け。 */
-public final class VisibilityEventCollector implements VisibilityEventPublisher {
+public final class SkillEventCollector implements SkillEventPublisher {
 
-    private final List<VisibilityEvent> buffer;
+    private final List<SkillEvent> buffer;
 
-    public VisibilityEventCollector() {
+    public SkillEventCollector() {
         this.buffer = new ArrayList<>();
     }
 
     @Override
-    public void publish(VisibilityEvent event) {
+    public void publish(SkillEvent event) {
         buffer.add(Objects.requireNonNull(event, "event"));
     }
 
-    public List<VisibilityEvent> events() {
+    public List<SkillEvent> events() {
         return Collections.unmodifiableList(buffer);
     }
 

@@ -6,7 +6,7 @@ import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
-import io.github.hide212131.langchain4j.claude.skills.runtime.VisibilityLog;
+import io.github.hide212131.langchain4j.claude.skills.runtime.SkillLog;
 import io.github.hide212131.langchain4j.claude.skills.runtime.planning.ExecutionEnvironmentTool;
 import io.github.hide212131.langchain4j.claude.skills.runtime.planning.ExecutionTask;
 import io.github.hide212131.langchain4j.claude.skills.runtime.planning.ExecutionTaskList;
@@ -14,10 +14,10 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.planning.Execution
 import io.github.hide212131.langchain4j.claude.skills.runtime.planning.ExecutionTaskStatus;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.AgentStatePayload;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ErrorPayload;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEvent;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventMetadata;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventPublisher;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventType;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEvent;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventMetadata;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventPublisher;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -43,7 +43,7 @@ public final class PlanExecutorAgent {
     }
 
     public PlanExecutionResult execute(ExecutionTaskList taskList, String goal, String skillId, String runId,
-            VisibilityLog log, boolean basicLog, VisibilityEventPublisher events) {
+            SkillLog log, boolean basicLog, SkillEventPublisher events) {
         Objects.requireNonNull(taskList, "taskList");
         Objects.requireNonNull(skillId, "skillId");
         Objects.requireNonNull(runId, "runId");
@@ -136,19 +136,19 @@ public final class PlanExecutorAgent {
         return trimmed.substring(0, Math.min(trimmed.length(), 200));
     }
 
-    private static void publishTaskState(VisibilityEventPublisher events, String runId, String skillId, String step,
+    private static void publishTaskState(SkillEventPublisher events, String runId, String skillId, String step,
             String goal, ExecutionTask task, String state) {
-        VisibilityEventMetadata metadata = new VisibilityEventMetadata(runId, skillId, "act", step, null);
+        SkillEventMetadata metadata = new SkillEventMetadata(runId, skillId, "act", step, null);
         String summary = "taskId=" + safe(task.id()) + " title=" + safe(task.title()) + " status=" + state;
-        events.publish(new VisibilityEvent(VisibilityEventType.AGENT_STATE, metadata,
+        events.publish(new SkillEvent(SkillEventType.AGENT_STATE, metadata,
                 new AgentStatePayload(goalValue(goal), step, summary)));
     }
 
-    private static void publishTaskError(VisibilityEventPublisher events, String runId, String skillId,
+    private static void publishTaskError(SkillEventPublisher events, String runId, String skillId,
             ExecutionTask task, Throwable error) {
-        VisibilityEventMetadata metadata = new VisibilityEventMetadata(runId, skillId, "error", "task.failed", null);
+        SkillEventMetadata metadata = new SkillEventMetadata(runId, skillId, "error", "task.failed", null);
         String message = "タスク実行でエラーが発生しました: " + safe(task.id()) + " " + error.getMessage();
-        events.publish(new VisibilityEvent(VisibilityEventType.ERROR, metadata,
+        events.publish(new SkillEvent(SkillEventType.ERROR, metadata,
                 new ErrorPayload(message, error.getClass().getSimpleName())));
     }
 

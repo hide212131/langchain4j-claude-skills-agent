@@ -21,11 +21,11 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
-/** OTLP へ可視化イベントを送信するパブリッシャ。 */
+/** OTLP へスキルイベントを送信するパブリッシャ。 */
 @SuppressWarnings({ "PMD.AvoidCatchingGenericException", "PMD.CloseResource" })
-public final class OtlpVisibilityPublisher implements VisibilityEventPublisher, AutoCloseable {
+public final class OtlpSkillPublisher implements SkillEventPublisher, AutoCloseable {
 
-    private static final String INSTRUMENTATION_NAME = "langchain4j-claude-skills-visibility";
+    private static final String INSTRUMENTATION_NAME = "langchain4j-claude-skills-skill";
     private static final String LANGFUSE_PUBLIC_OTEL_PATH = "/api/public/otel";
     private static final String OTLP_V1_TRACES_PATH = "/v1/traces";
 
@@ -36,11 +36,11 @@ public final class OtlpVisibilityPublisher implements VisibilityEventPublisher, 
     /** runId ごとの root span context（1 run 1 trace 用）。 */
     private final Map<String, SpanContext> rootSpanContexts = new ConcurrentHashMap<>();
 
-    public OtlpVisibilityPublisher(String endpoint, Map<String, String> headers) {
+    public OtlpSkillPublisher(String endpoint, Map<String, String> headers) {
         this(buildExporter(endpoint, headers));
     }
 
-    OtlpVisibilityPublisher(SpanExporter exporter) {
+    OtlpSkillPublisher(SpanExporter exporter) {
         Objects.requireNonNull(exporter, "exporter");
         tracerProvider = SdkTracerProvider.builder()
                 .setResource(Resource.create(
@@ -51,15 +51,15 @@ public final class OtlpVisibilityPublisher implements VisibilityEventPublisher, 
     }
 
     @Override
-    public void publish(VisibilityEvent event) {
+    public void publish(SkillEvent event) {
         Objects.requireNonNull(event, "event");
-        VisibilityEventMetadata metadata = event.metadata();
+        SkillEventMetadata metadata = event.metadata();
         SpanContext root = rootSpanContextFor(metadata);
         Context parent = Context.current().with(Span.wrap(root));
         Span span = tracer.spanBuilder(metadata.step()).setSpanKind(SpanKind.INTERNAL).setParent(parent)
-                .setAttribute("visibility.type", event.type().name()).setAttribute("visibility.phase", metadata.phase())
-                .setAttribute("visibility.skill_id", safe(metadata.skillId()))
-                .setAttribute("visibility.run_id", safe(metadata.runId())).startSpan();
+                .setAttribute("skill.type", event.type().name()).setAttribute("skill.phase", metadata.phase())
+                .setAttribute("skill.skill_id", safe(metadata.skillId()))
+                .setAttribute("skill.run_id", safe(metadata.runId())).startSpan();
         try {
             addPayloadAttributes(span, event);
             if (metadata.timestamp() != null) {
@@ -81,14 +81,14 @@ public final class OtlpVisibilityPublisher implements VisibilityEventPublisher, 
         tracerProvider.shutdown().join(5, TimeUnit.SECONDS);
     }
 
-    private SpanContext rootSpanContextFor(VisibilityEventMetadata metadata) {
+    private SpanContext rootSpanContextFor(SkillEventMetadata metadata) {
         String runId = safe(metadata.runId());
         return rootSpanContexts.computeIfAbsent(runId, id -> {
             Span root = tracer.spanBuilder("skills.run").setSpanKind(SpanKind.INTERNAL)
-                    .setAttribute("visibility.run_id", id).startSpan();
+                    .setAttribute("skill.run_id", id).startSpan();
 
             if (metadata.skillId() != null && !metadata.skillId().isBlank()) {
-                root.setAttribute("visibility.skill_id", metadata.skillId().trim());
+                root.setAttribute("skill.skill_id", metadata.skillId().trim());
             }
 
             // Langfuse 側で親spanの到着が後になると結合されない可能性があるため、rootを先にexportする。
@@ -97,15 +97,15 @@ public final class OtlpVisibilityPublisher implements VisibilityEventPublisher, 
         });
     }
 
-    private void addPayloadAttributes(Span span, VisibilityEvent event) {
-        VisibilityPayload payload = event.payload();
+    private void addPayloadAttributes(Span span, SkillEvent event) {
+        SkillPayload payload = event.payload();
         if (payload instanceof ParsePayload parse) {
-            span.setAttribute("visibility.parse.path", parse.path());
-            span.setAttribute("visibility.parse.body_preview", safe(parse.bodyPreview()));
-            span.setAttribute("visibility.parse.validated", parse.validated());
-            span.setAttribute("visibility.parse.front_matter", parse.frontMatter().toString());
+            span.setAttribute("skill.parse.path", parse.path());
+            span.setAttribute("skill.parse.body_preview", safe(parse.bodyPreview()));
+            span.setAttribute("skill.parse.validated", parse.validated());
+            span.setAttribute("skill.parse.front_matter", parse.frontMatter().toString());
         } else if (payload instanceof PromptPayload prompt) {
-            span.setAttribute("visibility.prompt.role", prompt.role());
+            span.setAttribute("skill.prompt.role", prompt.role());
             span.setAttribute("gen_ai.request.model", safe(prompt.model()));
             span.setAttribute("gen_ai.request.prompt", prompt.prompt());
             span.setAttribute("gen_ai.response.text", safe(prompt.response()));
@@ -116,12 +116,12 @@ public final class OtlpVisibilityPublisher implements VisibilityEventPublisher, 
                 span.setAttribute("gen_ai.usage.total_tokens", safeLong(usage.totalTokens()));
             }
         } else if (payload instanceof AgentStatePayload state) {
-            span.setAttribute("visibility.agent.goal", safe(state.goal()));
-            span.setAttribute("visibility.agent.decision", state.decision());
-            span.setAttribute("visibility.agent.state", safe(state.stateSummary()));
+            span.setAttribute("skill.agent.goal", safe(state.goal()));
+            span.setAttribute("skill.agent.decision", state.decision());
+            span.setAttribute("skill.agent.state", safe(state.stateSummary()));
         } else if (payload instanceof MetricsPayload metrics) {
-            span.setAttribute("visibility.metrics.latency_ms", safeLong(metrics.latencyMillis()));
-            span.setAttribute("visibility.metrics.retry_count", safeLong(metrics.retryCount()));
+            span.setAttribute("skill.metrics.latency_ms", safeLong(metrics.latencyMillis()));
+            span.setAttribute("skill.metrics.retry_count", safeLong(metrics.retryCount()));
             if (metrics.inputTokens() != null) {
                 span.setAttribute("gen_ai.usage.input_tokens", metrics.inputTokens());
             }
@@ -130,8 +130,8 @@ public final class OtlpVisibilityPublisher implements VisibilityEventPublisher, 
             }
         } else if (payload instanceof ErrorPayload error) {
             span.setStatus(StatusCode.ERROR, error.message());
-            span.setAttribute("visibility.error.message", error.message());
-            span.setAttribute("visibility.error.type", error.errorType());
+            span.setAttribute("skill.error.message", error.message());
+            span.setAttribute("skill.error.type", error.errorType());
         }
     }
 

@@ -2,7 +2,7 @@ package io.github.hide212131.langchain4j.claude.skills.runtime.visibility;
 
 /** LLM プロンプト/応答の可視化ペイロード。 */
 public record PromptPayload(String prompt, String response, String model, String role, TokenUsage usage)
-        implements VisibilityPayload {
+        implements SkillPayload {
 
     public PromptPayload(String prompt, String response, String model, String role, TokenUsage usage) {
         this.prompt = requirePrompt(prompt);

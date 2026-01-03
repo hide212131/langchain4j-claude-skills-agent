@@ -41,7 +41,7 @@ class AgentFlowFactoryTest {
         AgentFlow flow = new AgentFlowFactory(config, ExecutionBackend.DOCKER).create();
         SkillDocument document = new SkillDocument("mock-skill", "Mock Skill", "Desc", "Body line");
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        VisibilityLog log = new VisibilityLog(newLogger(out));
+        SkillLog log = new SkillLog(newLogger(out));
 
         AgentFlow.AgentFlowResult result = flow.run(document, "mock goal", log, true, "run-mock-1", "dummy-skill",
                 null);

@@ -4,10 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ParsePayload;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.PromptPayload;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEvent;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventCollector;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventType;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityMasking;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEvent;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventCollector;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventType;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillMasking;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -17,36 +17,36 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 @SuppressWarnings("PMD.JUnitTestContainsTooManyAsserts")
-class VisibilityIntegrationTest {
+class SkillIntegrationTest {
 
     @SuppressWarnings("PMD.UnnecessaryConstructor")
-    VisibilityIntegrationTest() {
+    SkillIntegrationTest() {
         // default
     }
 
     @Test
-    @DisplayName("SKILL.md パースから Plan/Act/Reflect までの可視化イベントを取得する")
-    void collectVisibilityEventsFromSkill() {
-        try (VisibilityEventCollector collector = new VisibilityEventCollector()) {
-            SkillDocumentParser parser = new SkillDocumentParser(collector, VisibilityMasking.defaultRules());
+    @DisplayName("SKILL.md パースから Plan/Act/Reflect までのスキルイベントを取得する")
+    void collectSkillEventsFromSkill() {
+        try (SkillEventCollector collector = new SkillEventCollector()) {
+            SkillDocumentParser parser = new SkillDocumentParser(collector, SkillMasking.defaultRules());
             Path skillMd = Path.of("src/test/resources/skills/e2e/SKILL.md").toAbsolutePath().normalize();
 
             SkillDocument document = parser.parse(skillMd, "e2e-skill", "run-e2e");
-            VisibilityLog log = new VisibilityLog(newSilentLogger());
+            SkillLog log = new SkillLog(newSilentLogger());
             DummyAgentFlow flow = new DummyAgentFlow();
 
             flow.run(document, "integration goal", log, true, "run-e2e", skillMd.toString(), null, collector);
 
-            List<VisibilityEvent> events = collector.events();
-            assertThat(events).extracting(VisibilityEvent::type).contains(VisibilityEventType.PARSE,
-                    VisibilityEventType.PROMPT, VisibilityEventType.AGENT_STATE);
+            List<SkillEvent> events = collector.events();
+            assertThat(events).extracting(SkillEvent::type).contains(SkillEventType.PARSE,
+                    SkillEventType.PROMPT, SkillEventType.AGENT_STATE);
             assertThat(events).allMatch(event -> "run-e2e".equals(event.metadata().runId()));
 
-            VisibilityEvent bodyEvent = events.stream().filter(event -> "parse.body".equals(event.metadata().step()))
+            SkillEvent bodyEvent = events.stream().filter(event -> "parse.body".equals(event.metadata().step()))
                     .findFirst().orElseThrow();
             assertThat(((ParsePayload) bodyEvent.payload()).bodyPreview()).contains("Plan/Act/Reflect");
 
-            VisibilityEvent reflectEvent = events.stream()
+            SkillEvent reflectEvent = events.stream()
                     .filter(event -> "reflect.eval".equals(event.metadata().step())).findFirst().orElseThrow();
             assertThat(((PromptPayload) reflectEvent.payload()).response()).contains("Reflect");
             assertThat(reflectEvent.metadata().skillId()).isEqualTo("e2e-skill");
@@ -54,14 +54,14 @@ class VisibilityIntegrationTest {
     }
 
     @Test
-    @DisplayName("可視化イベント収集のオーバーヘッドが実用的な範囲に収まる")
+    @DisplayName("スキルイベント収集のオーバーヘッドが実用的な範囲に収まる")
     void measureCollectorOverhead() {
-        try (VisibilityEventCollector collector = new VisibilityEventCollector()) {
-            SkillDocumentParser parser = new SkillDocumentParser(collector, VisibilityMasking.defaultRules());
+        try (SkillEventCollector collector = new SkillEventCollector()) {
+            SkillDocumentParser parser = new SkillDocumentParser(collector, SkillMasking.defaultRules());
             Path skillMd = Path.of("src/test/resources/skills/e2e/SKILL.md").toAbsolutePath().normalize();
             SkillDocument document = parser.parse(skillMd, "e2e-skill", "run-perf");
             DummyAgentFlow flow = new DummyAgentFlow();
-            VisibilityLog log = new VisibilityLog(newSilentLogger());
+            SkillLog log = new SkillLog(newSilentLogger());
 
             long startNanos = System.nanoTime();
             for (int i = 0; i < 20; i++) {
@@ -75,7 +75,7 @@ class VisibilityIntegrationTest {
     }
 
     private Logger newSilentLogger() {
-        Logger logger = Logger.getLogger("visibility-test-" + System.nanoTime());
+        Logger logger = Logger.getLogger("skill-test-" + System.nanoTime());
         logger.setUseParentHandlers(false);
         logger.setLevel(Level.OFF);
         return logger;

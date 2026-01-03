@@ -6,11 +6,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ErrorPayload;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ParsePayload;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEvent;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventMetadata;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventPublisher;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventType;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityMasking;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEvent;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventMetadata;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventPublisher;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventType;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillMasking;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -27,15 +27,15 @@ public final class SkillDocumentParser {
     private static final Pattern LEADING_NEWLINES = Pattern.compile("^(\\r?\\n)+");
 
     private final Yaml yaml = new Yaml();
-    private final VisibilityEventPublisher events;
-    private final VisibilityMasking masking;
+    private final SkillEventPublisher events;
+    private final SkillMasking masking;
 
     @SuppressWarnings("PMD.UnnecessaryConstructor")
     public SkillDocumentParser() {
-        this(VisibilityEventPublisher.noop(), VisibilityMasking.defaultRules());
+        this(SkillEventPublisher.noop(), SkillMasking.defaultRules());
     }
 
-    public SkillDocumentParser(VisibilityEventPublisher events, VisibilityMasking masking) {
+    public SkillDocumentParser(SkillEventPublisher events, SkillMasking masking) {
         this.events = Objects.requireNonNull(events, "events");
         this.masking = Objects.requireNonNull(masking, "masking");
     }
@@ -99,16 +99,16 @@ public final class SkillDocumentParser {
 
     private void publishParseEvent(String step, String runId, String skillId, String path,
             Map<String, Object> frontMatter, String preview) {
-        VisibilityEventMetadata metadata = new VisibilityEventMetadata(runId, skillId, "parse", step, null);
+        SkillEventMetadata metadata = new SkillEventMetadata(runId, skillId, "parse", step, null);
         ParsePayload payload = new ParsePayload(path, frontMatter, preview, true);
-        events.publish(new VisibilityEvent(VisibilityEventType.PARSE, metadata, payload));
+        events.publish(new SkillEvent(SkillEventType.PARSE, metadata, payload));
     }
 
     private void publishErrorEvent(String runId, String skillId, String path, RuntimeException ex) {
-        VisibilityEventMetadata metadata = new VisibilityEventMetadata(runId, skillId, "parse", "parse.error", null);
+        SkillEventMetadata metadata = new SkillEventMetadata(runId, skillId, "parse", "parse.error", null);
         ErrorPayload payload = new ErrorPayload(path + " のパースに失敗しました: " + ex.getMessage(),
                 ex.getClass().getSimpleName());
-        events.publish(new VisibilityEvent(VisibilityEventType.ERROR, metadata, payload));
+        events.publish(new SkillEvent(SkillEventType.ERROR, metadata, payload));
     }
 
     private String readContent(Path skillMdPath) {

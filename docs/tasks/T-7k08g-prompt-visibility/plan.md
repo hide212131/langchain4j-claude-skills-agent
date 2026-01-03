@@ -70,7 +70,7 @@ Phase 1/2 を完了し、Phase 3 も完了した。
 ### Tasks
 
 - [ ] **イベントスキーマ定義**
-  - [x] VisibilityEvent/PromptPayload/AgentStatePayload/MetricsPayload を定義
+  - [x] SkillEvent/PromptPayload/AgentStatePayload/MetricsPayload を定義
   - [x] マスキングルールと共通メタデータ（skillId/runId/phase）を決定
 - [ ] **SKILL パース計装**
   - [x] YAML frontmatter/Markdown 本文のパース結果をイベント化
@@ -131,7 +131,7 @@ Phase 1/2 を完了し、Phase 3 も完了した。
   - [x] OTLP のモック送信でフィールドマッピングを検証（LangFuse/Azure どちらでも同一スキーマ）
   - [x] ローカル検証向けに LangFuse docker-compose 起動を簡略化する Gradle タスク（例: `langfuseUp`/`langfuseDown`）を追加し、README に手順を記載（インフラ構築は範囲外であることを明示）
   - [x] LangFuse トレースを取得する Gradle タスク（例: `langfuseReport`）を追加し、直近トレースの gen_ai 指標（トークン数/レイテンシ/エラー率）を標準出力に集計（キー未設定時はスキップ）
-  - [x] プロンプト取得 Gradle タスク（例: `langfusePrompt`）を実装し、VisibilityEvent 種別 `prompt` や `gen_ai.request.*` を持つ Span/Log からプロンプト情報を抽出する。固定パスに依存せず、資格情報は環境変数/Gradle プロパティ両対応
+  - [x] プロンプト取得 Gradle タスク（例: `langfusePrompt`）を実装し、SkillEvent 種別 `prompt` や `gen_ai.request.*` を持つ Span/Log からプロンプト情報を抽出する。固定パスに依存せず、資格情報は環境変数/Gradle プロパティ両対応
 
 ### Phase 2 Deliverables
 
@@ -175,17 +175,17 @@ Phase 1/2 を完了し、Phase 3 も完了した。
 
 ### 観測サンプル（OTLP 相当）
 
-`OtlpVisibilityPublisher` を InMemorySpanExporter で観測した例。
+`OtlpSkillPublisher` を InMemorySpanExporter で観測した例。
 
 ```json
 [
   {
     "name": "plan.prompt",
     "attributes": {
-      "visibility.type": "PROMPT",
-      "visibility.phase": "plan",
-      "visibility.skill_id": "skill-1",
-      "visibility.run_id": "run-1",
+      "skill.type": "PROMPT",
+      "skill.phase": "plan",
+      "skill.skill_id": "skill-1",
+      "skill.run_id": "run-1",
       "gen_ai.request.prompt": "prompt-text",
       "gen_ai.response.text": "resp",
       "gen_ai.usage.input_tokens": 10,
@@ -196,12 +196,12 @@ Phase 1/2 を完了し、Phase 3 も完了した。
   {
     "name": "workflow.done",
     "attributes": {
-      "visibility.type": "METRICS",
-      "visibility.phase": "metrics",
-      "visibility.skill_id": "skill-1",
-      "visibility.run_id": "run-1",
-      "visibility.metrics.latency_ms": 42,
-      "visibility.metrics.retry_count": 1,
+      "skill.type": "METRICS",
+      "skill.phase": "metrics",
+      "skill.skill_id": "skill-1",
+      "skill.run_id": "run-1",
+      "skill.metrics.latency_ms": 42,
+      "skill.metrics.retry_count": 1,
       "gen_ai.usage.input_tokens": 5,
       "gen_ai.usage.output_tokens": 3
     }
@@ -210,12 +210,12 @@ Phase 1/2 を完了し、Phase 3 も完了した。
     "name": "run.failed",
     "status": "ERROR",
     "attributes": {
-      "visibility.type": "ERROR",
-      "visibility.phase": "error",
-      "visibility.skill_id": "skill-1",
-      "visibility.run_id": "run-1",
-      "visibility.error.message": "失敗しました",
-      "visibility.error.type": "IllegalStateException"
+      "skill.type": "ERROR",
+      "skill.phase": "error",
+      "skill.skill_id": "skill-1",
+      "skill.run_id": "run-1",
+      "skill.error.message": "失敗しました",
+      "skill.error.type": "IllegalStateException"
     }
   }
 ]

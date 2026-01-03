@@ -7,7 +7,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /** 秘匿情報を初期ルールでマスクするユーティリティ。 */
-public final class VisibilityMasking {
+public final class SkillMasking {
 
     private static final int PREVIEW_LIMIT = 240;
     private static final String MASK_TOKEN = "****";
@@ -16,12 +16,12 @@ public final class VisibilityMasking {
 
     private final Set<String> sensitiveKeys;
 
-    public VisibilityMasking(Set<String> sensitiveKeys) {
+    public SkillMasking(Set<String> sensitiveKeys) {
         this.sensitiveKeys = Objects.requireNonNull(sensitiveKeys, "sensitiveKeys");
     }
 
-    public static VisibilityMasking defaultRules() {
-        return new VisibilityMasking(DEFAULT_SENSITIVE_KEYS);
+    public static SkillMasking defaultRules() {
+        return new SkillMasking(DEFAULT_SENSITIVE_KEYS);
     }
 
     public Map<String, Object> maskFrontMatter(Map<String, Object> source) {

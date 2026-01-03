@@ -1,7 +1,7 @@
 package io.github.hide212131.langchain4j.claude.skills.runtime;
 
 import io.github.hide212131.langchain4j.claude.skills.runtime.AgentFlow.AgentFlowResult;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityMasking;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillMasking;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -25,7 +25,7 @@ public final class DefaultSkillExecutionAgent implements SkillExecutionAgent {
     public SkillExecutionResult execute(SkillExecutionRequest request) {
         Objects.requireNonNull(request, "request は必須です");
         String runId = normalizeRunId(request.runId());
-        SkillDocumentParser parser = new SkillDocumentParser(request.events(), VisibilityMasking.defaultRules());
+        SkillDocumentParser parser = new SkillDocumentParser(request.events(), SkillMasking.defaultRules());
         SkillDocument document;
         try {
             document = parser.parse(request.skillMdPath(), request.skillId(), runId);
@@ -42,7 +42,7 @@ public final class DefaultSkillExecutionAgent implements SkillExecutionAgent {
 
         AgentFlowFactory factory = new AgentFlowFactory(configuration, request.executionBackend());
         AgentFlow flow = factory.create();
-        boolean basic = request.visibilityLevel() == VisibilityLevel.BASIC;
+        boolean basic = request.visibilityLevel() == SkillLevel.BASIC;
         String goal = request.goal() == null ? "" : request.goal();
         String artifactsDir = request.artifactsDir() == null ? "" : request.artifactsDir().toString();
         String inputFilePath = request.inputFilePath() == null ? null : request.inputFilePath().toString();

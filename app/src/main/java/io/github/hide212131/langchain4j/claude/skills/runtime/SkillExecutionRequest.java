@@ -1,7 +1,7 @@
 package io.github.hide212131.langchain4j.claude.skills.runtime;
 
 import io.github.hide212131.langchain4j.claude.skills.runtime.execution.ExecutionBackend;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventPublisher;
+import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.SkillEventPublisher;
 import java.nio.file.Path;
 import java.util.Objects;
 
@@ -10,7 +10,7 @@ import java.util.Objects;
  */
 public record SkillExecutionRequest(Path skillMdPath, String goal, Path inputFilePath, Path outputDirectoryPath,
         String skillId, String runId, ExecutionBackend executionBackend, LlmProvider llmProvider, Path artifactsDir,
-        VisibilityLevel visibilityLevel, VisibilityEventPublisher events, VisibilityLog log) {
+        SkillLevel visibilityLevel, SkillEventPublisher events, SkillLog log) {
 
     public SkillExecutionRequest {
         Objects.requireNonNull(skillMdPath, "skillMdPath は必須です");
