@@ -168,23 +168,45 @@ final class ExecutionPlanExecutionFlow implements AgentFlow {
             if (artifact == null || artifact.isBlank()) {
                 continue;
             }
-            Path fileName = Path.of(artifact).getFileName();
+            String normalizedArtifact = normalizeRemoteArtifactPath(artifact);
+            Path fileName = Path.of(normalizedArtifact).getFileName();
             if (fileName == null) {
                 continue;
             }
             Path destination = outputDir.resolve(fileName.toString());
-            log.info(basicLog, runId, skillId, "act", "task.output.download", "成果物をダウンロードします", artifact,
+            log.info(basicLog, runId, skillId, "act", "task.output.download", "成果物をダウンロードします", normalizedArtifact,
                     destination.toString());
-            byte[] data = environmentTool.downloadFile(artifact);
+            byte[] data = environmentTool.downloadFile(normalizedArtifact);
             try {
                 Files.write(destination, data);
             } catch (java.io.IOException ex) {
                 throw new IllegalStateException("成果物の書き込みに失敗しました: " + destination, ex);
             }
-            publishOutputDownload(events, runId, skillId, artifact, destination.toString());
+            publishOutputDownload(events, runId, skillId, normalizedArtifact, destination.toString());
             downloaded.add(destination.toString());
         }
         return List.copyOf(downloaded);
+    }
+
+    private static String normalizeRemoteArtifactPath(String artifact) {
+        String trimmed = artifact.trim();
+        String normalized = trimmed.replace('\\', '/');
+        if (normalized.startsWith("/workspace/")) {
+            return normalized;
+        }
+        Path path = Path.of(normalized);
+        if (path.isAbsolute()) {
+            return normalized;
+        }
+        Path cleaned = path.normalize();
+        if (cleaned.startsWith("..")) {
+            return normalized;
+        }
+        String relative = cleaned.toString().replace('\\', '/');
+        if (relative.startsWith("./")) {
+            relative = relative.substring(2);
+        }
+        return "/workspace/" + relative;
     }
 
     private static void publishInputGoal(SkillEventPublisher events, String runId, String skillId, String goal) {

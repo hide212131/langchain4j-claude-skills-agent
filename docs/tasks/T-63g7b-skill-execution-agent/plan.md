@@ -59,6 +59,8 @@ set -a; source .env; set +a; ./gradlew langfuseReport -Plimit=5
 set -a; source .env; set +a; ./gradlew langfusePrompt -PtraceId="<traceId>"
 ```
 
+- 実行結果: `./build/langchain4j_presentation.md` を取得済み（`--output-dir ./build` 指定でダウンロード確認）
+
 ---
 
 ## Phase 1: 基盤インターフェースと責務分離
@@ -168,19 +170,19 @@ set -a; source .env; set +a; ./gradlew langfusePrompt -PtraceId="<traceId>"
 ### Phase 3 Tasks
 
 - [x] **スキル実行**
-  - [ ] 実行計画開始前に入力ファイルがあれば CodeExecutionEnvironment.uploadFile() を呼ぶ
+  - [x] 実行計画開始前に入力ファイルがあれば CodeExecutionEnvironment.uploadFile() を呼ぶ
   - [x] PlanExecutorAgent によるタスクリスト実行
   - [x] ExecutionEnvironmentTool によるコマンド実行
   - [x] ステータス更新（未実施/実行中/異常終了/完了）
-  - [ ] スキル実行終了後、出力がファイルなら出力フォルダにダウンロードする
-  - [ ] スキル実行終了後、出力が標準出力なら CLI の標準出力に出力する
+  - [x] スキル実行終了後、出力がファイルなら出力フォルダにダウンロードする
+  - [x] スキル実行終了後、出力が標準出力なら CLI の標準出力に出力する
 - [x] **リトライ制御**
   - [x] 異常終了時のエラー状況付与とリトライ
   - [x] リトライ失敗時のスキル異常終了/計画修正の分岐
-- [ ] **入力ファイル属性の追加**
-  - [ ] CLI の goal と同じレイヤで inputFilePath を受け取る
-- [ ] **出力フォルダ属性の追加**
-  - [ ] CLI の goal と同じレイヤで outputDirectoryPath を受け取る
+- [x] **入力ファイル属性の追加**
+  - [x] CLI の goal と同じレイヤで inputFilePath を受け取る
+- [x] **出力フォルダ属性の追加**
+  - [x] CLI の goal と同じレイヤで outputDirectoryPath を受け取る
 
 ### Phase 3 Deliverables
 

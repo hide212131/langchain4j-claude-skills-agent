@@ -5,8 +5,8 @@ import java.util.Objects;
 public record ExecutionResult(String command, int exitCode, String stdout, String stderr, long elapsedMs) {
 
     public ExecutionResult {
-        Objects.requireNonNull(command, "command");
-        Objects.requireNonNull(stdout, "stdout");
-        Objects.requireNonNull(stderr, "stderr");
+        command = command == null ? "" : command;
+        stdout = Objects.requireNonNull(stdout, "stdout");
+        stderr = Objects.requireNonNull(stderr, "stderr");
     }
 }
