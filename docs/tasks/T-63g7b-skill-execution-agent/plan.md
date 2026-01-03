@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Implementation Plan
-- Status: Phase 2 In Progress
+- Status: Phase 3 In Progress
   <!-- Draft: Planning complete, awaiting start | Phase X In Progress: Actively working | Cancelled: Work intentionally halted before completion | Complete: All phases done and verified -->
 
 ## Links
@@ -45,6 +45,19 @@
 ### Phase Status Tracking
 
 Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an item is intentionally skipped or deferred, annotate it (e.g., strike-through with a brief note) instead of leaving it unchecked.
+
+---
+
+## 全Phase共通の疎通確認事項
+
+#### PPTX-001 確認手順（実行計画作成〜LangFuse確認）
+
+```bash
+./gradlew :app:installDist
+set -a; source .env; set +a; app/build/install/skills/bin/skills run --skill=build/skills/anthropics/skills/pptx/SKILL.md --goal "PPTX-001 以下のファイルのテキスト抽出してください。" --input-file build/work/langchain4j_presentation.pptx --llm-provider=openai
+set -a; source .env; set +a; ./gradlew langfuseReport -Plimit=5
+set -a; source .env; set +a; ./gradlew langfusePrompt -PtraceId="<traceId>"
+```
 
 ---
 
@@ -135,15 +148,6 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 ./gradlew test
 ```
 
-#### PPTX-001 確認手順（実行計画作成〜LangFuse確認）
-
-```bash
-./gradlew :app:installDist
-set -a; source .env; set +a; app/build/install/skills/bin/skills run --skill=build/skills/anthropics/skills/pptx/SKILL.md --goal "PPTX-001 以下のファイルのテキスト抽出してください。build/work/langchain4j_presentation.pptx、出力は build/work/pptx-001/langchain4j_presentation.md" --llm-provider=openai
-set -a; source .env; set +a; ./gradlew langfuseReport -Plimit=5
-set -a; source .env; set +a; ./gradlew langfusePrompt -PtraceId="<traceId>"
-```
-
 ### Phase 2 Acceptance Criteria
 
 - 実行計画が要件どおりに構築され、タスクリストが生成される
@@ -163,17 +167,26 @@ set -a; source .env; set +a; ./gradlew langfusePrompt -PtraceId="<traceId>"
 
 ### Phase 3 Tasks
 
-- [ ] **スキル実行**
-  - [ ] PlanExecutorAgent によるタスクリスト実行
-  - [ ] ExecutionEnvironmentTool によるコマンド実行
-  - [ ] ステータス更新（未実施/実行中/異常終了/完了）
-- [ ] **リトライ制御**
-  - [ ] 異常終了時のエラー状況付与とリトライ
-  - [ ] リトライ失敗時のスキル異常終了/計画修正の分岐
+- [x] **スキル実行**
+  - [ ] 実行計画開始前に入力ファイルがあれば CodeExecutionEnvironment.uploadFile() を呼ぶ
+  - [x] PlanExecutorAgent によるタスクリスト実行
+  - [x] ExecutionEnvironmentTool によるコマンド実行
+  - [x] ステータス更新（未実施/実行中/異常終了/完了）
+  - [ ] スキル実行終了後、出力がファイルなら出力フォルダにダウンロードする
+  - [ ] スキル実行終了後、出力が標準出力なら CLI の標準出力に出力する
+- [x] **リトライ制御**
+  - [x] 異常終了時のエラー状況付与とリトライ
+  - [x] リトライ失敗時のスキル異常終了/計画修正の分岐
+- [ ] **入力ファイル属性の追加**
+  - [ ] CLI の goal と同じレイヤで inputFilePath を受け取る
+- [ ] **出力フォルダ属性の追加**
+  - [ ] CLI の goal と同じレイヤで outputDirectoryPath を受け取る
 
 ### Phase 3 Deliverables
 
 - スキル実行ロジック
+- inputFilePath と事前アップロードの取り扱い
+- outputDirectoryPath と出力成果物の持ち帰り方針
 - リトライ制御の実装方針
 
 ### Phase 3 Verification

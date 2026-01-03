@@ -36,13 +36,22 @@ final class ExecutionPlanningFlow implements AgentFlow {
     @SuppressWarnings("checkstyle:ParameterNumber")
     public AgentFlowResult run(SkillDocument document, String goal, VisibilityLog log, boolean basicLog, String runId,
             String skillPath, String artifactsDir) {
-        return run(document, goal, log, basicLog, runId, skillPath, artifactsDir, VisibilityEventPublisher.noop());
+        return run(document, goal, null, null, log, basicLog, runId, skillPath, artifactsDir,
+                VisibilityEventPublisher.noop());
     }
 
     @Override
     @SuppressWarnings({ "PMD.AvoidCatchingGenericException", "checkstyle:ParameterNumber" })
     public AgentFlowResult run(SkillDocument document, String goal, VisibilityLog log, boolean basicLog, String runId,
             String skillPath, String artifactsDir, VisibilityEventPublisher events) {
+        return run(document, goal, null, null, log, basicLog, runId, skillPath, artifactsDir, events);
+    }
+
+    @Override
+    @SuppressWarnings({ "PMD.AvoidCatchingGenericException", "checkstyle:ParameterNumber" })
+    public AgentFlowResult run(SkillDocument document, String goal, String inputFilePath, String outputDirectoryPath,
+            VisibilityLog log, boolean basicLog, String runId, String skillPath, String artifactsDir,
+            VisibilityEventPublisher events) {
         Objects.requireNonNull(document, "document");
         Objects.requireNonNull(log, "log");
         Objects.requireNonNull(runId, "runId");
@@ -50,10 +59,17 @@ final class ExecutionPlanningFlow implements AgentFlow {
         Objects.requireNonNull(events, "events");
 
         String safeGoal = goal == null ? "" : goal.trim();
+        String safeInputFilePath = inputFilePath == null ? "" : inputFilePath.trim();
+        String safeOutputDirectoryPath = outputDirectoryPath == null ? "" : outputDirectoryPath.trim();
         ChatModel chatModel = buildChatModel(log, basicLog, runId, document.id(), events);
         long start = System.nanoTime();
         try {
-            ExecutionTaskList taskList = buildTaskList(chatModel, document, safeGoal, skillPath, "", log, runId);
+            Path skillMdPath = Path.of(skillPath);
+            ExecutionEnvironmentTool environmentTool = new ExecutionEnvironmentTool(
+                    new CodeExecutionEnvironmentFactory(executionBackend), skillMdPath);
+            uploadInputFileIfNeeded(safeInputFilePath, environmentTool, log, basicLog, runId, document.id());
+            ExecutionTaskList taskList = buildTaskList(chatModel, document, safeGoal, safeInputFilePath,
+                    safeOutputDirectoryPath, skillPath, "", log, runId, environmentTool);
             String planLog = taskList.formatForLog();
             log.info(basicLog, runId, document.id(), "plan", "plan.tasks", "実行計画を作成しました", "", planLog);
             publishWorkflowMetrics(events, runId, document.id(), nanosToMillis(start));
@@ -81,19 +97,27 @@ final class ExecutionPlanningFlow implements AgentFlow {
         return builder.build();
     }
 
-    private ExecutionTaskList buildTaskList(ChatModel chatModel, SkillDocument document, String goal, String skillPath,
-            String planSummary, VisibilityLog log, String runId) {
+    @SuppressWarnings("checkstyle:ParameterNumber")
+    private ExecutionTaskList buildTaskList(ChatModel chatModel, SkillDocument document, String goal,
+            String inputFilePath, String outputDirectoryPath, String skillPath, String planSummary, VisibilityLog log,
+            String runId, ExecutionEnvironmentTool environmentTool) {
         try {
-            Path skillMdPath = Path.of(skillPath);
-            LocalResourceTool resourceTool = new LocalResourceTool(skillMdPath);
-            ExecutionEnvironmentTool environmentTool = new ExecutionEnvironmentTool(
-                    new CodeExecutionEnvironmentFactory(executionBackend), skillMdPath);
+            LocalResourceTool resourceTool = new LocalResourceTool(Path.of(skillPath));
             ExecutionPlanningAgent planner = new ExecutionPlanningAgent(chatModel, resourceTool, environmentTool);
-            return planner.plan(document, goal, skillPath, planSummary);
+            return planner.plan(document, goal, inputFilePath, outputDirectoryPath, skillPath, planSummary);
         } catch (RuntimeException ex) {
             log.warn(runId, document.id(), "plan", "plan.tasks", "実行計画の作成に失敗しました", "", "", ex);
             return ExecutionTaskList.empty(goal);
         }
+    }
+
+    private void uploadInputFileIfNeeded(String inputFilePath, ExecutionEnvironmentTool environmentTool,
+            VisibilityLog log, boolean basicLog, String runId, String skillId) {
+        if (inputFilePath == null || inputFilePath.isBlank()) {
+            return;
+        }
+        log.info(basicLog, runId, skillId, "plan", "plan.input.upload", "入力ファイルをアップロードします", inputFilePath, "");
+        environmentTool.uploadFile(Path.of(inputFilePath));
     }
 
     private static void publishWorkflowMetrics(VisibilityEventPublisher events, String runId, String skillId,

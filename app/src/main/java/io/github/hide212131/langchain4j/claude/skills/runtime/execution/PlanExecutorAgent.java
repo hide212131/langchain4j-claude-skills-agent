@@ -14,7 +14,6 @@ import io.github.hide212131.langchain4j.claude.skills.runtime.planning.Execution
 import io.github.hide212131.langchain4j.claude.skills.runtime.planning.ExecutionTaskStatus;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.AgentStatePayload;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.ErrorPayload;
-import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.MetricsPayload;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEvent;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventMetadata;
 import io.github.hide212131.langchain4j.claude.skills.runtime.visibility.VisibilityEventPublisher;
@@ -30,27 +29,17 @@ import java.util.Objects;
         "PMD.AvoidCatchingGenericException", "PMD.ExceptionAsFlowControl" })
 public final class PlanExecutorAgent {
 
-    private static final int DEFAULT_MAX_RETRIES = 1;
     private static final String PHASE_ACT = "act";
     private static final String OUTPUT_TYPE_FILE = "file";
     private static final String OUTPUT_TYPE_NONE = "none";
 
     private final TaskExecutionAgent agent;
-    private final ExecutionEnvironmentTool environmentTool;
-    private final int maxRetries;
 
     public PlanExecutorAgent(ChatModel chatModel, ExecutionEnvironmentTool environmentTool) {
-        this(chatModel, environmentTool, DEFAULT_MAX_RETRIES);
-    }
-
-    PlanExecutorAgent(ChatModel chatModel, ExecutionEnvironmentTool environmentTool, int maxRetries) {
         Objects.requireNonNull(chatModel, "chatModel");
-        this.environmentTool = Objects.requireNonNull(environmentTool, "environmentTool");
-        if (maxRetries < 0) {
-            throw new IllegalArgumentException("maxRetries は 0 以上にしてください");
-        }
-        this.maxRetries = maxRetries;
-        this.agent = AgenticServices.agentBuilder(TaskExecutionAgent.class).chatModel(chatModel).build();
+        Objects.requireNonNull(environmentTool, "environmentTool");
+        this.agent = AgenticServices.agentBuilder(TaskExecutionAgent.class).chatModel(chatModel).tools(environmentTool)
+                .build();
     }
 
     public PlanExecutionResult execute(ExecutionTaskList taskList, String goal, String skillId, String runId,
@@ -65,60 +54,28 @@ public final class PlanExecutorAgent {
         List<ExecutionResult> results = new ArrayList<>();
         List<String> artifacts = new ArrayList<>();
         for (ExecutionTask task : taskList.tasks()) {
-            ExecutionTaskStatus status = executeTaskWithRetry(task, goal, skillId, runId, log, basicLog, events,
-                    results, artifacts);
-            completed.add(task.withStatus(status));
-        }
-        ExecutionTaskList updated = new ExecutionTaskList(taskList.goal(), completed);
-        String report = ExecutionReportFormatter.format(results, artifacts);
-        return new PlanExecutionResult(updated, results, artifacts, report);
-    }
-
-    @SuppressWarnings("checkstyle:ParameterNumber")
-    private ExecutionTaskStatus executeTaskWithRetry(ExecutionTask task, String goal, String skillId, String runId,
-            VisibilityLog log, boolean basicLog, VisibilityEventPublisher events, List<ExecutionResult> results,
-            List<String> artifacts) {
-        Objects.requireNonNull(task, "task");
-        publishTaskState(events, runId, skillId, "task.start", goal, task, "実行中");
-        log.info(basicLog, runId, skillId, PHASE_ACT, "task.start", "タスクを実行します", taskSummary(task), "");
-
-        int attempt = 0;
-        while (true) {
-            attempt++;
+            publishTaskState(events, runId, skillId, "task.start", goal, task, "実行中");
+            log.info(basicLog, runId, skillId, PHASE_ACT, "task.start", "タスクを実行します", taskSummary(task), "");
             try {
-                ExecutionResult result = executeTaskOnce(task, goal, skillId, runId, log, basicLog);
+                ExecutionResult result = agent.execute(goalValue(goal), task.id(), task.title(), task.description(),
+                        task.input(), task.action(), describeOutput(task.output()));
+                log.info(basicLog, runId, skillId, PHASE_ACT, "task.execute", "タスクを実行しました", taskSummary(task),
+                        resultSummary(result));
                 results.add(result);
                 collectArtifact(task.output(), artifacts);
-                if (result.exitCode() != 0) {
-                    throw new IllegalStateException("コマンドの終了コードが 0 ではありません: " + result.exitCode());
-                }
                 publishTaskState(events, runId, skillId, "task.complete", goal, task, "完了");
                 log.info(basicLog, runId, skillId, PHASE_ACT, "task.complete", "タスクが完了しました", taskSummary(task),
                         resultSummary(result));
-                return ExecutionTaskStatus.COMPLETED;
+                completed.add(task.withStatus(ExecutionTaskStatus.COMPLETED));
             } catch (RuntimeException ex) {
                 publishTaskError(events, runId, skillId, task, ex);
-                if (attempt <= maxRetries) {
-                    log.warn(runId, skillId, "error", "task.retry", "タスク実行に失敗したため再試行します", taskSummary(task), "", ex);
-                    publishRetryMetrics(events, runId, skillId, attempt);
-                    continue;
-                }
                 log.error(runId, skillId, "error", "task.failed", "タスク実行が失敗しました", taskSummary(task), "", ex);
                 throw new IllegalStateException("タスク実行が失敗しました: " + taskSummary(task), ex);
             }
         }
-    }
-
-    private ExecutionResult executeTaskOnce(ExecutionTask task, String goal, String skillId, String runId,
-            VisibilityLog log, boolean basicLog) {
-        if (!task.command().isBlank()) {
-            log.info(basicLog, runId, skillId, PHASE_ACT, "task.command", "コマンドを実行します", task.command(), "");
-            return environmentTool.executeCommand(task.command());
-        }
-        String output = agent.execute(goalValue(goal), task.id(), task.title(), task.description(), task.input(),
-                task.action(), describeOutput(task.output()));
-        log.info(basicLog, runId, skillId, PHASE_ACT, "task.llm", "LLM でタスクを処理しました", taskSummary(task), output);
-        return new ExecutionResult("(llm)", 0, output, "", 0L);
+        ExecutionTaskList updated = new ExecutionTaskList(taskList.goal(), completed);
+        String report = ExecutionReportFormatter.format(results, artifacts);
+        return new PlanExecutionResult(updated, results, artifacts, report);
     }
 
     private static void collectArtifact(ExecutionTaskOutput output, List<String> artifacts) {
@@ -195,12 +152,6 @@ public final class PlanExecutorAgent {
                 new ErrorPayload(message, error.getClass().getSimpleName())));
     }
 
-    private static void publishRetryMetrics(VisibilityEventPublisher events, String runId, String skillId, int retry) {
-        VisibilityEventMetadata metadata = new VisibilityEventMetadata(runId, skillId, "metrics", "task.retry", null);
-        events.publish(new VisibilityEvent(VisibilityEventType.METRICS, metadata,
-                new MetricsPayload(null, null, null, retry)));
-    }
-
     private static String safe(String value) {
         return value == null ? "" : value;
     }
@@ -219,9 +170,10 @@ public final class PlanExecutorAgent {
     @SuppressWarnings("PMD.UseObjectForClearerAPI")
     public interface TaskExecutionAgent {
         @SystemMessage("""
-                あなたは実行計画のタスクを実行するエージェントです。
-                コマンド実行が不要なタスクについて、ゴールとタスク情報に基づいて必要な出力を生成してください。
-                出力は簡潔かつ実行に必要な内容のみを返します。
+                タスクの command 有無に従い実行手段を選択する
+                - command あり: ExecutionEnvironmentTool でコマンドを実行し、結果を返す
+                - command なし: ゴールとタスク情報に基づいて必要な出力を生成する
+                command は "(agent)"、exitCode は 0、stdout に生成結果、stderr は空文字列、elapsedMs は 0 を設定する
                 """)
         @UserMessage("""
                 ゴール: {{goal}}
@@ -233,7 +185,7 @@ public final class PlanExecutorAgent {
                 出力要件: {{taskOutput}}
                 """)
         @Agent(value = "planExecutorAgent", description = "実行計画のタスクを実行する")
-        String execute(@V("goal") String goal, @V("taskId") String taskId, @V("taskTitle") String taskTitle,
+        ExecutionResult execute(@V("goal") String goal, @V("taskId") String taskId, @V("taskTitle") String taskTitle,
                 @V("taskDescription") String taskDescription, @V("taskInput") String taskInput,
                 @V("taskAction") String taskAction, @V("taskOutput") String taskOutput);
     }

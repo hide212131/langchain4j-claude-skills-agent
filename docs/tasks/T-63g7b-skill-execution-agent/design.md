@@ -82,15 +82,19 @@ SkillExecutionAgent
 
 PlanExecutorAgent が実行計画で作成したタスクリストに従い、タスクを順次実行する。
 
-1. PlanExecutorAgent が各タスクの command 有無に従い実行手段を選択する
+1. 実行計画の開始前に入力ファイルの有無を確認し、存在する場合は CodeExecutionEnvironment.uploadFile() を明示的に呼ぶ
+2. PlanExecutorAgent が各タスクの command 有無に従い実行手段を選択する
    - command あり: ExecutionEnvironmentTool でコマンドを実行する
    - command なし: LLM への出力情報依頼を実行する
-2. PlanExecutorAgent がタスクのステータスを未実施から実行中へ更新する
-3. PlanExecutorAgent が実行結果（標準出力/生成ファイルなど）をコンテキストに追加する
-4. PlanExecutorAgent が成否に応じてステータスを完了/異常終了へ更新する
-5. PlanExecutorAgent が異常終了の場合は、原因分析のためにエラー状況を付与して一定回数リトライする
-6. PlanExecutorAgent がリトライに失敗した場合は、スキル全体を異常終了するか、実行計画自体を修正して再試行する
-7. TraceEmitter により各タスクの開始/終了/失敗を可視化イベントとして送信する
+3. PlanExecutorAgent がタスクのステータスを未実施から実行中へ更新する
+4. PlanExecutorAgent が実行結果（標準出力/生成ファイルなど）をコンテキストに追加する
+5. PlanExecutorAgent が成否に応じてステータスを完了/異常終了へ更新する
+6. PlanExecutorAgent が異常終了の場合は、原因分析のためにエラー状況を付与して一定回数リトライする
+7. PlanExecutorAgent がリトライに失敗した場合は、スキル全体を異常終了するか、実行計画自体を修正して再試行する
+8. TraceEmitter により各タスクの開始/終了/失敗を可視化イベントとして送信する
+9. スキル実行終了後、最終出力結果を以下の仕様で取り扱う
+   - 出力がファイルの場合: 出力フォルダへダウンロードする
+   - 出力が標準出力の場合: CLI の標準出力へ出力する
 
 ### Storage Layout and Paths (if applicable)
 
@@ -101,11 +105,13 @@ PlanExecutorAgent が実行計画で作成したタスクリストに従い、�
 Usage
 
 ```bash
-SkillExecutionAgent.execute(skillId, input, context)
+SkillExecutionAgent.execute(skillId, input, inputFilePath, outputDirectoryPath, context)
 ```
 
 - skillId: 実行対象のスキル識別子
 - input: ユーザー入力/指示
+- inputFilePath: CLI の goal と同じレイヤで指定する入力ファイルのパス（任意）
+- outputDirectoryPath: CLI の goal と同じレイヤで指定する出力フォルダのパス（任意、実行環境で生成されたファイル名をそのまま持ち帰るためフォルダ指定とする）
 - context: 実行制約（リソース、セキュリティ、観測）
 
 Implementation Notes
@@ -120,6 +126,7 @@ Implementation Notes
 ### Data Models and Types
 
 - SkillExecutionPlan: ステップ列と分岐条件
+- SkillExecutionRequest: goal と同じレイヤで inputFilePath と outputDirectoryPath を保持する実行入力
 - ExecutionTaskList: 実行計画作成フェーズで生成されるタスク一覧
 - ExecutionTask: 入力情報/処理内容/出力情報/ステータスのセット（計画単位）
 - ExecutionResult: 標準出力、標準エラー、終了コード、生成物

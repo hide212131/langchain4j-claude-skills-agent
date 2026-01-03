@@ -8,9 +8,9 @@ import java.util.Objects;
 /**
  * スキル実行エージェントへの入力。
  */
-public record SkillExecutionRequest(Path skillMdPath, String goal, String skillId, String runId,
-        ExecutionBackend executionBackend, LlmProvider llmProvider, Path artifactsDir, VisibilityLevel visibilityLevel,
-        VisibilityEventPublisher events, VisibilityLog log) {
+public record SkillExecutionRequest(Path skillMdPath, String goal, Path inputFilePath, Path outputDirectoryPath,
+        String skillId, String runId, ExecutionBackend executionBackend, LlmProvider llmProvider, Path artifactsDir,
+        VisibilityLevel visibilityLevel, VisibilityEventPublisher events, VisibilityLog log) {
 
     public SkillExecutionRequest {
         Objects.requireNonNull(skillMdPath, "skillMdPath は必須です");

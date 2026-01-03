@@ -38,6 +38,20 @@ public final class ExecutionEnvironmentTool {
         return new RemoteFileCheck(normalized, matches.paths().contains(normalized));
     }
 
+    public String uploadFile(Path localPath) {
+        Objects.requireNonNull(localPath, "localPath");
+        try (CodeExecutionEnvironment environment = factory.create(skillMdPath)) {
+            return environment.uploadFile(localPath);
+        }
+    }
+
+    public byte[] downloadFile(String remotePath) {
+        Objects.requireNonNull(remotePath, "remotePath");
+        try (CodeExecutionEnvironment environment = factory.create(skillMdPath)) {
+            return environment.downloadFile(remotePath);
+        }
+    }
+
     public ExecutionResult executeCommand(String command) {
         if (command == null || command.isBlank()) {
             throw new IllegalArgumentException("command は空にできません");

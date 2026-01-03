@@ -59,6 +59,12 @@ public final class RunCommand implements Callable<Integer> {
     @Option(names = "--goal", paramLabel = "TEXT", description = "エージェントに与えるゴール（任意）")
     private String goal;
 
+    @Option(names = "--input-file", paramLabel = "PATH", description = "入力ファイルのパス（任意）")
+    private Path inputFilePath;
+
+    @Option(names = "--output-dir", paramLabel = "DIR", description = "出力ファイルの保存先ディレクトリ（任意）")
+    private Path outputDirectoryPath;
+
     @Option(names = "--skill-id", paramLabel = "ID", description = "SKILL ID を明示的に指定（任意）")
     private String skillId;
 
@@ -116,9 +122,9 @@ public final class RunCommand implements Callable<Integer> {
                 log.info(basic, runId, "-", "parse", "parse.skill", "SKILL.md を読み込みます", "path=" + skillPath, "");
 
                 SkillExecutionAgent agent = new DefaultSkillExecutionAgent();
-                SkillExecutionRequest request = new SkillExecutionRequest(skillPath, goal, skillId, runId,
-                        resolveExecutionBackend(), llmProvider, resolveArtifactsDir(), visibilityLevel,
-                        closeablePublisher, log);
+                SkillExecutionRequest request = new SkillExecutionRequest(skillPath, goal, inputFilePath,
+                        outputDirectoryPath, skillId, runId, resolveExecutionBackend(), llmProvider,
+                        resolveArtifactsDir(), visibilityLevel, closeablePublisher, log);
                 Supplier<SkillExecutionResult> action = () -> agent.execute(request);
                 String fallbackSkillId = skillId == null ? "(不明)" : skillId;
                 try {

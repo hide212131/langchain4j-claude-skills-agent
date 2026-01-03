@@ -25,13 +25,16 @@ public final class ExecutionPlanningAgent {
                 .tools(resourceTool, environmentTool).build();
     }
 
-    public ExecutionTaskList plan(SkillDocument document, String goal, String skillPath, String planSummary) {
+    public ExecutionTaskList plan(SkillDocument document, String goal, String inputFilePath, String outputDirectoryPath,
+            String skillPath, String planSummary) {
         Objects.requireNonNull(document, "document");
         String safeGoal = goal == null ? "" : goal.trim();
+        String safeInputFilePath = inputFilePath == null ? "" : inputFilePath.trim();
+        String safeOutputDirectoryPath = outputDirectoryPath == null ? "" : outputDirectoryPath.trim();
         String safePlan = planSummary == null ? "" : planSummary.trim();
         String safePath = skillPath == null ? "" : skillPath.trim();
         ExecutionTaskList plan = agent.plan(document.name(), document.description(), document.body(), safeGoal,
-                safePath, safePlan);
+                safeInputFilePath, safeOutputDirectoryPath, safePath, safePlan);
         if (plan == null) {
             return ExecutionTaskList.empty(safeGoal);
         }
@@ -49,8 +52,6 @@ public final class ExecutionPlanningAgent {
                 - スキルディレクトリ上の追加ファイルの情報を読むには ExecutionEnvironmentTool を使います。
 
                 要求事項:
-                - 実行開始時は、入力ファイルを必ず実行環境へアップロードする手順を含めてください。
-                - 実行終了時は、出力がファイルの場合に必ずダウンロードする手順を含めてください。
                 - タスクは実行環境で実行可能なコマンドに分解してください。
                 - 各タスクは具体的かつ実行可能である必要があります。
                 - 各タスクには title, description, command, output を含めてください。
@@ -58,6 +59,8 @@ public final class ExecutionPlanningAgent {
                 """)
         @UserMessage("""
                 ゴール: {{goal}}
+                入力ファイル: {{inputFilePath}}
+                出力フォルダ: {{outputDirectoryPath}}
 
                 スキル名: {{skillName}}
                 説明: {{skillDescription}}
@@ -71,7 +74,8 @@ public final class ExecutionPlanningAgent {
                 """)
         @Agent(value = "executionPlanningAgent", description = "実行計画を作成する")
         ExecutionTaskList plan(@V("skillName") String skillName, @V("skillDescription") String skillDescription,
-                @V("skillBody") String skillBody, @V("goal") String goal, @V("skillPath") String skillPath,
+                @V("skillBody") String skillBody, @V("goal") String goal, @V("inputFilePath") String inputFilePath,
+                @V("outputDirectoryPath") String outputDirectoryPath, @V("skillPath") String skillPath,
                 @V("planSummary") String planSummary);
     }
 }
