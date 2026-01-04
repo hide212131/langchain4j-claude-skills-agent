@@ -227,3 +227,16 @@ pptxスキルは、ユーザー要望を大きく3系統に分けている。
 - “全文を読め” 指示のある `html2pptx.md` と `ooxml.md` を、必要なときに確実に読む。
 - 既存スクリプト（`thumbnail.py`、`unpack.py`、`validate.py`、`pack.py`）を見つけて、順番どおりに実行できる。
 - validate失敗時に握りつぶさず、止めて直してから進む。
+
+---
+
+## 7. E2E観点整理（エンジン横断）
+
+本テスト計画を E2E 実行で検証する際は、ケースごとの成果物に加えて、実行エンジン共通の観点を合わせて確認する。
+
+- **実行計画**: ExecutionTaskList が「タスクの分割」「command/出力種別の明示」「taskId 付与」を満たす
+- **可視化イベント**: `plan.input.goal` / `plan.input.upload` / `task.start` / `task.complete` / `task.failed`
+  / `task.output.*` / `workflow.done` がケースに応じて欠落なく発行される
+- **エラー処理**: PPTX-007 のような失敗ケースで `ERROR` イベントと `FAILED` ステータスが記録され、後続を停止する
+- **成果物回収**: `outputDirectoryPath` 指定時に成果物をダウンロードし、パスがログとイベントで追跡できる
+- **分岐保証**: PPTX-001/002/004/006 で `html2pptx.md` / `ooxml.md` の読み取り要否が期待どおりになる

@@ -3,7 +3,7 @@
 ## Metadata
 
 - Type: Implementation Plan
-- Status: Phase 3 In Progress
+- Status: Phase 4 In Progress
   <!-- Draft: Planning complete, awaiting start | Phase X In Progress: Actively working | Cancelled: Work intentionally halted before completion | Complete: All phases done and verified -->
 
 ## Links
@@ -218,15 +218,15 @@ set -a; source .env; set +a; ./gradlew langfusePrompt -PtraceId="<traceId>"
 
 ### Phase 4 Tasks
 
-- [ ] Test utilities
-  - [ ] 可視化イベント検証のヘルパー
-  - [ ] 代表的なスキル入力のフィクスチャ
-- [ ] Scenarios
-  - [ ] Happy path
-  - [ ] Error handling
-  - [ ] Edge cases
+- [x] Test utilities
+  - [x] 可視化イベント検証のヘルパー
+  - [x] 代表的なスキル入力のフィクスチャ
+- [x] Scenarios
+  - [x] Happy path
+  - [x] Error handling
+  - [x] Edge cases
 - [ ] pptxスキルテスト計画のケース対応
-  - [ ] PPTX-001 テキスト抽出のみ（markitdown経由）
+  - [x] PPTX-001 テキスト抽出のみ（markitdown経由）
   - [ ] PPTX-002 ノート・コメント要求（XML unpackへ分岐）
   - [ ] PPTX-003 スクリプトのパス揺れ耐性（findで解決）
   - [ ] PPTX-004 新規作成（テンプレなし、HTML→PPTX）
@@ -236,10 +236,10 @@ set -a; source .env; set +a; ./gradlew langfusePrompt -PtraceId="<traceId>"
   - [ ] PPTX-008 テーマ/フォント/色の抽出（theme1.xmlの参照）
   - [ ] PPTX-009 テンプレ利用の新規作成（抽出＋棚卸し）
   - [ ] PPTX-010 テンプレ利用の新規作成（複製→差し替え→検証）
-- [ ] pptxスキルテスト計画（`docs/tasks/T-63g7b-skill-execution-agent/pptx-skill-test-plan.md`）を基準にE2E観点を整理
-- [ ] Concurrency & cleanup
-  - [ ] Boundary conditions
-  - [ ] Resource cleanup
+- [x] pptxスキルテスト計画（`docs/tasks/T-63g7b-skill-execution-agent/pptx-skill-test-plan.md`）を基準にE2E観点を整理
+- [x] Concurrency & cleanup
+  - [x] Boundary conditions
+  - [x] Resource cleanup
 
 ### Phase 4 Deliverables
 
