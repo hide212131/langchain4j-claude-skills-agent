@@ -50,16 +50,23 @@ Mark checkboxes (`[x]`) immediately after completing each task or subtask. If an
 
 ## 全Phase共通の疎通確認事項
 
-#### PPTX-001 確認手順（実行計画作成〜LangFuse確認）
+#### PPTX-XXX 確認手順（実行計画作成〜スキル実行〜LangFuse確認）
 
 ```bash
 ./gradlew :app:installDist
-set -a; source .env; set +a; app/build/install/skills/bin/skills run --skill=build/skills/anthropics/skills/pptx/SKILL.md --goal "PPTX-001 以下のファイルのテキスト抽出してください。" --input-file app/src/test/resources/skills/pptx/langchain4j_presentation.pptx --llm-provider=openai
+set -a; source .env; set +a; app/build/install/skills/bin/skills run \
+  --skill=build/skills/anthropics/skills/pptx/SKILL.md \
+  --goal "<PPTX-XXX のゴール文>" \
+  --input-file "<対象.pptxのパス (必要なケースのみ)>" \
+  --output-dir "<成果物出力先 (必要なケースのみ)>" \
+  --llm-provider=openai
 set -a; source .env; set +a; ./gradlew langfuseReport -Plimit=5
 set -a; source .env; set +a; ./gradlew langfusePrompt -PtraceId="<traceId>"
 ```
 
-- 実行結果: `./build/langchain4j_presentation.md` を取得済み（`--output-dir ./build` 指定でダウンロード確認）
+- 実行結果: `--output-dir` 指定時は成果物のダウンロードを確認する
+- 追加パラメータが必要な場合は該当の PPTX-XXX に合わせて追記する
+- pptx入力が必要な場合のサンプル: `app/src/test/resources/skills/pptx/langchain4j_presentation.pptx`
 
 ---
 
@@ -228,7 +235,7 @@ set -a; source .env; set +a; ./gradlew langfusePrompt -PtraceId="<traceId>"
 - [ ] pptxスキルテスト計画のケース対応
   - [x] PPTX-001 テキスト抽出のみ（markitdown経由）
   - [x] PPTX-002 ノート・コメント要求（XML unpackへ分岐）
-  - [ ] PPTX-003 スクリプトのパス揺れ耐性（findで解決）
+  - [x] PPTX-003 スクリプトのパス揺れ耐性（findで解決）
   - [ ] PPTX-004 新規作成（テンプレなし、HTML→PPTX）
   - [ ] PPTX-005 新規作成＋サムネイル検証（thumbnail.py）
   - [ ] PPTX-006 既存pptx編集（最小変更）＋validate＋pack
