@@ -40,10 +40,10 @@ public class DockerCodeExecutionEnvironment implements CodeExecutionEnvironment 
         if (command == null || command.isBlank()) {
             throw new IllegalArgumentException("command は空にできません");
         }
-        String resolvedCommand = "export NODE_PATH=\"$(npm root -g)\" " + "&& export PATH=\"$(npm bin -g):$PATH\" "
-                + "&& " + command;
-        List<String> dockerCommand = List.of(DOCKER_COMMAND, "exec", "-w", workspace.containerPath(), containerId, "sh",
-                "-c", resolvedCommand);
+        String resolvedCommand = "set -e; " + "export NODE_PATH=\"$(npm root -g)\"; "
+                + "export PATH=\"$(npm bin -g):$PATH\"; " + command;
+        List<String> dockerCommand = List.of(DOCKER_COMMAND, "exec", "-w", "/workspace", containerId, "sh", "-c",
+                resolvedCommand);
         return DockerProcessRunner.run(dockerCommand, command);
     }
 

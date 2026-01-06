@@ -32,8 +32,8 @@ import java.util.Objects;
 public final class PlanExecutorAgent {
 
     private static final String PHASE_ACT = "act";
-    private static final String OUTPUT_TYPE_FILE = "file";
-    private static final String OUTPUT_TYPE_NONE = "none";
+    private static final ExecutionTaskOutput.OutputType OUTPUT_TYPE_FILE = ExecutionTaskOutput.OutputType.FILE;
+    private static final ExecutionTaskOutput.OutputType OUTPUT_TYPE_NONE = ExecutionTaskOutput.OutputType.NONE;
 
     private static final int MAX_RETRIES = 5;
 
@@ -164,7 +164,7 @@ public final class PlanExecutorAgent {
         }
         String path = output.path().isBlank() ? "" : " path=" + output.path();
         String desc = output.description().isBlank() ? "" : " (" + output.description() + ")";
-        return output.type() + path + desc;
+        return output.type().name() + path + desc;
     }
 
     private static String taskSummary(ExecutionTask task) {
@@ -235,8 +235,9 @@ public final class PlanExecutorAgent {
         @SystemMessage("""
                 タスクの command 有無に従い実行手段を選択する
                 - command あり: コマンドを実行し、結果を返す
+                    - 過去の command 実行結果が複数存在している場合、command 実行が失敗していることを示す。exitCode や stderr、失敗した command の内容を確認し、問題を修正した command を実行する。
                 - command なし: ゴールとタスク情報に基づいて必要な出力を stdout に生成する。生成したら exit code 0 を返す。
-                過去の command 実行結果が複数存在している場合、command 実行が失敗していることを示す。実行結果が でない場合 exitCode や stderr、失敗した command の内容を確認し、問題を修正した command を実行する。
+
                 """)
         @UserMessage("""
                 ゴール: {{goal}}

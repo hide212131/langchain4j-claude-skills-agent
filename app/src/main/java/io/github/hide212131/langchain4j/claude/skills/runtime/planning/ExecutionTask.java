@@ -24,7 +24,7 @@ public record ExecutionTask(@Description("タスク識別子。未指定の場�
         this.input = input == null ? "" : input;
         this.action = action == null ? "" : action;
         this.command = command == null ? "" : command;
-        this.output = output == null ? new ExecutionTaskOutput("none", "", "") : output;
+        this.output = output == null ? new ExecutionTaskOutput(ExecutionTaskOutput.OutputType.NONE, "", "") : output;
     }
 
     private static String normalize(String value) {
@@ -62,8 +62,8 @@ public record ExecutionTask(@Description("タスク識別子。未指定の場�
         if (!command.isBlank()) {
             sb.append(" / command: ").append(command);
         }
-        if (!"none".equals(output.type())) {
-            sb.append(" / 出力: ").append(output.type());
+        if (output.type() != ExecutionTaskOutput.OutputType.NONE) {
+            sb.append(" / 出力: ").append(output.type().name());
             if (!output.path().isBlank()) {
                 sb.append(" (").append(output.path()).append(')');
             }

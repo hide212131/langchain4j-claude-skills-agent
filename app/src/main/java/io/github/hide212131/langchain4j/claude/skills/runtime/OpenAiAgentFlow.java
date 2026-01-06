@@ -52,7 +52,6 @@ final class OpenAiAgentFlow implements AgentFlow {
     private static final String KEY_EXECUTION_PLAN = "executionPlan";
     private static final String KEY_REFLECT = "reflect";
     private static final String KEY_GOAL = "goal";
-    private static final String KEY_SKILL_PATH = "skillPath";
     private static final String KEY_SKILL_CONTEXT = "skillContext";
     private static final String KEY_ARTIFACTS_DIR = "artifactsDir";
 
@@ -104,7 +103,6 @@ final class OpenAiAgentFlow implements AgentFlow {
         inputs.put("skillDescription", document.description());
         inputs.put("skillBody", document.body());
         inputs.put(KEY_GOAL, safeGoal);
-        inputs.put(KEY_SKILL_PATH, skillPath);
         inputs.put(KEY_SKILL_CONTEXT, "");
         inputs.put(KEY_ARTIFACTS_DIR, artifactsDir == null ? "" : artifactsDir);
 
@@ -155,7 +153,7 @@ final class OpenAiAgentFlow implements AgentFlow {
                     new CodeExecutionEnvironmentFactory(executionBackend), skillMdPath, log, basicLog, runId,
                     document.id(), events);
             ExecutionPlanningAgent planner = new ExecutionPlanningAgent(chatModel, resourceTool, environmentTool);
-            return planner.plan(document, goal, "", "", skillPath, planSummary);
+            return planner.plan(document, goal, "", "", planSummary);
         } catch (RuntimeException ex) {
             log.warn(runId, document.id(), "plan", "plan.tasks", "実行計画の作成に失敗しました", "", "", ex);
             return ExecutionTaskList.empty(goal);
@@ -332,15 +330,13 @@ final class OpenAiAgentFlow implements AgentFlow {
                 {{skillBody}}
 
                 ゴール: {{goal}}
-                SKILL.md パス: {{skillPath}}
                 参照資料:
                 {{skillContext}}
                 手順の概要を簡潔に日本語で返してください。
                 """)
         @Agent(value = "planner", description = "Plan ステップを生成する")
         String plan(@V("skillName") String skillName, @V("skillDescription") String skillDescription,
-                @V("skillBody") String skillBody, @V("goal") String goal, @V("skillPath") String skillPath,
-                @V("skillContext") String skillContext);
+                @V("skillBody") String skillBody, @V("goal") String goal, @V("skillContext") String skillContext);
     }
 
     public interface ExecutionPlanAgent {
@@ -375,7 +371,7 @@ final class OpenAiAgentFlow implements AgentFlow {
                 """)
         @Agent(value = "executionPlanner", description = "実行計画を作成する")
         String planExecution(@V("plan") String plan, @V("skillBody") String skillBody, @V("goal") String goal,
-                @V("skillPath") String skillPath, @V("skillContext") String skillContext);
+                @V("skillContext") String skillContext);
     }
 
     public interface ReflectAgent {

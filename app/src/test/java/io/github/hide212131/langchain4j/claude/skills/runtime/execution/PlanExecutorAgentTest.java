@@ -45,7 +45,8 @@ class PlanExecutorAgentTest {
                 new CodeExecutionEnvironmentFactory(ExecutionBackend.DOCKER), Path.of("skill.md"));
                 SkillEventCollector collector = new SkillEventCollector()) {
             PlanExecutorAgent agent = new PlanExecutorAgent(chatModel, tool);
-            ExecutionTaskOutput output = new ExecutionTaskOutput("file", "/workspace/out.txt", "成果物");
+            ExecutionTaskOutput output = new ExecutionTaskOutput(ExecutionTaskOutput.OutputType.FILE,
+                    "/workspace/out.txt", "成果物");
             ExecutionTask task = ExecutionTaskFixtures.commandTask("task-1", "サンプル", "echo ok", output);
             ExecutionTaskList plan = ExecutionTaskFixtures.singleCommandPlan(GOAL, task);
 
@@ -74,7 +75,7 @@ class PlanExecutorAgentTest {
                 new CodeExecutionEnvironmentFactory(ExecutionBackend.DOCKER), Path.of("skill.md"));
                 SkillEventCollector collector = new SkillEventCollector()) {
             PlanExecutorAgent agent = new PlanExecutorAgent(chatModel, tool);
-            ExecutionTaskOutput output = new ExecutionTaskOutput("stdout", "", "");
+            ExecutionTaskOutput output = new ExecutionTaskOutput(ExecutionTaskOutput.OutputType.STDOUT, "", "");
             ExecutionTask task = ExecutionTaskFixtures.commandTask("task-1", "失敗ケース", "exit 1", output);
             ExecutionTaskList plan = ExecutionTaskFixtures.singleCommandPlan(GOAL, task);
 
@@ -98,7 +99,7 @@ class PlanExecutorAgentTest {
                 new CodeExecutionEnvironmentFactory(ExecutionBackend.DOCKER), Path.of("skill.md"));
                 SkillEventCollector collector = new SkillEventCollector()) {
             PlanExecutorAgent agent = new PlanExecutorAgent(chatModel, tool);
-            ExecutionTaskOutput output = new ExecutionTaskOutput("file", "", "");
+            ExecutionTaskOutput output = new ExecutionTaskOutput(ExecutionTaskOutput.OutputType.FILE, "", "");
             ExecutionTask task = ExecutionTaskFixtures.commandTask("task-1", "空パス", "echo ok", output);
             ExecutionTaskList plan = ExecutionTaskFixtures.singleCommandPlan(GOAL, task);
 

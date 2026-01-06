@@ -1,4 +1,4 @@
-    package io.github.hide212131.langchain4j.claude.skills.runtime.planning;
+package io.github.hide212131.langchain4j.claude.skills.runtime.planning;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

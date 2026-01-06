@@ -108,7 +108,7 @@ final class ExecutionPlanningFlow implements AgentFlow {
         try {
             LocalResourceTool resourceTool = new LocalResourceTool(Path.of(skillPath));
             ExecutionPlanningAgent planner = new ExecutionPlanningAgent(chatModel, resourceTool, environmentTool);
-            return planner.plan(document, goal, inputFilePath, outputDirectoryPath, skillPath, planSummary);
+            return planner.plan(document, goal, inputFilePath, outputDirectoryPath, planSummary);
         } catch (RuntimeException ex) {
             log.warn(runId, document.id(), "plan", "plan.tasks", "実行計画の作成に失敗しました", "", "", ex);
             return ExecutionTaskList.empty(goal);

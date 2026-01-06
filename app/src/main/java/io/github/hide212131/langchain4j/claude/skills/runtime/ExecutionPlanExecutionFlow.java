@@ -133,7 +133,7 @@ final class ExecutionPlanExecutionFlow implements AgentFlow {
             Path skillMdPath = Path.of(skillPath);
             LocalResourceTool resourceTool = new LocalResourceTool(skillMdPath);
             ExecutionPlanningAgent planner = new ExecutionPlanningAgent(chatModel, resourceTool, environmentTool);
-            return planner.plan(document, goal, inputFilePath, outputDirectoryPath, skillPath, planSummary);
+            return planner.plan(document, goal, inputFilePath, outputDirectoryPath, planSummary);
         } catch (RuntimeException ex) {
             log.warn(runId, document.id(), "plan", "plan.tasks", "実行計画の作成に失敗しました", "", "", ex);
             return ExecutionTaskList.empty(goal);
@@ -240,7 +240,7 @@ final class ExecutionPlanExecutionFlow implements AgentFlow {
             if (output == null || !isStdoutOutput(output.type())) {
                 continue;
             }
-            String outputType = "text".equals(output.type()) ? "llm" : "stdout";
+            String outputType = output.type() == ExecutionTaskOutput.OutputType.TEXT ? "llm" : "stdout";
             SkillEventMetadata metadata = new SkillEventMetadata(runId, skillId, "act", "task.output." + outputType,
                     null);
             events.publish(new SkillEvent(SkillEventType.OUTPUT, metadata,
@@ -265,8 +265,8 @@ final class ExecutionPlanExecutionFlow implements AgentFlow {
         return finalOutput;
     }
 
-    private static boolean isStdoutOutput(String type) {
-        return "stdout".equals(type) || "text".equals(type);
+    private static boolean isStdoutOutput(ExecutionTaskOutput.OutputType type) {
+        return type == ExecutionTaskOutput.OutputType.STDOUT || type == ExecutionTaskOutput.OutputType.TEXT;
     }
 
     private static void publishWorkflowMetrics(SkillEventPublisher events, String runId, String skillId,

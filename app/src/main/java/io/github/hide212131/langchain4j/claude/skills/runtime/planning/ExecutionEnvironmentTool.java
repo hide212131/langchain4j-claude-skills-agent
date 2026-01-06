@@ -127,10 +127,16 @@ public final class ExecutionEnvironmentTool implements AutoCloseable {
             throw new IllegalArgumentException("remotePath は空にできません");
         }
         String normalized = remotePath.replace('\\', '/').trim();
-        if (!normalized.startsWith(WORKSPACE_PREFIX)) {
+        if (normalized.startsWith(WORKSPACE_PREFIX)) {
+            return normalized;
+        }
+        if (normalized.startsWith("./")) {
+            return WORKSPACE_PREFIX + normalized.substring(2);
+        }
+        if (normalized.startsWith("/")) {
             throw new IllegalArgumentException("remotePath は /workspace/ 配下に限定してください: " + remotePath);
         }
-        return normalized;
+        return WORKSPACE_PREFIX + normalized;
     }
 
     public record RemoteFileList(String pattern, List<String> paths) {

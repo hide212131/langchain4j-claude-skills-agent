@@ -227,7 +227,7 @@ set -a; source .env; set +a; ./gradlew langfusePrompt -PtraceId="<traceId>"
   - [x] Edge cases
 - [ ] pptxスキルテスト計画のケース対応
   - [x] PPTX-001 テキスト抽出のみ（markitdown経由）
-  - [ ] PPTX-002 ノート・コメント要求（XML unpackへ分岐）
+  - [x] PPTX-002 ノート・コメント要求（XML unpackへ分岐）
   - [ ] PPTX-003 スクリプトのパス揺れ耐性（findで解決）
   - [ ] PPTX-004 新規作成（テンプレなし、HTML→PPTX）
   - [ ] PPTX-005 新規作成＋サムネイル検証（thumbnail.py）

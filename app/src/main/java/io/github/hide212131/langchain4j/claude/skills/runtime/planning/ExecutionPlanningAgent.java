@@ -26,15 +26,14 @@ public final class ExecutionPlanningAgent {
     }
 
     public ExecutionTaskList plan(SkillDocument document, String goal, String inputFilePath, String outputDirectoryPath,
-            String skillPath, String planSummary) {
+            String planSummary) {
         Objects.requireNonNull(document, "document");
         String safeGoal = goal == null ? "" : goal.trim();
         String safeInputFilePath = inputFilePath == null ? "" : inputFilePath.trim();
         String safeOutputDirectoryPath = outputDirectoryPath == null ? "" : outputDirectoryPath.trim();
         String safePlan = planSummary == null ? "" : planSummary.trim();
-        String safePath = skillPath == null ? "" : skillPath.trim();
         ExecutionTaskList plan = agent.plan(document.name(), document.description(), document.body(), safeGoal,
-                safeInputFilePath, safeOutputDirectoryPath, safePath, safePlan);
+                safeInputFilePath, safeOutputDirectoryPath, safePlan);
         if (plan == null) {
             return ExecutionTaskList.empty(safeGoal);
         }
@@ -67,7 +66,6 @@ public final class ExecutionPlanningAgent {
                 スキル本文:
                 {{skillBody}}
 
-                SKILL.md パス: {{skillPath}}
                 事前プラン:
                 {{planSummary}}
 
@@ -75,7 +73,6 @@ public final class ExecutionPlanningAgent {
         @Agent(value = "executionPlanningAgent", description = "実行計画を作成する")
         ExecutionTaskList plan(@V("skillName") String skillName, @V("skillDescription") String skillDescription,
                 @V("skillBody") String skillBody, @V("goal") String goal, @V("inputFilePath") String inputFilePath,
-                @V("outputDirectoryPath") String outputDirectoryPath, @V("skillPath") String skillPath,
-                @V("planSummary") String planSummary);
+                @V("outputDirectoryPath") String outputDirectoryPath, @V("planSummary") String planSummary);
     }
 }
