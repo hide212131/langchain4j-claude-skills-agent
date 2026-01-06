@@ -88,7 +88,7 @@ final class ExecutionPlanExecutionFlow implements AgentFlow {
                 return new AgentFlowResult(planLog, note, note, "");
             }
 
-            PlanExecutorAgent executor = new PlanExecutorAgent(chatModel, environmentTool);
+            PlanExecutorAgent executor = new PlanExecutorAgent(chatModel, environmentTool, document.body());
             PlanExecutionResult execution = executor.execute(taskList, safeGoal, document.id(), runId, log, basicLog,
                     events);
             String actLog = execution.reportLog();

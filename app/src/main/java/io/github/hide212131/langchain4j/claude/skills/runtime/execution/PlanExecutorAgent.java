@@ -4,7 +4,6 @@ import dev.langchain4j.agentic.Agent;
 import dev.langchain4j.agentic.AgenticServices;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
-import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
 import io.github.hide212131.langchain4j.claude.skills.runtime.SkillLog;
@@ -36,13 +35,25 @@ public final class PlanExecutorAgent {
     private static final ExecutionTaskOutput.OutputType OUTPUT_TYPE_NONE = ExecutionTaskOutput.OutputType.NONE;
 
     private static final int MAX_RETRIES = 5;
+    private static final String SYSTEM_MESSAGE_TEMPLATE = """
+            タスクの command 有無に従い実行手段を選択する
+            - command あり: コマンドを実行し、結果を返す
+                - 過去の command 実行結果が複数存在している場合、command 実行が失敗していることを示す。
+                  exitCode や stderr、失敗した command の内容を確認し、問題を修正した command を実行する。
+            - command なし: ゴールとタスク情報に基づいて必要な出力を stdout に生成する。生成したら exit code 0 を返す。
+
+            スキル本文:
+            %s
+            """;
 
     private final TaskExecutionAgent agent;
 
-    public PlanExecutorAgent(ChatModel chatModel, ExecutionEnvironmentTool environmentTool) {
+    public PlanExecutorAgent(ChatModel chatModel, ExecutionEnvironmentTool environmentTool, String skillBody) {
         Objects.requireNonNull(chatModel, "chatModel");
         Objects.requireNonNull(environmentTool, "environmentTool");
+        Objects.requireNonNull(skillBody, "skillBody");
         this.agent = AgenticServices.agentBuilder(TaskExecutionAgent.class).chatModel(chatModel).tools(environmentTool)
+                .systemMessageProvider(ignored -> SYSTEM_MESSAGE_TEMPLATE.formatted(skillBody))
                 .chatMemory(MessageWindowChatMemory.withMaxMessages(10)).build();
     }
 
@@ -232,13 +243,6 @@ public final class PlanExecutorAgent {
     }
 
     public interface TaskExecutionAgent {
-        @SystemMessage("""
-                タスクの command 有無に従い実行手段を選択する
-                - command あり: コマンドを実行し、結果を返す
-                    - 過去の command 実行結果が複数存在している場合、command 実行が失敗していることを示す。exitCode や stderr、失敗した command の内容を確認し、問題を修正した command を実行する。
-                - command なし: ゴールとタスク情報に基づいて必要な出力を stdout に生成する。生成したら exit code 0 を返す。
-
-                """)
         @UserMessage("""
                 ゴール: {{goal}}
                 タスク: {{task}}
